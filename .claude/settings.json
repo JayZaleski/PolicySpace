@@ -1,0 +1,74 @@
+{
+  "model": "opus",
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(.venv/Scripts/python tools/export_status.py *)",
+      "Bash(.venv/Scripts/python -m jupyter nbconvert *)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git log *)",
+      "PowerShell(git show *)",
+      "PowerShell(git rev-parse *)",
+      "PowerShell(git ls-files *)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)",
+      "PowerShell(.venv/Scripts/python tools/export_status.py *)",
+      "PowerShell(.venv\\Scripts\\python tools\\export_status.py *)",
+      "PowerShell(.venv/Scripts/python -m jupyter nbconvert *)",
+      "PowerShell(.venv\\Scripts\\python -m jupyter nbconvert *)"
+    ],
+    "ask": [
+      "Bash(git restore *)",
+      "Bash(git clean *)",
+      "PowerShell(git restore *)",
+      "PowerShell(git clean *)"
+    ],
+    "deny": [
+      "Bash(git push)",
+      "Bash(git reset --hard)",
+      "Bash(git rebase)",
+      "Bash(git commit --amend)",
+      "PowerShell(git push)",
+      "PowerShell(git reset --hard)",
+      "PowerShell(git rebase)",
+      "PowerShell(git commit --amend)",
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Bash(git rebase *)",
+      "Bash(git commit --amend *)",
+      "Bash(git commit * --amend *)",
+      "Bash(git commit * --no-verify *)",
+      "Bash(git clean -*x *)",
+      "Bash(git clean -*x)",
+      "PowerShell(git push *)",
+      "PowerShell(git reset --hard *)",
+      "PowerShell(git rebase *)",
+      "PowerShell(git commit --amend *)",
+      "PowerShell(git commit * --amend *)",
+      "PowerShell(git commit * --no-verify *)",
+      "PowerShell(git clean -*x *)",
+      "PowerShell(git clean -*x)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.venv/Scripts/python\" \"$CLAUDE_PROJECT_DIR/tools/export_status.py\" --hook"
+          }
+        ]
+      }
+    ]
+  }
+}
