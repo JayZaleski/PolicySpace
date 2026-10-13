@@ -107,4 +107,7 @@ Once `build-review` finishes, summarize the diff (`git diff HEAD` plus new files
 
 ## 7. Wrap up
 
-Once the build is approved, continue the Step loop as `CLAUDE.md` describes: `step-docs-draft`, then `update-status` at the **step** checkpoint.
+Once the build is approved:
+
+1. Make sure `spec.md` and `design.md` reflect every change the user approved during the build, Code Review, and any fix rounds, so `step-docs-draft` works from what was actually built. Edit them where they don't, and tell the user briefly what changed.
+2. Continue the Step loop as `CLAUDE.md` describes: `step-docs-draft`, then `update-status` at the **step** checkpoint.

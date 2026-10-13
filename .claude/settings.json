@@ -1,5 +1,4 @@
 {
-  "model": "opus",
   "permissions": {
     "allow": [
       "Bash(git status *)",
@@ -24,12 +23,6 @@
       "PowerShell(.venv\\Scripts\\python tools\\export_status.py *)",
       "PowerShell(.venv/Scripts/python -m jupyter nbconvert *)",
       "PowerShell(.venv\\Scripts\\python -m jupyter nbconvert *)"
-    ],
-    "ask": [
-      "Bash(git restore *)",
-      "Bash(git clean *)",
-      "PowerShell(git restore *)",
-      "PowerShell(git clean *)"
     ],
     "deny": [
       "Bash(git push)",
@@ -56,8 +49,15 @@
       "PowerShell(git commit * --no-verify *)",
       "PowerShell(git clean -*x *)",
       "PowerShell(git clean -*x)"
+    ],
+    "ask": [
+      "Bash(git restore *)",
+      "Bash(git clean *)",
+      "PowerShell(git restore *)",
+      "PowerShell(git clean *)"
     ]
   },
+  "model": "opus",
   "hooks": {
     "PostToolUse": [
       {
@@ -70,5 +70,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true
   }
 }
