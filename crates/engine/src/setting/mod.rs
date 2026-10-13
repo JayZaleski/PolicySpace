@@ -48,9 +48,12 @@
 //!
 //! # Adding a section type (for later Steps)
 //! 1. Define the data, and store it in [`Rules`] or [`StartState`]. Goods are the worked
-//!    example: the domain types are in [`crate::goods`] (which knows nothing about
-//!    files), the reader is in `setting/goods.rs`, and the finished list is
-//!    `Rules::goods`.
+//!    example for a kind identified by a name: the domain types are in [`crate::goods`]
+//!    (which knows nothing about files), the reader is in `setting/goods.rs`, and the
+//!    finished list is `Rules::goods`. Hexes are the worked example for a starting-state
+//!    section type, and for a kind identified by something other than a name, which
+//!    therefore checks its own duplicates: the domain types are in [`crate::map`], the
+//!    reader is in `setting/map.rs`, and the finished map is `StartState::map`.
 //! 2. Add a `SectionType` to `WorldContent::section_types`, naming its header, the one
 //!    folder it belongs in, and a `read` function.
 //! 3. Check references in `WorldContent::resolve`.
@@ -62,6 +65,7 @@ mod defs;
 mod discover;
 mod error;
 mod goods;
+mod map;
 mod reader;
 mod source;
 #[cfg(test)]
@@ -74,8 +78,10 @@ use toml::de::DeTable;
 pub use error::{LoadError, LoadErrors};
 
 use crate::goods::Goods;
+use crate::map::HexMap;
 use error::{ErrorSink, Location};
 use goods::GoodsReader;
+use map::MapReader;
 use reader::EntryReader;
 use source::{SourceFile, read_toml};
 
@@ -89,7 +95,7 @@ pub struct LoadedSetting {
     pub manifest: Manifest,
     /// Persistent rules (from rules/).
     pub rules: Rules,
-    /// Starting state (from start/). Empty until Step 04.
+    /// Starting state (from start/).
     pub start: StartState,
 }
 
@@ -111,9 +117,12 @@ pub struct Rules {
     pub goods: Goods,
 }
 
-/// Starting state (turn 0). No fields yet; Steps 04 and 05 add them.
+/// Starting state (turn 0). Step 05 onward add more fields.
 #[derive(Debug, Default)]
-pub struct StartState {}
+pub struct StartState {
+    /// Every hex in the setting's map, in load order.
+    pub map: HexMap,
+}
 
 /// Loads the setting folder at `path`. Either every check passes and a [`LoadedSetting`]
 /// is returned, or every problem found is returned (sorted; see the module docs).
@@ -124,7 +133,9 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
         rules: Rules {
             goods: content.goods.finish(),
         },
-        start: content.start,
+        start: StartState {
+            map: content.map.finish(),
+        },
     })
 }
 
@@ -182,23 +193,30 @@ pub(crate) trait SettingContent: Default {
     fn resolve(&mut self, sink: &mut ErrorSink);
 }
 
-/// The real content. Steps 04 onward add more section types.
+/// The real content. Step 05 onward add more section types.
 #[derive(Default)]
 pub(crate) struct WorldContent {
     pub goods: GoodsReader,
-    pub start: StartState,
+    pub map: MapReader,
 }
 
 impl SettingContent for WorldContent {
     fn section_types() -> Vec<SectionType<Self>> {
-        vec![SectionType {
-            header: "good",
-            folder: Folder::Rules,
-            read: |content, reader| content.goods.read(reader),
-        }]
+        vec![
+            SectionType {
+                header: "good",
+                folder: Folder::Rules,
+                read: |content, reader| content.goods.read(reader),
+            },
+            SectionType {
+                header: "hex",
+                folder: Folder::Start,
+                read: |content, reader| content.map.read(reader),
+            },
+        ]
     }
 
-    // Goods refer to nothing, so there is nothing to check yet.
+    // Goods and hexes refer to nothing, so there is nothing to check yet.
     fn resolve(&mut self, _sink: &mut ErrorSink) {}
 }
 

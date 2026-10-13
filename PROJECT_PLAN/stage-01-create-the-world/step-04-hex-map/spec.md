@@ -255,3 +255,6 @@ Run everything with `python tools/check.py` (or `.venv/Scripts/python tools/chec
 
 ## Done When
 All tasks are complete, every test in the Test Plan passes, `python tools/check.py` exits 0, and every Acceptance Criterion in design.md is met.
+
+## Follow-ups for comp-review
+- **F1 (build-review, minor; deferred by the user):** `crates/engine/src/id.rs` item docs still describe IDs as coming only from name registries, while `HexMap` now hands out IDs too. The `compile_fail` example on `Id` registers a hex by name (hexes have no names; switch it to another made-up kind such as `DepositKind`), and the `from_index` and `index` docs say "registries" (make it "registries or lists"). This spec limited the build to the module docs.

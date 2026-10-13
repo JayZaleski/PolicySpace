@@ -11,6 +11,9 @@ Valid settings:
 - `goods_valid`: goods across several files and a nested folder, with and without property
   keys. Load order: `grain`, `copper`, `labor`, `tools`.
 - `goods_one`: exactly one good (for the setting checker's `1 good`).
+- `hexes_valid`: hexes across several files and a nested folder, with negative coordinates
+  and the extremes of `i32`. Load order: (0, 0), (1, -1), (-3, 2), (i32::MAX, i32::MIN).
+- `hexes_one`: exactly one hex (for the setting checker's `1 hex`).
 
 Folder-structure errors:
 - `missing_manifest`, `missing_rules`, `missing_start`: a required entry is absent.
@@ -24,6 +27,9 @@ File-content errors:
   names, so they stay unknown as real section types are added).
 - `goods_errors`: every kind of `[[good]]` error, including one good with several problems,
   a duplicate across files, and a `[[good]]` in `start/`.
+- `hexes_errors`: every kind of `[[hex]]` error, including hexes with a missing, wrongly
+  typed or out-of-range coordinate, an unknown key, one hex with several problems, a
+  duplicate across files, and a `[[hex]]` in `rules/`.
 - `many_errors`: several kinds of problem at once, to check that all are reported in order.
 
 Framework settings. These use the test-only section types (a "thing" in `rules/` and a

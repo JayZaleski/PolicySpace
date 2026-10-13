@@ -1,15 +1,19 @@
 //! Typed numeric IDs and the registries that hand them out.
 //!
-//! Setting files refer to things (goods, hexes, deposits, ...) by text name. When a
+//! Setting files refer to most things (goods, deposits, ...) by text name. When a
 //! setting is loaded, a [`NameRegistry`] turns each text name into a compact numeric
-//! [`Id`], and the rest of the engine works with those IDs. An ID's index can be used
-//! to index a `Vec` directly, and registries iterate in registration order, so the
+//! [`Id`], and the rest of the engine works with those IDs. Some kinds of thing, such as
+//! hexes, have no name and are identified by other data (a hex by its coordinates); the
+//! list that holds them hands out their IDs directly, in load order. An ID's index can be
+//! used to index a `Vec` directly, and registries and lists iterate in load order, so the
 //! engine stays deterministic.
 //!
 //! Rules:
-//! - Text names live in setting files. The registry converts them to IDs at load time.
-//! - An ID is only meaningful inside the registry (the world) that created it. IDs must
-//!   never be persisted: anything saved long-term stores text names, not IDs.
+//! - Names (and the other data that identifies a thing) live in setting files. The
+//!   registry, or the list for kinds without names, converts them to IDs at load time.
+//! - An ID is only meaningful inside the registry or list (the world) that created it.
+//!   IDs must never be persisted: anything saved long-term stores text names, or the
+//!   data that identifies the thing, not IDs.
 //! - Each kind of thing has its own marker type implementing [`IdKind`], so IDs of
 //!   different kinds are different types and cannot be mixed up. Each later Step
 //!   defines its own kinds; this module defines none.

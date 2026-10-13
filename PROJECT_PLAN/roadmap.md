@@ -20,7 +20,7 @@
 - Description: Define goods in setting data. Properties are named in data (perishes after N periods, movable), and the engine knows only the property names. Movable has no effect yet. Add goods to the sample setting. Carry-over from Step 02: reference checking must also be skipped when discovery couldn't see some data files (missing folder, unreadable subfolder, bad file name), not only when a file is broken.
 
 ### Step 04: hex-map
-- Status: specified
+- Status: done
 - Tags: #hex-map #setting-data
 - Description: Define hex tiles in the starting state, with only the data needed to place them on a grid. Terrain and other attributes come later. Add a map to the sample setting.
 

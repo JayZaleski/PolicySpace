@@ -1,0 +1,100 @@
+# The map: the hex tiles of the starting state. Every [[hex]] needs two whole numbers,
+# `q` and `r`, its axial coordinates. Nothing else is allowed yet (terrain and other
+# attributes come later).
+#
+# The engine fixes the orientation; the setting doesn't choose it. Hexes are pointy-top.
+# Each value of `r` is a straight east-west row; `q` increases eastward and `r` increases
+# southward. So (1, -1) is the east neighbor of (0, -1), and the row `r = 0` is south of
+# the row `r = -1`.
+#
+# There are no shape rules: any set of distinct coordinates is a map (holes, islands and
+# negative coordinates are all fine), and a setting may have no hexes at all. Two hexes
+# may not share coordinates.
+#
+# This map is a hexagon of radius 2 around (0, 0): 19 hexes, listed row by row from north
+# to south, and west to east within each row.
+
+# Row r = -2
+[[hex]]
+q = 0
+r = -2
+
+[[hex]]
+q = 1
+r = -2
+
+[[hex]]
+q = 2
+r = -2
+
+
+# Row r = -1
+[[hex]]
+q = -1
+r = -1
+
+[[hex]]
+q = 0
+r = -1
+
+[[hex]]
+q = 1
+r = -1
+
+[[hex]]
+q = 2
+r = -1
+
+
+# Row r = 0
+[[hex]]
+q = -2
+r = 0
+
+[[hex]]
+q = -1
+r = 0
+
+[[hex]]
+q = 0
+r = 0
+
+[[hex]]
+q = 1
+r = 0
+
+[[hex]]
+q = 2
+r = 0
+
+
+# Row r = 1
+[[hex]]
+q = -2
+r = 1
+
+[[hex]]
+q = -1
+r = 1
+
+[[hex]]
+q = 0
+r = 1
+
+[[hex]]
+q = 1
+r = 1
+
+
+# Row r = 2
+[[hex]]
+q = -2
+r = 2
+
+[[hex]]
+q = -1
+r = 2
+
+[[hex]]
+q = 0
+r = 2

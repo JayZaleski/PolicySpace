@@ -87,8 +87,6 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     }
 
     /// The entry's header (or the start of the file, for the manifest).
-    // Not used by any real section type yet (Step 05 on); until then only by tests.
-    #[allow(dead_code)]
     pub fn location(&self) -> &Location {
         &self.entry
     }

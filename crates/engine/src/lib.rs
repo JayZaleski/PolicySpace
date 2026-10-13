@@ -7,12 +7,15 @@
 //!
 //! A setting is a folder of TOML files. [`load_setting`] reads and strictly checks one,
 //! and returns a [`LoadedSetting`] or every problem found (see the [`setting`] module).
-//! Goods are defined by the setting (see the [`goods`] module).
+//! Goods are defined by the setting (see the [`goods`] module). The map is a set of hexes
+//! in the setting's starting state (see the [`map`] module).
 
 pub mod goods;
 pub use goods::{Good, GoodId, GoodKind, Goods, Perishes};
 pub mod id;
 pub use id::{Id, IdError, IdKind, NameRegistry};
+pub mod map;
+pub use map::{HexCoord, HexId, HexKind, HexMap};
 pub mod setting;
 pub use setting::{
     LoadError, LoadErrors, LoadedSetting, Manifest, Rules, SUPPORTED_FORMAT_VERSION, StartState,
