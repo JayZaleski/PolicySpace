@@ -129,6 +129,7 @@ impl LoadErrors {
     /// Number of errors (at least 1).
     pub fn len(&self) -> usize;
 }
+impl<'a> IntoIterator for &'a LoadErrors   // yields &LoadError, so callers can write `for e in &errors`
 ```
 - `Display` writes one error per line, separated by `\n`, with no trailing newline.
 - Implement `std::error::Error`.
@@ -177,7 +178,7 @@ pub(crate) fn read_toml(abs_path: &Path, rel_path: &str, sink: &mut ErrorSink)
   - Invalid UTF-8 is an error located at the first invalid byte: `Utf8Error::valid_up_to()`, with the line and column computed over the valid prefix. The message is `file is not valid UTF-8`.
 - Strip one leading UTF-8 BOM (`\u{FEFF}`) before parsing. Compute every location on the stripped text.
 - Parse with `DeTable::parse_recoverable`. Each parse error becomes `invalid TOML: {message}`, at `location(span.start)` when it has a span, or `in_file` when it doesn't. If there were any parse errors, return `None`, so the file's content isn't validated.
-- The parsed tree borrows the text. Either call `make_owned()` on it, or structure the code so the tree is used while the text is still borrowed. This is the builder's choice; the signature above is indicative.
+- The parsed tree borrows the text. Either call `make_owned()` on it, or structure the code so the tree is used while the text is still borrowed. This is the builder's choice; the signature above is indicative. (As built: `read_toml` takes a closure `|&SourceFile, &DeTable, &mut ErrorSink| -> R` and returns `Option<R>`, calling the closure only if the file wasn't rejected.)
 - `read_toml` also records whether the file was rejected (a read, UTF-8 or TOML error). `load_with` needs this to skip phase 2 (see below).
 
 **Name syntax (`reader.rs`)**
@@ -293,7 +294,7 @@ pub(crate) fn load_with<C: SettingContent>(path: &Path) -> Result<(Manifest, C),
 |---|---|
 | Missing key | `missing required key '{key}' in {label}` |
 | Unknown key | `unknown key '{key}' in {label}` |
-| Wrong type | `key '{key}' in {label} must be a {expected}, found {type_str}`, where `{expected}` is `string`, `integer` or `boolean`, and `{type_str}` is `DeValue::type_str()` |
+| Wrong type | `key '{key}' in {label} must be {expected}, found {type_str}`, where `{expected}` is `a string`, `an integer` or `a boolean`, and `{type_str}` is `DeValue::type_str()` |
 | Integer out of range | `key '{key}' in {label} is out of range` |
 | Invalid name | `invalid name '{name}' (names must start with a lowercase letter and contain only lowercase letters, digits, and underscores)` |
 | Duplicate definition | `{IdError::DuplicateName display} (first defined at {location})`, e.g. `duplicate thing name 'copper' (first defined at rules/a.toml:2:8)` |
@@ -402,7 +403,7 @@ Engine unit tests live in the `setting` modules; framework tests that use `TestC
 | 11 | `valid_name` accepts `copper_ore`, `grain2`, `a`, `a_b_1`, and rejects `Copper`, `copper-ore`, `2grain`, `_copper`, ``, `cöpper`, `copper ore`. | name-syntax check |
 | 12 | A temp setting containing `.DS_Store`, `.hidden/` (with a `junk.txt` inside), `Thumbs.db`, `desktop.ini` at the root and in `rules/` and `start/`, and a `setting.toml` starting with a UTF-8 BOM, loads `Ok`. | ignored files; README.md (covered by 3) |
 | 13 | `many_errors` gives every expected error, and the full list equals the expected `Vec<String>` in the sorted order: manifest, then `rules/a.toml`, then `rules/b.txt`, then `start/` (group 4). Check the result is `Err`. | all errors in one load, in order; no loaded setting |
-| 14 | Loading `framework_valid` twice gives identical `{:?}` output. Loading `many_errors` twice gives equal `LoadErrors`. | same setting twice gives the same result |
+| 14 | Integration: loading `valid_nested` twice gives identical `{:?}` output, and loading `many_errors` twice gives equal `LoadErrors`. Unit (in `test_content.rs`): loading `framework_valid` twice with `load_with::<TestContent>` gives identical registry `(index, name)` lists and identical `resolved` IDs. | same setting twice gives the same result |
 | 15 | `load_with::<TestContent>(framework_valid)` is `Ok`. Things are registered in the order `iron` (a.toml), `tin` (a/z.toml), `copper` (b.toml), with IDs 0, 1, 2. `resolved` holds the IDs of `copper` and `tin`, in file order. | test-only: cross-file references; IDs in file-read order |
 | 16 | `framework_duplicate` gives `rules/b.toml:L:C: duplicate thing name 'copper' (first defined at rules/a.toml:L:C)`. | test-only: duplicate across files names both places |
 | 17 | `framework_wrong_folder` gives `section 'thing' belongs in rules/, not start/` and `section 'placed_thing' belongs in start/, not rules/`. | test-only: wrong folder |

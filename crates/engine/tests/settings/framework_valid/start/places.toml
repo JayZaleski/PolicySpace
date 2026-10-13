@@ -1,0 +1,7 @@
+[[placed_thing]]
+thing = "copper"
+count = 3
+visible = true
+
+[[placed_thing]]
+thing = "tin"

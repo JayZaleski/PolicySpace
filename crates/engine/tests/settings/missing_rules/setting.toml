@@ -1,0 +1,3 @@
+name = "Test Setting"
+description = "A setting used by loader tests."
+format_version = 1

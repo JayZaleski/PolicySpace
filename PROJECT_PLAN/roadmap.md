@@ -10,14 +10,14 @@
 - Description: Set up the Rust workspace with an engine library crate and a dev-UI binary crate. The engine never depends on the UI. Also set up the core ID types and the test setup that later Steps build on.
 
 ### Step 02: setting-loader
-- Status: specified
+- Status: done
 - Tags: #setting-data #engine
 - Description: Define the setting folder layout and file format, split into persistent rules and starting state. Load a setting folder into the engine and report clear validation errors. Start a sample setting that later Steps extend.
 
 ### Step 03: goods-and-properties
 - Status: planned
 - Tags: #goods #setting-data
-- Description: Define goods in setting data. Properties are named in data (perishes after N periods, movable), and the engine knows only the property names. Movable has no effect yet. Add goods to the sample setting.
+- Description: Define goods in setting data. Properties are named in data (perishes after N periods, movable), and the engine knows only the property names. Movable has no effect yet. Add goods to the sample setting. Carry-over from Step 02: reference checking must also be skipped when discovery couldn't see some data files (missing folder, unreadable subfolder, bad file name), not only when a file is broken.
 
 ### Step 04: hex-map
 - Status: planned
