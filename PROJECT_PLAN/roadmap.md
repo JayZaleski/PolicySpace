@@ -25,9 +25,9 @@
 - Description: Define hex tiles in the starting state, with only the data needed to place them on a grid. Terrain and other attributes come later. Add a map to the sample setting.
 
 ### Step 05: natural-resources
-- Status: planned
+- Status: specified
 - Tags: #natural-resources #goods #hex-map #setting-data
-- Description: Define resource types in the rules (which unimproved good they produce and how much per period) and place deposits on hexes in the starting state. There is no ownership yet. Add deposits to the sample setting.
+- Description: Define resource types in the rules (which unimproved good they produce, and how much one deposit outputs per period) and place whole numbers of deposits on hexes in the starting state. Each deposit is a separate unit for a single future owner. There is no ownership, depletion, or regeneration yet. Add deposits to the sample setting.
 
 ### Step 06: turn-clock
 - Status: planned
