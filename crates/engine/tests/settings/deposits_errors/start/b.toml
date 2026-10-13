@@ -1,0 +1,4 @@
+[[deposit]]
+resource = "ore_deposit"
+q = 0
+r = 0

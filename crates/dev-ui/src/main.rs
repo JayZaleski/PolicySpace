@@ -4,7 +4,7 @@
 //! crate builds against the engine's public interface. Given the path to a setting folder
 //! it works as a setting checker: it loads the setting through the engine's public API,
 //! and either prints the setting's name, format version and counts of what it defines
-//! (so far, goods and hexes), or prints every error found and exits with a failure code.
+//! (so far, goods, hexes, resources, and deposits), or prints every error found and exits with a failure code.
 //!
 //! Exit codes: 0 = success; 1 = the setting has errors; 2 = wrong usage.
 
@@ -28,11 +28,13 @@ fn main() -> ExitCode {
         [path] => match load_setting(path) {
             Ok(setting) => {
                 println!(
-                    "Loaded setting '{}' (format version {}): {}, {}",
+                    "Loaded setting '{}' (format version {}): {}, {}, {}, {}",
                     setting.manifest.name,
                     setting.manifest.format_version,
                     count(setting.rules.goods.len(), "good", "goods"),
-                    count(setting.start.map.len(), "hex", "hexes")
+                    count(setting.start.map.len(), "hex", "hexes"),
+                    count(setting.rules.resources.len(), "resource", "resources"),
+                    count(setting.start.deposits.len(), "deposit", "deposits")
                 );
                 ExitCode::SUCCESS
             }

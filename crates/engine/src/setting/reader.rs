@@ -91,6 +91,11 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         &self.entry
     }
 
+    /// The label used in messages ("good", "hex", "manifest", ...).
+    pub fn label(&self) -> &'static str {
+        self.label
+    }
+
     /// The error collector, for section-specific checks and `Definitions`.
     pub fn errors(&mut self) -> &mut ErrorSink {
         self.sink
@@ -167,6 +172,34 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         }
     }
 
+    /// A number that must be present: an integer or a float, as `f64`.
+    fn number(&mut self, key: &str) -> Option<Located<f64>> {
+        let Found::Value(value) = self.find(key, true) else {
+            return None;
+        };
+        let at = self.file.location_of(value.span());
+        let parsed = match value.get_ref() {
+            DeValue::Integer(int) => i64::from_str_radix(int.as_str(), int.radix())
+                .ok()
+                .map(|n| n as f64),
+            DeValue::Float(float) => float.as_str().parse::<f64>().ok(),
+            _ => {
+                self.wrong_type(key, "a number", value);
+                return None;
+            }
+        };
+        match parsed {
+            Some(n) => Some(Located { value: n, at }),
+            None => {
+                self.sink.at(
+                    &at,
+                    format!("key '{key}' in {} is out of range", self.label),
+                );
+                None
+            }
+        }
+    }
+
     fn boolean(&mut self, key: &str, required: bool) -> Option<Located<bool>> {
         let Found::Value(value) = self.find(key, required) else {
             return None;
@@ -220,8 +253,14 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         self.integer(key, false)
     }
 
+    /// A number that must be present: an integer or a float, as `f64`. The value is
+    /// returned as written (including `inf` and `nan`); range checks belong to the caller.
+    pub fn required_number(&mut self, key: &str) -> Option<Located<f64>> {
+        self.number(key)
+    }
+
     /// A boolean value that must be present.
-    // Not used by any real section type yet (Step 05 on); until then only by tests.
+    // Not used by any real section type yet; until then only by tests.
     #[allow(dead_code)]
     pub fn required_bool(&mut self, key: &str) -> Option<Located<bool>> {
         self.boolean(key, true)
@@ -351,6 +390,47 @@ mod tests {
                 "rules/t.toml:3:5: key 'c' in thing is out of range",
             ]
         );
+    }
+
+    #[test]
+    fn numbers_integers_floats_and_special_values() {
+        let errors = run(
+            "a = 5
+b = 2.5
+c = 1_000.5
+d = -3
+e = inf
+f = nan
+g = \"5\"
+h = 99999999999999999999
+i = -inf
+",
+            |r| {
+                assert_eq!(r.required_number("a").unwrap().value, 5.0);
+                assert_eq!(r.required_number("b").unwrap().value, 2.5);
+                assert_eq!(r.required_number("c").unwrap().value, 1000.5);
+                assert_eq!(r.required_number("d").unwrap().value, -3.0);
+                assert_eq!(r.required_number("e").unwrap().value, f64::INFINITY);
+                assert!(r.required_number("f").unwrap().value.is_nan());
+                assert!(r.required_number("g").is_none());
+                assert!(r.required_number("h").is_none());
+                assert_eq!(r.required_number("i").unwrap().value, f64::NEG_INFINITY);
+                assert!(r.required_number("missing").is_none());
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:1:1: missing required key 'missing' in thing",
+                "rules/t.toml:7:5: key 'g' in thing must be a number, found string",
+                "rules/t.toml:8:5: key 'h' in thing is out of range",
+            ]
+        );
+    }
+
+    #[test]
+    fn label_is_the_section_label() {
+        run("", |r| assert_eq!(r.label(), "thing"));
     }
 
     #[test]

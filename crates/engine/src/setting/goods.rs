@@ -56,8 +56,6 @@ impl GoodsReader {
     }
 
     /// The definitions, for resolving references to goods in phase 2.
-    // Used by the section types that refer to goods (Step 05 on); until then unused.
-    #[allow(dead_code)]
     pub fn defs(&self) -> &Definitions<GoodKind> {
         &self.defs
     }

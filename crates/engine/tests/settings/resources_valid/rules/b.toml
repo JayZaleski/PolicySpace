@@ -1,0 +1,9 @@
+[[resource]]
+name = "farmland"
+produces = "grain"
+output = 4
+
+[[resource]]
+name = "unused"
+produces = "grain"
+output = 0.25

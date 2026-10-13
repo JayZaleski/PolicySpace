@@ -1,0 +1,25 @@
+# Resource types: the kinds of natural resource. Every resource type comes from a
+# [[resource]] section here. A resource type needs three keys:
+#
+#   name      The type's name (lowercase snake_case).
+#   produces  The name of the good one deposit of this type produces.
+#   output    How much of that good one deposit produces per period. A number greater
+#             than 0, whole or with decimals (for example 4 or 2.5).
+#
+# By convention, the produced good is unmovable and perishes after one period (see
+# goods.toml), so output has to be used where it appears. The engine doesn't require
+# this. Several resource types may produce the same good.
+#
+# Nothing is produced yet: deposits only sit on the map for now.
+
+# Copper ore yields 2.5 units of unimproved copper per deposit per period.
+[[resource]]
+name = "copper_ore"
+produces = "unimproved_copper"
+output = 2.5
+
+# Arable land yields 4 units of unimproved grain per deposit per period.
+[[resource]]
+name = "arable_land"
+produces = "unimproved_grain"
+output = 4

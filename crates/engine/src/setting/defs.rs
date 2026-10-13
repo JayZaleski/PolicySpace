@@ -48,8 +48,6 @@ impl<K: IdKind> Definitions<K> {
 
     /// Looks up a reference. If the name is unknown, reports an error at the reference
     /// and returns `None`.
-    // Not used by any real section type yet (Step 05 on); until then only by tests.
-    #[allow(dead_code)]
     pub fn resolve(&self, reference: &Located<String>, sink: &mut ErrorSink) -> Option<Id<K>> {
         match self.registry.id(&reference.value) {
             Ok(id) => Some(id),
@@ -61,14 +59,14 @@ impl<K: IdKind> Definitions<K> {
     }
 
     /// The registry of names defined so far.
-    // Not used by any real section type yet (Step 05 on); until then only by tests.
+    // Not used by any real section type yet; until then only by tests.
     #[allow(dead_code)]
     pub fn registry(&self) -> &NameRegistry<K> {
         &self.registry
     }
 
     /// Where `id` was defined.
-    // Not used by any real section type yet (Step 05 on); until then only by tests.
+    // Not used by any real section type yet; until then only by tests.
     #[allow(dead_code)]
     pub fn location(&self, id: Id<K>) -> &Location {
         &self.locations[id.index()]

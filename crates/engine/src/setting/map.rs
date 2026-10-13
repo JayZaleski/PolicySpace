@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use crate::map::{HexCoord, HexMap};
+use crate::map::{HexCoord, HexId, HexMap};
 
 use super::error::Location;
 use super::reader::EntryReader;
@@ -20,14 +20,14 @@ pub(crate) struct MapReader {
 }
 
 /// Reads one coordinate key as an `i32`. A value outside `i32` is reported at the value.
-fn coordinate(reader: &mut EntryReader<'_, '_>, key: &str) -> Option<i32> {
+/// Shared by hexes and deposits; the message names the entry's label.
+pub(crate) fn coordinate(reader: &mut EntryReader<'_, '_>, key: &str) -> Option<i32> {
     let value = reader.required_integer(key)?;
     match i32::try_from(value.value) {
         Ok(n) => Some(n),
         Err(_) => {
-            reader
-                .errors()
-                .at(&value.at, format!("key '{key}' in hex is out of range"));
+            let message = format!("key '{key}' in {} is out of range", reader.label());
+            reader.errors().at(&value.at, message);
             None
         }
     }
@@ -60,6 +60,13 @@ impl MapReader {
         self.by_coord.insert(coord, self.coords.len());
         self.coords.push(coord);
         self.locations.push(at);
+    }
+
+    /// The ID the hex at `coord` will have in the finished map, or None if there is none.
+    pub fn id(&self, coord: HexCoord) -> Option<HexId> {
+        let index = *self.by_coord.get(&coord)?;
+        // `finish` gives each hex the ID of its index (and checks that it fits).
+        u32::try_from(index).ok().map(HexId::from_index)
     }
 
     /// The finished map.

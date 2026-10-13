@@ -14,6 +14,12 @@ Valid settings:
 - `hexes_valid`: hexes across several files and a nested folder, with negative coordinates
   and the extremes of `i32`. Load order: (0, 0), (1, -1), (-3, 2), (i32::MAX, i32::MIN).
 - `hexes_one`: exactly one hex (for the setting checker's `1 hex`).
+- `resources_valid`: resource types and deposits across several files and nested folders,
+  with the goods and hexes they refer to defined in files read after them. Resource
+  types: `copper_ore`, `iron_ore`, `farmland`, `unused`. Deposits: 2 `copper_ore` and 1
+  `farmland` at (0, 0), then 3 `iron_ore` at (1, 0).
+- `resources_one`: one good, one hex, one resource type and one deposit (for the setting
+  checker's `1 resource` and `1 deposit`).
 
 Folder-structure errors:
 - `missing_manifest`, `missing_rules`, `missing_start`: a required entry is absent.
@@ -30,6 +36,18 @@ File-content errors:
 - `hexes_errors`: every kind of `[[hex]]` error, including hexes with a missing, wrongly
   typed or out-of-range coordinate, an unknown key, one hex with several problems, a
   duplicate across files, and a `[[hex]]` in `rules/`.
+- `resources_errors`: every kind of `[[resource]]` error, including a missing, invalid or
+  wrongly typed key, an output that is not a finite number above 0, an unknown good, one
+  resource with several problems, a duplicate across files, and a `[[resource]]` in
+  `start/`.
+- `deposits_errors`: every kind of `[[deposit]]` error, including a missing, wrongly typed
+  or out-of-range key, bad counts (0, negative, over 1,000,000, a float), an unknown
+  resource, a coordinate with no hex, one deposit with several problems, a duplicate across
+  files, and a `[[deposit]]` in `rules/`.
+- `resources_broken_file`: a broken TOML file next to resources that refer to a good and a
+  hex that don't exist: only the syntax error is reported.
+- `resources_missing_start`: no `start/` folder, and a resource that refers to a good that
+  doesn't exist: only the missing folder is reported.
 - `many_errors`: several kinds of problem at once, to check that all are reported in order.
 
 Framework settings. These use the test-only section types (a "thing" in `rules/` and a

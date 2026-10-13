@@ -1,0 +1,5 @@
+[[deposit]]
+resource = "iron_ore"
+q = 1
+r = 0
+count = 3

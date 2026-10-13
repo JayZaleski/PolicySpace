@@ -1,0 +1,76 @@
+[[good]]
+name = "ore"
+
+[[resource]]
+name = "copper_ore"
+produces = "ore"
+output = 1
+
+[[resource]]
+produces = "ore"
+output = 1
+
+[[resource]]
+name = "Copper"
+produces = "ore"
+output = 1
+
+[[resource]]
+name = "zero_out"
+produces = "ore"
+output = 0
+
+[[resource]]
+name = "neg_out"
+produces = "ore"
+output = -1.5
+
+[[resource]]
+name = "inf_out"
+produces = "ore"
+output = inf
+
+[[resource]]
+name = "nan_out"
+produces = "ore"
+output = nan
+
+[[resource]]
+name = "huge_out"
+produces = "ore"
+output = 1e400
+
+[[resource]]
+name = "string_out"
+produces = "ore"
+output = "5"
+
+[[resource]]
+name = "no_produces"
+output = 1
+
+[[resource]]
+name = "no_output"
+produces = "ore"
+
+[[resource]]
+name = "num_produces"
+produces = 3
+output = 1
+
+[[resource]]
+name = "bad_good"
+produces = "gold"
+output = 1
+
+[[resource]]
+name = "typo"
+produces = "ore"
+output = 1
+amount = 2
+
+[[resource]]
+name = "Bad-Name"
+produces = 7
+output = 0
+colour = "red"

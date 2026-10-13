@@ -47,6 +47,8 @@ fn sample_setting_loads() {
     assert_eq!(setting.manifest.format_version, 1);
     assert_eq!(setting.manifest.format_version, SUPPORTED_FORMAT_VERSION);
     assert_eq!(setting.start.map.len(), 19);
+    assert_eq!(setting.rules.resources.len(), 2);
+    assert_eq!(setting.start.deposits.len(), 10);
 }
 
 #[test]

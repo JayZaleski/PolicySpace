@@ -8,7 +8,9 @@
 //! A setting is a folder of TOML files. [`load_setting`] reads and strictly checks one,
 //! and returns a [`LoadedSetting`] or every problem found (see the [`setting`] module).
 //! Goods are defined by the setting (see the [`goods`] module). The map is a set of hexes
-//! in the setting's starting state (see the [`map`] module).
+//! in the setting's starting state (see the [`map`] module). Natural resources (resource
+//! types in the rules, deposits on hexes in the starting state) are in the [`resources`]
+//! module, and amounts of goods are [`Quantity`] values (see the [`quantity`] module).
 
 pub mod goods;
 pub use goods::{Good, GoodId, GoodKind, Goods, Perishes};
@@ -16,6 +18,13 @@ pub mod id;
 pub use id::{Id, IdError, IdKind, NameRegistry};
 pub mod map;
 pub use map::{HexCoord, HexId, HexKind, HexMap};
+pub mod quantity;
+pub use quantity::Quantity;
+pub mod resources;
+pub use resources::{
+    Deposit, DepositId, DepositKind, Deposits, ResourceId, ResourceKind, ResourceType,
+    ResourceTypes,
+};
 pub mod setting;
 pub use setting::{
     LoadError, LoadErrors, LoadedSetting, Manifest, Rules, SUPPORTED_FORMAT_VERSION, StartState,

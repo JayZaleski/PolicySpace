@@ -1,0 +1,4 @@
+[[resource]]
+name = "gold_ore"
+produces = "gold"
+output = 1

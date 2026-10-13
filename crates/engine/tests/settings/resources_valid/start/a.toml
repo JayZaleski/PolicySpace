@@ -1,0 +1,10 @@
+[[deposit]]
+resource = "copper_ore"
+q = 0
+r = 0
+count = 2
+
+[[deposit]]
+resource = "farmland"
+q = 0
+r = 0

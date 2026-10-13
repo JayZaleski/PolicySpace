@@ -1,7 +1,7 @@
 //! Loading a setting: a folder of TOML files that describes a world.
 //!
 //! The engine knows nothing about any particular setting. A setting is data: the goods,
-//! the map, and the rules of a world, written as TOML files in a folder. [`load_setting`]
+//! the map, the natural resources, and the rules of a world, written as TOML files in a folder. [`load_setting`]
 //! reads such a folder, checks it strictly, and returns a [`LoadedSetting`] (the manifest,
 //! the persistent rules, and the starting state). A loaded setting is not a running
 //! world: later Steps build the world state from it.
@@ -44,7 +44,10 @@
 //!   with an `EntryReader`, defines names with `Definitions`, and stores any references
 //!   unresolved.
 //! - **Phase 2** (`SettingContent::resolve`) checks the references once every file has
-//!   been read, so a reference can point into any file.
+//!   been read, so a reference can point into any file. Resource types refer to goods by
+//!   name, and deposits refer to resource types by name and to hexes by coordinates.
+//!   A reader's `finish` that depends on phase 2 (such as `ResourcesReader::finish`) is
+//!   only called after a successful load.
 //!
 //! # Adding a section type (for later Steps)
 //! 1. Define the data, and store it in [`Rules`] or [`StartState`]. Goods are the worked
@@ -53,10 +56,15 @@
 //!    finished list is `Rules::goods`. Hexes are the worked example for a starting-state
 //!    section type, and for a kind identified by something other than a name, which
 //!    therefore checks its own duplicates: the domain types are in [`crate::map`], the
-//!    reader is in `setting/map.rs`, and the finished map is `StartState::map`.
+//!    reader is in `setting/map.rs`, and the finished map is `StartState::map`. Resource
+//!    types (`Rules::resources`) and deposits (`StartState::deposits`) follow the same two
+//!    patterns, in [`crate::resources`] and `setting/resources.rs`.
 //! 2. Add a `SectionType` to `WorldContent::section_types`, naming its header, the one
 //!    folder it belongs in, and a `read` function.
-//! 3. Check references in `WorldContent::resolve`.
+//! 3. Check references in `WorldContent::resolve`. Resources and deposits are the worked
+//!    example: a name is resolved through `Definitions::resolve` (a resource's `produces`
+//!    against the goods, a deposit's `resource` against the resource types), and a hex
+//!    through `MapReader::id`.
 //!
 //! File discovery, merging, duplicate detection, name checking and error reporting are
 //! shared and need not be rebuilt.
@@ -67,6 +75,7 @@ mod error;
 mod goods;
 mod map;
 mod reader;
+mod resources;
 mod source;
 #[cfg(test)]
 mod test_content;
@@ -79,10 +88,12 @@ pub use error::{LoadError, LoadErrors};
 
 use crate::goods::Goods;
 use crate::map::HexMap;
+use crate::resources::{Deposits, ResourceTypes};
 use error::{ErrorSink, Location};
 use goods::GoodsReader;
 use map::MapReader;
 use reader::EntryReader;
+use resources::{DepositsReader, ResourcesReader};
 use source::{SourceFile, read_toml};
 
 /// The only setting format version this engine reads.
@@ -110,32 +121,37 @@ pub struct Manifest {
     pub format_version: i64,
 }
 
-/// Persistent rules. Step 05 onward add more fields.
+/// Persistent rules. Later Steps add more fields.
 #[derive(Debug, Default)]
 pub struct Rules {
     /// Every good the setting defines, in load order.
     pub goods: Goods,
+    /// Every resource type the setting defines, in load order.
+    pub resources: ResourceTypes,
 }
 
-/// Starting state (turn 0). Step 05 onward add more fields.
+/// Starting state (turn 0). Later Steps add more fields.
 #[derive(Debug, Default)]
 pub struct StartState {
     /// Every hex in the setting's map, in load order.
     pub map: HexMap,
+    /// Every deposit, in load order.
+    pub deposits: Deposits,
 }
 
 /// Loads the setting folder at `path`. Either every check passes and a [`LoadedSetting`]
 /// is returned, or every problem found is returned (sorted; see the module docs).
 pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors> {
     let (manifest, content) = load_with::<WorldContent>(path.as_ref())?;
+    let map = content.map.finish();
+    let deposits = content.deposits.finish(map.len());
     Ok(LoadedSetting {
         manifest,
         rules: Rules {
             goods: content.goods.finish(),
+            resources: content.resources.finish(),
         },
-        start: StartState {
-            map: content.map.finish(),
-        },
+        start: StartState { map, deposits },
     })
 }
 
@@ -193,11 +209,13 @@ pub(crate) trait SettingContent: Default {
     fn resolve(&mut self, sink: &mut ErrorSink);
 }
 
-/// The real content. Step 05 onward add more section types.
+/// The real content. Later Steps add more section types.
 #[derive(Default)]
 pub(crate) struct WorldContent {
     pub goods: GoodsReader,
     pub map: MapReader,
+    pub resources: ResourcesReader,
+    pub deposits: DepositsReader,
 }
 
 impl SettingContent for WorldContent {
@@ -213,11 +231,26 @@ impl SettingContent for WorldContent {
                 folder: Folder::Start,
                 read: |content, reader| content.map.read(reader),
             },
+            SectionType {
+                header: "resource",
+                folder: Folder::Rules,
+                read: |content, reader| content.resources.read(reader),
+            },
+            SectionType {
+                header: "deposit",
+                folder: Folder::Start,
+                read: |content, reader| content.deposits.read(reader),
+            },
         ]
     }
 
-    // Goods and hexes refer to nothing, so there is nothing to check yet.
-    fn resolve(&mut self, _sink: &mut ErrorSink) {}
+    // Goods and hexes refer to nothing. Resource types refer to goods, and deposits refer
+    // to resource types and hexes.
+    fn resolve(&mut self, sink: &mut ErrorSink) {
+        self.resources.resolve(self.goods.defs(), sink);
+        self.deposits
+            .resolve(self.resources.defs(), &self.map, sink);
+    }
 }
 
 /// Turns a sink that holds errors into the `Err` result.

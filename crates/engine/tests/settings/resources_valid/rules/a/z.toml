@@ -1,0 +1,4 @@
+[[resource]]
+name = "iron_ore"
+produces = "ore"
+output = 3

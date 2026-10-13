@@ -1,0 +1,7 @@
+[[good]]
+name = "ore"
+perishes_after = 1
+movable = false
+
+[[good]]
+name = "grain"

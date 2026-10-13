@@ -1,0 +1,7 @@
+[[good]]
+name = "ore"
+
+[[resource]]
+name = "ore_deposit"
+produces = "ore"
+output = 1
