@@ -57,7 +57,7 @@ missing_docs = "warn"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 ```
-Each crate's `Cargo.toml` inherits these with `version.workspace = true`, `edition.workspace = true`, `rust-version.workspace = true`, `publish.workspace = true`, and `[lints] workspace = true`. Since `missing_docs` is a warning and clippy runs with `-D warnings`, every public item needs a doc comment. That's intended.
+Each crate's `Cargo.toml` inherits these with `version.workspace = true`, `edition.workspace = true`, `rust-version.workspace = true`, `publish.workspace = true`, and `[lints] workspace = true`. The engine's `Cargo.toml` has an empty `[lib]` section; it has no effect, since the library target is found automatically. Since `missing_docs` is a warning and clippy runs with `-D warnings`, every public item needs a doc comment, including the named fields of public enum variants (such as `IdError`'s `kind` and `name`). That's intended.
 
 ### `rust-toolchain.toml`
 ```toml
@@ -158,7 +158,7 @@ pub enum IdError {
   - `UnknownName`: `unknown good 'copper'`
 
 ### `crates/dev-ui/src/main.rs`
-A crate doc comment saying this is a placeholder that Step 07 replaces with a real developer UI. `main` prints exactly one line, `format!("{} {}", ENGINE_NAME, ENGINE_VERSION)` (currently `PolicySpace Engine 0.1.0`), to stdout and returns normally, so the exit code is 0. It uses only the engine's public interface.
+A crate doc comment saying this is a placeholder that Step 07 replaces with a real developer UI. `main` prints exactly one line to stdout with `println!("{ENGINE_NAME} {ENGINE_VERSION}")` (currently `PolicySpace Engine 0.1.0`) and returns normally, so the exit code is 0. Don't wrap a `format!` in `println!`: clippy's `useless_format` lint rejects it. It uses only the engine's public interface.
 
 ### `crates/engine/tests/settings/README.md`
 A short note: this folder holds small setting folders used by engine tests; it's empty until Step 02 (setting-loader) adds the first ones; each test setting should be minimal and named for what it tests.
@@ -179,7 +179,7 @@ A short note: this folder holds small setting folders used by engine tests; it's
 2. Create `rust-toolchain.toml` and the workspace `Cargo.toml`.
 3. Create the `policyspace-engine` crate: `Cargo.toml` and `src/lib.rs` with the constants and docs.
 4. Write `src/id.rs`: `IdKind`, `Id<K>` with hand-written trait impls, `IdError` with `Display`/`Error`, and `NameRegistry<K>` with `Default`. Re-export from `lib.rs`.
-5. Write the unit tests and the compile-fail doc test for the ID mechanism (Test Plan, items 1–7).
+5. Write the unit tests and the compile-fail doc test for the ID mechanism (Test Plan, items 1–7, including 6a).
 6. Create `crates/engine/tests/settings/README.md`.
 7. Create the `policyspace-dev-ui` crate: `Cargo.toml` (bin `dev-ui`, path dependency on the engine) and `src/main.rs`.
 8. Write `crates/dev-ui/tests/placeholder.rs` (Test Plan, item 8).
@@ -198,6 +198,7 @@ The unit tests live in a `#[cfg(test)] mod tests` in `id.rs`, using test-only ki
 | 4 | `id("missing")` returns `Err(IdError::UnknownName { kind: "good", name: "missing" })`. Its `Display` text is `unknown good 'missing'`. Also check the `DuplicateName` display text. | reports a missing text name clearly |
 | 5 | A `NameRegistry<TestGood>` and a `NameRegistry<TestHex>` can both register `copper`, with no error. | allows the same text name in two different kinds |
 | 6 | `name()` with an out-of-range ID panics (`#[should_panic]`; build the bad ID with `Id::from_index`, which is crate-visible in tests). | (robustness; IDs are only valid in their own registry) |
+| 6a | `Id`'s `Debug` output uses the kind's label: `Id::<TestGood>::from_index(3)` formats as `Id<good>(3)`. | (checks the `Debug` format defined in Interfaces & Data) |
 | 7 | A `compile_fail` doc test on `Id` (in `id.rs` docs) shows that passing an `Id<HexKind>` where an `Id<GoodKind>` is expected doesn't compile. The doc test defines its own marker kinds and uses only public API (`NameRegistry::register` to obtain IDs). | keeps different ID kinds from being mixed up (caught at build time) |
 | 8 | `crates/dev-ui/tests/placeholder.rs` runs `env!("CARGO_BIN_EXE_dev-ui")` with `std::process::Command`. It asserts exit success, and that stdout trimmed equals `format!("{} {}", ENGINE_NAME, ENGINE_VERSION)`. | running the dev UI prints the engine's name and version and exits successfully |
 
