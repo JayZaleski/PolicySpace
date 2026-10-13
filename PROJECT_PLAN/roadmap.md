@@ -10,7 +10,7 @@
 - Description: Set up the Rust workspace with an engine library crate and a dev-UI binary crate. The engine never depends on the UI. Also set up the core ID types and the test setup that later Steps build on.
 
 ### Step 02: setting-loader
-- Status: planned
+- Status: specified
 - Tags: #setting-data #engine
 - Description: Define the setting folder layout and file format, split into persistent rules and starting state. Load a setting folder into the engine and report clear validation errors. Start a sample setting that later Steps extend.
 
