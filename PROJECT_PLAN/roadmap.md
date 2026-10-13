@@ -1,11 +1,11 @@
 # PolicySpace: Roadmap
 
 ## Stage 01: create-the-world
-- Status: planned
+- Status: in-progress
 - Goal: A setting folder loads into a Rust engine as hexes, goods, and natural resources. A minimal turn advances the clock, resources emit their goods, and unused goods perish. A developer UI shows the hex grid and the world's data, and steps turns.
 
 ### Step 01: engine-workspace
-- Status: planned
+- Status: specified
 - Tags: #engine #rust
 - Description: Set up the Rust workspace with an engine library crate and a dev-UI binary crate. The engine never depends on the UI. Also set up the core ID types and the test setup that later Steps build on.
 
