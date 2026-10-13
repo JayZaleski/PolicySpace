@@ -71,9 +71,14 @@ Files `build` must read before starting.
 - **Tests:** <tests to add, change, or run to show behavior is unchanged>
 - **Reason rejected:** <only if rejected>
 
+## Packages
+Only if the build splits (see Parallel builds in CLAUDE.md): each package's Owns, Tasks (recommendation IDs), and Isolated tests, then Integration.
+
 ## Done When
 Every approved recommendation is applied, and all tests pass.
 ```
+
+**Parallel build.** Check whether the approved recommendations split into packages that can be built at the same time (see Parallel builds in `CLAUDE.md`). Usually a package is a group of recommendations whose files don't overlap with any other group's. Look for it actively, but split only when the rules allow it, and tell the user whether the build will run as one or as N packages plus Integration. A recommendation that touches shared files belongs to Integration as a whole: don't split one recommendation across packages.
 
 Then empty `scratchpad.md`. Do not commit.
 
@@ -81,16 +86,17 @@ Then empty `scratchpad.md`. Do not commit.
 
 1. Ask the user for permission to commit `consolidate.md` and build, in one question. Only if they agree:
    1. Deploy the `update-status` subagent at the **consolidate** checkpoint. This commit is the build's safe point (see `CLAUDE.md`). If it reports a problem, explain it to the user and stop.
-   2. Deploy the `build` subagent with `consolidate.md` and the list of approved recommendations, in **new** mode.
-   3. Once `build` finishes, deploy the `build-review` subagent with `consolidate.md`, the approved list, the mode, and `build`'s report (the build permission covers it).
+   2. Deploy the `build` subagent with `consolidate.md` and the list of approved recommendations, in **new** mode. If `consolidate.md` has Packages, run the parallel build instead, as Parallel builds in `CLAUDE.md` describes.
+   3. Once `build` finishes (Integration, for a parallel build), deploy the `build-review` subagent with `consolidate.md`, the approved list, the mode, and every build's report (the build permission covers it).
 2. If `build` reports an issue, update `consolidate.md` so it always matches what gets built:
    - **Small changes** (the kind you would have decided yourself without asking): edit `consolidate.md`, tell the user briefly what changed, and tell `build` to continue.
    - **Larger changes:** propose the change to the user first. Once they approve, edit `consolidate.md` and tell `build` to continue.
    - **Changes that move away from `design.md`:** always propose to the user, however small.
+   - **In a parallel build,** continue only the builder that reported the issue (with `SendMessage`), and follow Parallel builds in `CLAUDE.md` if the split was wrong.
 3. **Code Review:** once `build-review` finishes, summarize the diff (`git diff HEAD` plus new files), the test results, and the `build-review` findings for the user in plain English, recommendation by recommendation, and ask them to approve or reject. Don't fix anything before they decide.
    - **Approved:** set each approved recommendation that was built to `applied`.
    - **Rejected:** offer the three choices in `CLAUDE.md` (Rejected builds):
-     1. **Fix and re-review:** sort the problems as `CLAUDE.md` describes and update `consolidate.md` where needed. To drop a single recommendation, set it to `rejected` with a reason, and list "undo CNN" as a problem. Deploy `build` in **fix** mode with the list of problems, then `build-review`, then review again.
+     1. **Fix and re-review:** sort the problems as `CLAUDE.md` describes and update `consolidate.md` where needed. To drop a single recommendation, set it to `rejected` with a reason, and list "undo CNN" as a problem. Deploy one `build` in **fix** mode (no package) with the list of problems, then `build-review`, then review again.
      2. **Discard and re-plan:** discard the build as `CLAUDE.md` describes, return to section 4 to revise the recommendations with the user, and continue from section 5. The revised `consolidate.md` gets its own (revised) commit.
      3. **Discard and set aside:** discard the build, and set every approved recommendation to `rejected` with the reason "set aside after Code Review". Then continue with section 7, so the Stage can finish without consolidation.
 

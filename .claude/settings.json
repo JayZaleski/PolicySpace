@@ -11,6 +11,9 @@
       "Bash(git commit *)",
       "Bash(.venv/Scripts/python tools/export_status.py *)",
       "Bash(.venv/Scripts/python -m jupyter nbconvert *)",
+      "Bash(.venv/Scripts/python tools/merge_package.py *)",
+      "Bash(git worktree list *)",
+      "Bash(git worktree list)",
       "PowerShell(git status *)",
       "PowerShell(git diff *)",
       "PowerShell(git log *)",
@@ -22,7 +25,11 @@
       "PowerShell(.venv/Scripts/python tools/export_status.py *)",
       "PowerShell(.venv\\Scripts\\python tools\\export_status.py *)",
       "PowerShell(.venv/Scripts/python -m jupyter nbconvert *)",
-      "PowerShell(.venv\\Scripts\\python -m jupyter nbconvert *)"
+      "PowerShell(.venv\\Scripts\\python -m jupyter nbconvert *)",
+      "PowerShell(.venv/Scripts/python tools/merge_package.py *)",
+      "PowerShell(.venv\\Scripts\\python tools\\merge_package.py *)",
+      "PowerShell(git worktree list *)",
+      "PowerShell(git worktree list)"
     ],
     "deny": [
       "Bash(git push)",

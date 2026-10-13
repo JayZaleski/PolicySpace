@@ -14,7 +14,7 @@ A previous session ended partway through the development loop (see `CLAUDE.md`).
 ## 1. Gather the state
 
 1. Read `PROJECT_PLAN/roadmap.md`, `PROJECT_PLAN/scratchpad.md`, and `PROJECT_PLAN/bugs.md` (if it exists).
-2. Run `git status --short` and `git log --oneline -15`. If the project isn't a git repository, tell the user the loop needs git (safe points and checkpoints are commits) and stop.
+2. Run `git status --short`, `git log --oneline -15`, and `git worktree list`. If the project isn't a git repository, tell the user the loop needs git (safe points and checkpoints are commits) and stop.
 3. Find the current Stage: the first Stage in `roadmap.md` that isn't `done`. Read its Stage folder and the folders of its Steps.
 4. Run `.venv/Scripts/python tools/export_status.py --check`. Any mismatch between `roadmap.md` and the plan folders is part of the evidence: point it out to the user.
 5. Note what has uncommitted changes: `vision.md`, `roadmap.md`, `bugs.md`, the current Stage's plan files, bug `fix.md` files, `docs/`, `manual.ipynb`, and code (anything outside `PROJECT_PLAN/`, `docs/`, and `manual.*`).
@@ -59,6 +59,8 @@ Tell the user in plain English:
 - any `open` bugs in `bugs.md`, which the user can fix with `bugfix` at a clean point.
 
 For an interrupted build, also say what the code changes cover, and offer the alternative of discarding them (see Rejected builds in `CLAUDE.md`).
+
+**Interrupted parallel build.** If the plan file has a `## Packages` section and `git worktree list` shows package worktrees (under `.claude/worktrees/`), the session ended partway through a parallel build (see Parallel builds in `CLAUDE.md`). Packages without a worktree were already merged. For each remaining worktree, say what it changed (`git -C <worktree> status --short`). Offer to merge each one with `tools/merge_package.py`, including partial work, then finish with one `build` in **continue** mode in the main tree, which checks every task. If the user would rather drop a package's work, remove its worktree with `git worktree remove --force <path>` and `git branch -D <branch>` only after they confirm. Don't restart the package builds.
 
 Get the user's agreement before doing anything.
 

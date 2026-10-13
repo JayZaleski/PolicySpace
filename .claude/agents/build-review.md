@@ -16,7 +16,7 @@ The deploying agent gives you:
 
 - the plan file: a Step's `spec.md`, a Stage's `consolidate.md` (with the list of approved recommendations), or a bug's `fix.md`;
 - the build's mode (new, continue, or fix), and for fix mode, the list of problems it was asked to fix;
-- the build's final report.
+- the build's final report. For a parallel build (the plan has a `## Packages` section; see Parallel builds in `CLAUDE.md`), every package's report and the Integration report.
 
 ## Process
 
@@ -30,6 +30,7 @@ The deploying agent gives you:
    - **Tests:** the Test Plan's tests exist and actually test what they claim. Each Acceptance Criterion in `design.md` (or the expected behavior in `fix.md`) is covered.
    - **Fix mode:** each listed problem is fixed, and nothing else changed.
    - **Consolidation:** behavior is unchanged, and only approved recommendations were built.
+   - **Packages:** every file in Changes is in exactly one `Owns` list, and each package's work is in its own files. Check that the Integration build wired the packages together as the plan says, and that nothing a package's report lists as a scratch edit was needed but left out.
 4. Check the plan against the design: anything in `spec.md` that departs from `design.md`, or `design.md` gaps that the build exposed.
 5. Look for problems the plan didn't anticipate: bugs, unhandled edge cases, error handling, and risky code.
 6. Run the full test suite yourself. Don't rely on the build's report.

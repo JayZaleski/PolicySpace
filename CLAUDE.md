@@ -94,13 +94,13 @@ Work proceeds Stage by Stage, and within each Stage, Step by Step. **Skills** ar
    1. User launches a fresh session.
    2. **Create `design.md`** — user invokes the `step-design` skill to develop the Step's `design.md`.
    3. **Create `spec.md`** — user invokes the `step-spec` skill to translate `design.md` into `spec.md`.
-   4. **Build and Test** — agent deploys the `update-status` subagent at the **spec** checkpoint to commit `design.md` and `spec.md` as a safe point, then deploys the `build` subagent to write code based on `spec.md`, plus any requested tests, and then the `build-review` subagent to check the build independently. *Requires user permission (one question covers all three).*
+   4. **Build and Test** — agent deploys the `update-status` subagent at the **spec** checkpoint to commit `design.md` and `spec.md` as a safe point, then deploys the `build` subagent to write code based on `spec.md`, plus any requested tests (several `build` subagents at once when `spec.md` has Packages; see [Parallel builds](#parallel-builds)), and then the `build-review` subagent to check the build independently. *Requires user permission (one question covers all three).*
    5. **Code Review** — agent summarizes the diff, test results, and `build-review` findings for the user in plain English, and waits for the user's approval before continuing. On approval, the agent sets the Step's status to `built`. If the user rejects the build, see [Rejected builds](#rejected-builds).
    6. **Draft Documentation Changes** — agent deploys the `step-docs-draft` subagent to write `docs_changes.md` (proposed changes to `docs/`) and `manual_changes.md` (a general description of what the manual should add) in the Step folder.
    7. **Update Status** — agent deploys the `update-status` subagent. *Requires user permission.*
 6. User launches a fresh session.
 7. **Comprehensive Review** — user invokes the `comp-review` skill to review changes across the Stage's Steps and look for opportunities to consolidate and optimize the code. Recommendations are written to `consolidate.md` in the Stage folder.
-8. **Implement Consolidation** — agent deploys the `update-status` subagent at the **consolidate** checkpoint to commit `consolidate.md` as a safe point, then deploys the `build` subagent to incorporate the approved recommendations, plus any requested tests, and then the `build-review` subagent. *Requires user permission (one question covers all three).*
+8. **Implement Consolidation** — agent deploys the `update-status` subagent at the **consolidate** checkpoint to commit `consolidate.md` as a safe point, then deploys the `build` subagent to incorporate the approved recommendations, plus any requested tests (several at once when `consolidate.md` has Packages), and then the `build-review` subagent. *Requires user permission (one question covers all three).*
 9. **Code Review** — agent summarizes the diff, test results, and `build-review` findings for the user, and waits for the user's approval before continuing. If the user rejects the build, see [Rejected builds](#rejected-builds).
 10. **Update Documentation** — agent deploys the `update-docs` and `update-manual` subagents:
    - `update-docs` uses the Stage's `docs_changes.md` files and `consolidate.md` to update `docs/`.
@@ -111,7 +111,40 @@ Each session starts fresh, so all state needed to continue the loop must live in
 
 ### Safe points
 
-Before every build, the plan file it follows (`spec.md`, `consolidate.md`, or a bug's `fix.md`) is committed. That commit is the build's **safe point**: every code change since it belongs to the build. `build` never commits, so until the next checkpoint commit, `git diff HEAD` (plus untracked files) shows exactly what the build did.
+Before every build, the plan file it follows (`spec.md`, `consolidate.md`, or a bug's `fix.md`) is committed. That commit is the build's **safe point**: every code change since it belongs to the build. `build` never commits, so until the next checkpoint commit, `git diff HEAD` (plus untracked files) shows exactly what the build did. In a parallel build, package worktrees start from the safe point, and their work reaches the main tree only through `tools/merge_package.py`, so this still holds.
+
+### Parallel builds
+
+A Step's `spec.md` or a Stage's `consolidate.md` (never a bug's `fix.md`) may split its build into **packages**: parts with no files in common that separate `build` subagents build at the same time, each in its own git worktree. An **Integration** build then wires them together in the main tree. The plan file says how in a `## Packages` section:
+
+```markdown
+## Packages
+### P1: <name>
+- Owns: `crates/engine/src/map.rs`, `crates/engine/tests/settings/hexes_valid/`
+- Tasks: <task numbers, or recommendation IDs for consolidate.md>
+- Isolated tests: <commands that test this package on its own>
+### P2: <name>
+...
+### Integration
+- Owns: <the shared files: module declarations, re-exports, Cargo.toml, shared tests>
+- Tasks: <the remaining tasks>
+- Tests: the full Test Plan and the existing suite
+```
+
+**When to split** (`step-spec` and `comp-review` decide, and tell the user in plain English either way):
+- Split into 2 or 3 packages only when each is a real chunk of work, their `Owns` lists have no file in common, and no package needs code from another. Anything shared, or that connects the packages, goes to Integration.
+- Every file in Changes appears in exactly one `Owns` list. Paths are in backticks; a path ending in `/` owns the whole folder.
+- Otherwise leave the section out and build as one. Small plans and tightly connected work shouldn't be split: the parallel build costs more agents and a merge step.
+
+**Running a parallel build** (new mode only; **continue** and **fix** modes always run one `build` in the main tree, without a package):
+1. Deploy every package's `build` **in one message**, each with `isolation: "worktree"`, the plan file, its package ID, and new mode.
+2. As each finishes with BUILD COMPLETE, merge it: `.venv/Scripts/python tools/merge_package.py <plan file> <package ID> <worktree path>`. It copies the package's owned files into the main tree, drops its scratch edits, and removes the worktree and its branch. If it refuses, explain why to the user and stop. Never merge a package by hand.
+3. Once every package is merged, deploy the Integration `build` in the main tree (no isolation).
+4. Deploy `build-review` with every build's report.
+
+**Issues:** an ISSUE from one package doesn't stop the others. Fix the plan as the skill describes, then continue that builder with `SendMessage` (don't start a new one). If the issue shows the split itself was wrong (one package needs another's code), let the other packages finish, merge every package (the stuck one's partial work too), remove the `## Packages` section from the plan, and finish with one `build` in **continue** mode in the main tree.
+
+Package worktrees live in `.claude/worktrees/` (ignored by git). If a session ends partway through a parallel build, `resume-loop` finds them with `git worktree list`.
 
 ### Rejected builds
 

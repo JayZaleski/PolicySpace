@@ -45,6 +45,8 @@ Draft `spec.md` in the Step folder using the template below. Present a plain-Eng
 
 The spec must be **self-contained**: the `build` subagent sees only `spec.md` and the files it points to, never this conversation. Specify exact files, public interfaces, and data structures, and break the work into ordered tasks. Leave function bodies to `build`, but call out any non-obvious logic, edge cases, or pitfalls.
 
+**Parallel build.** Once the Changes and Tasks are clear, check whether the work splits into packages that can be built at the same time (see Parallel builds in `CLAUDE.md` for the rules and the `## Packages` format). Look for it actively, but split only when the rules allow it. If it splits, add the `## Packages` section after Tasks, and make each package's Isolated tests concrete. In the summary for the user, say whether the build will run as one or as N packages plus Integration, and why.
+
 ```markdown
 # Step NN: <name> — Spec
 
@@ -62,6 +64,9 @@ Public functions, classes, and signatures; data structures; formats; events.
 
 ## Tasks
 An ordered checklist. Each task is small and can be checked on its own.
+
+## Packages
+Only if the build splits (see Parallel builds in CLAUDE.md): each package's Owns, Tasks, and Isolated tests, then Integration.
 
 ## Test Plan
 The tests to write, each mapped to an Acceptance Criterion in design.md, plus how to run them.
@@ -84,8 +89,8 @@ Once the user approves:
 Summarize the spec. Ask the user for permission to commit the spec and build, in one question. Only if they agree:
 
 1. Deploy the `update-status` subagent at the **spec** checkpoint. This commit is the build's safe point (see `CLAUDE.md`). If it reports a problem, explain it to the user and stop.
-2. Deploy the `build` subagent on this Step's `spec.md` in **new** mode.
-3. Once `build` finishes, deploy the `build-review` subagent with the spec, the mode, and `build`'s report (the build permission covers it).
+2. Deploy the `build` subagent on this Step's `spec.md` in **new** mode. If the spec has Packages, run the parallel build instead, as Parallel builds in `CLAUDE.md` describes: the package builds at once, a merge after each, then Integration.
+3. Once `build` finishes (Integration, for a parallel build), deploy the `build-review` subagent with the spec, the mode, and every build's report (the build permission covers it).
 
 ### Handling issues during the build
 
@@ -95,13 +100,15 @@ If `build` reports an issue with the spec, fix `spec.md` so that it always match
 - **Larger changes** (the kind you would have brought to the user in section 3): propose the change to the user first. Once they approve, edit `spec.md` and tell `build` to continue.
 - **Changes that move away from `design.md`**: always propose to the user, however small. Once they approve, update both `design.md` and `spec.md`, then tell `build` to continue.
 
+In a parallel build, tell only the builder that reported the issue to continue (with `SendMessage`); the others keep going. If the fix changes another package's files or the interfaces it uses, tell that builder too. If the issue shows the split was wrong, follow Parallel builds in `CLAUDE.md`.
+
 ## 6. Code Review
 
 Once `build-review` finishes, summarize the diff (`git diff HEAD` plus new files) and the test results for the user in plain English: what was built, how it meets each Acceptance Criterion, anything `build` flagged, the `build-review` findings (each sorted as in Rejected builds in `CLAUDE.md`), and anything that looks off to you. The findings inform the user's decision: don't fix anything before they decide. Ask the user to approve or reject.
 
 - **Approved:** set the Step's status in `roadmap.md` to `built`.
 - **Rejected:** offer the three choices in `CLAUDE.md` (Rejected builds):
-  1. **Fix and re-review:** sort the problems as `CLAUDE.md` describes, update `spec.md` (and `design.md`) where needed, deploy `build` in **fix** mode with the list of problems, then `build-review`, then review again.
+  1. **Fix and re-review:** sort the problems as `CLAUDE.md` describes, update `spec.md` (and `design.md`) where needed, deploy one `build` in **fix** mode (no package, even if the spec has Packages) with the list of problems, then `build-review`, then review again.
   2. **Discard and re-spec:** discard the build as `CLAUDE.md` describes. Set the Step's status back to `designed`, return to section 3 to revise `spec.md` (and `design.md` if needed) with the user, then continue from section 4. The new spec gets its own (revised) spec commit.
   3. **Discard and set aside:** discard the build, and set the Step's status back to `designed`. Keep `design.md` and `spec.md` as they are. Tell the user the Step can be picked up later with `step-spec` (or `step-design` to rethink it), and stop here.
 
