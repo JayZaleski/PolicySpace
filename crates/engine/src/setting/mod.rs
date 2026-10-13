@@ -31,8 +31,12 @@
 //! them all together in a [`LoadErrors`], in a fixed order (by file in read order, then
 //! by position), each with the file's path, line and column. A file that can't be read,
 //! isn't UTF-8, or isn't valid TOML reports only that; its content isn't checked, and if
-//! any file is broken this way, references between things aren't checked either. If
-//! there is any error, no setting is produced.
+//! any file is broken this way, references between things aren't checked either. They
+//! aren't checked either if discovery couldn't see every data file (a missing `rules/` or
+//! `start/`, a folder that can't be listed, or a file name that isn't valid UTF-8), since
+//! the thing a reference points to may be in a file the loader never saw. Other problems
+//! (unknown keys, bad names, duplicates, files rejected for their extension) don't skip
+//! the check. If there is any error, no setting is produced.
 //!
 //! # How loading works
 //! - **Phase 1** reads every file in order. Each `[[section]]` entry is handed to its
@@ -43,8 +47,10 @@
 //!   been read, so a reference can point into any file.
 //!
 //! # Adding a section type (for later Steps)
-//! 1. Define the data, and store it in [`Rules`] or [`StartState`] (these have no fields
-//!    yet).
+//! 1. Define the data, and store it in [`Rules`] or [`StartState`]. Goods are the worked
+//!    example: the domain types are in [`crate::goods`] (which knows nothing about
+//!    files), the reader is in `setting/goods.rs`, and the finished list is
+//!    `Rules::goods`.
 //! 2. Add a `SectionType` to `WorldContent::section_types`, naming its header, the one
 //!    folder it belongs in, and a `read` function.
 //! 3. Check references in `WorldContent::resolve`.
@@ -55,6 +61,7 @@
 mod defs;
 mod discover;
 mod error;
+mod goods;
 mod reader;
 mod source;
 #[cfg(test)]
@@ -66,7 +73,9 @@ use toml::de::DeTable;
 
 pub use error::{LoadError, LoadErrors};
 
+use crate::goods::Goods;
 use error::{ErrorSink, Location};
+use goods::GoodsReader;
 use reader::EntryReader;
 use source::{SourceFile, read_toml};
 
@@ -78,7 +87,7 @@ pub const SUPPORTED_FORMAT_VERSION: i64 = 1;
 pub struct LoadedSetting {
     /// The manifest (setting.toml).
     pub manifest: Manifest,
-    /// Persistent rules (from rules/). Empty until Step 03.
+    /// Persistent rules (from rules/).
     pub rules: Rules,
     /// Starting state (from start/). Empty until Step 04.
     pub start: StartState,
@@ -95,9 +104,12 @@ pub struct Manifest {
     pub format_version: i64,
 }
 
-/// Persistent rules. No fields yet; Steps 03 and 05 add them.
+/// Persistent rules. Step 05 onward add more fields.
 #[derive(Debug, Default)]
-pub struct Rules {}
+pub struct Rules {
+    /// Every good the setting defines, in load order.
+    pub goods: Goods,
+}
 
 /// Starting state (turn 0). No fields yet; Steps 04 and 05 add them.
 #[derive(Debug, Default)]
@@ -109,7 +121,9 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
     let (manifest, content) = load_with::<WorldContent>(path.as_ref())?;
     Ok(LoadedSetting {
         manifest,
-        rules: content.rules,
+        rules: Rules {
+            goods: content.goods.finish(),
+        },
         start: content.start,
     })
 }
@@ -151,8 +165,6 @@ impl Folder {
 }
 
 /// One kind of `[[section]]` that a setting file may contain.
-// Constructed by the real content type from Step 03 on; until then only by tests.
-#[allow(dead_code)]
 pub(crate) struct SectionType<C> {
     /// The `[[header]]` name.
     pub header: &'static str,
@@ -170,18 +182,23 @@ pub(crate) trait SettingContent: Default {
     fn resolve(&mut self, sink: &mut ErrorSink);
 }
 
-/// The real content. It has no section types until Step 03.
+/// The real content. Steps 04 onward add more section types.
 #[derive(Default)]
 pub(crate) struct WorldContent {
-    pub rules: Rules,
+    pub goods: GoodsReader,
     pub start: StartState,
 }
 
 impl SettingContent for WorldContent {
     fn section_types() -> Vec<SectionType<Self>> {
-        Vec::new()
+        vec![SectionType {
+            header: "good",
+            folder: Folder::Rules,
+            read: |content, reader| content.goods.read(reader),
+        }]
     }
 
+    // Goods refer to nothing, so there is nothing to check yet.
     fn resolve(&mut self, _sink: &mut ErrorSink) {}
 }
 
@@ -242,8 +259,9 @@ pub(crate) fn load_with<C: SettingContent>(path: &Path) -> Result<(Manifest, C),
         }
     }
 
-    // Phase 2: check references, unless a broken file may have hidden some definitions.
-    if !rejected {
+    // Phase 2: check references, unless a broken file or a file discovery never saw may
+    // have hidden some definitions.
+    if !rejected && discovered.complete {
         content.resolve(&mut sink);
     }
 

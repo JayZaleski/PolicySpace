@@ -8,6 +8,9 @@ folder holds at least one file (often a `README.md`) so that git keeps it.
 Valid settings:
 - `valid_minimal`: the smallest valid setting.
 - `valid_nested`: `.toml` files in nested subfolders, and `README.md` files everywhere.
+- `goods_valid`: goods across several files and a nested folder, with and without property
+  keys. Load order: `grain`, `copper`, `labor`, `tools`.
+- `goods_one`: exactly one good (for the setting checker's `1 good`).
 
 Folder-structure errors:
 - `missing_manifest`, `missing_rules`, `missing_start`: a required entry is absent.
@@ -17,7 +20,10 @@ Folder-structure errors:
 File-content errors:
 - `manifest_missing_fields`, `manifest_bad_values`: problems in `setting.toml`.
 - `invalid_toml`: a file with TOML syntax errors.
-- `unknown_section`: section headers the loader doesn't know.
+- `unknown_section`: section headers the loader doesn't know (`widget`, `gadget`; made-up
+  names, so they stay unknown as real section types are added).
+- `goods_errors`: every kind of `[[good]]` error, including one good with several problems,
+  a duplicate across files, and a `[[good]]` in `start/`.
 - `many_errors`: several kinds of problem at once, to check that all are reported in order.
 
 Framework settings. These use the test-only section types (a "thing" in `rules/` and a

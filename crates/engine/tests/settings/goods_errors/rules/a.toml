@@ -1,0 +1,38 @@
+[[good]]
+name = "copper"
+
+[[good]]
+movable = false
+
+[[good]]
+name = "Copper"
+
+[[good]]
+name = "zero"
+perishes_after = 0
+
+[[good]]
+name = "negative"
+perishes_after = -2
+
+[[good]]
+name = "fraction"
+perishes_after = 1.5
+
+[[good]]
+name = "huge"
+perishes_after = 4294967296
+
+[[good]]
+name = "wordy"
+movable = "yes"
+
+[[good]]
+name = "typo"
+perishes = 1
+
+[[good]]
+name = "Bad-Name"
+perishes_after = 0
+movable = 1
+colour = "red"

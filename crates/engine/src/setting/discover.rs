@@ -29,6 +29,8 @@ pub(crate) struct Discovered {
     /// Every data file: all of `rules/` first, then all of `start/`, each sorted by the
     /// bytes of the relative path.
     pub data_files: Vec<DataFile>,
+    /// False if discovery may have missed data files in `rules/` or `start/`.
+    pub complete: bool,
 }
 
 /// True for names that are ignored anywhere in a setting: hidden entries (names starting
@@ -47,8 +49,9 @@ struct Entry {
 /// Lists a folder's entries sorted by name. Problems with individual entries are
 /// reported (at `rel_dir` joined with the entry's name) and the entry is left out.
 /// `rel_dir` is the folder's relative path with forward slashes ("" for the root).
-/// Returns `None` if the folder can't be listed.
-fn list_dir(abs_dir: &Path, rel_dir: &str, sink: &mut ErrorSink) -> Option<Vec<Entry>> {
+/// Returns the entries, and whether the listing is complete: false if the folder couldn't
+/// be listed (then there are no entries), or if any entry had to be left out.
+fn list_dir(abs_dir: &Path, rel_dir: &str, sink: &mut ErrorSink) -> (Vec<Entry>, bool) {
     let report_folder_error = |sink: &mut ErrorSink, error: std::io::Error| {
         let message = format!("could not read folder: {error}");
         if rel_dir.is_empty() {
@@ -61,15 +64,17 @@ fn list_dir(abs_dir: &Path, rel_dir: &str, sink: &mut ErrorSink) -> Option<Vec<E
         Ok(read_dir) => read_dir,
         Err(error) => {
             report_folder_error(sink, error);
-            return None;
+            return (Vec::new(), false);
         }
     };
+    let mut complete = true;
     let mut entries = Vec::new();
     for item in read_dir {
         let item = match item {
             Ok(item) => item,
             Err(error) => {
                 report_folder_error(sink, error);
+                complete = false;
                 continue;
             }
         };
@@ -77,6 +82,7 @@ fn list_dir(abs_dir: &Path, rel_dir: &str, sink: &mut ErrorSink) -> Option<Vec<E
         let Some(name) = os_name.to_str() else {
             let lossy = os_name.to_string_lossy();
             sink.in_file(&join(rel_dir, &lossy), "file name is not valid UTF-8");
+            complete = false;
             continue;
         };
         let abs = item.path();
@@ -86,14 +92,17 @@ fn list_dir(abs_dir: &Path, rel_dir: &str, sink: &mut ErrorSink) -> Option<Vec<E
                 is_dir: metadata.is_dir(),
                 abs,
             }),
-            Err(error) => sink.in_file(
-                &join(rel_dir, name),
-                format!("could not read file information: {error}"),
-            ),
+            Err(error) => {
+                sink.in_file(
+                    &join(rel_dir, name),
+                    format!("could not read file information: {error}"),
+                );
+                complete = false;
+            }
         }
     }
     entries.sort_by(|a, b| a.name.cmp(&b.name));
-    Some(entries)
+    (entries, complete)
 }
 
 fn join(rel_dir: &str, name: &str) -> String {
@@ -112,42 +121,41 @@ pub(crate) fn discover(root: &Path, sink: &mut ErrorSink) -> Discovered {
     let mut have_folder = [false, false];
     let mut folders: [Option<PathBuf>; 2] = [None, None];
 
-    if let Some(entries) = list_dir(root, "", sink) {
-        for entry in entries {
-            if is_ignored(&entry.name, entry.is_dir) {
-                continue;
+    let (root_entries, mut complete) = list_dir(root, "", sink);
+    for entry in root_entries {
+        if is_ignored(&entry.name, entry.is_dir) {
+            continue;
+        }
+        match (entry.name.as_str(), entry.is_dir) {
+            (MANIFEST_NAME, false) => {
+                have_manifest_entry = true;
+                manifest = Some(entry.abs);
             }
-            match (entry.name.as_str(), entry.is_dir) {
-                (MANIFEST_NAME, false) => {
-                    have_manifest_entry = true;
-                    manifest = Some(entry.abs);
-                }
-                (MANIFEST_NAME, true) => {
-                    have_manifest_entry = true;
-                    sink.in_file(MANIFEST_NAME, "expected a file, found a folder");
-                }
-                ("README.md", false) => {}
-                ("README.md", true) => {
-                    sink.in_file("README.md", "expected a file, found a folder");
-                }
-                (name, is_dir) if Folder::from_dir_name(name).is_some() => {
-                    let folder = Folder::from_dir_name(name).unwrap_or(Folder::Rules);
-                    have_folder[folder.order()] = true;
-                    if is_dir {
-                        folders[folder.order()] = Some(entry.abs);
-                    } else {
-                        sink.in_file(name, "expected a folder, found a file");
-                    }
-                }
-                (name, false) => sink.in_file(
-                    name,
-                    format!("unexpected file in setting root ({ROOT_ALLOWED})"),
-                ),
-                (name, true) => sink.in_file(
-                    &format!("{name}/"),
-                    format!("unexpected folder in setting root ({ROOT_ALLOWED})"),
-                ),
+            (MANIFEST_NAME, true) => {
+                have_manifest_entry = true;
+                sink.in_file(MANIFEST_NAME, "expected a file, found a folder");
             }
+            ("README.md", false) => {}
+            ("README.md", true) => {
+                sink.in_file("README.md", "expected a file, found a folder");
+            }
+            (name, is_dir) if Folder::from_dir_name(name).is_some() => {
+                let folder = Folder::from_dir_name(name).unwrap_or(Folder::Rules);
+                have_folder[folder.order()] = true;
+                if is_dir {
+                    folders[folder.order()] = Some(entry.abs);
+                } else {
+                    sink.in_file(name, "expected a folder, found a file");
+                }
+            }
+            (name, false) => sink.in_file(
+                name,
+                format!("unexpected file in setting root ({ROOT_ALLOWED})"),
+            ),
+            (name, true) => sink.in_file(
+                &format!("{name}/"),
+                format!("unexpected folder in setting root ({ROOT_ALLOWED})"),
+            ),
         }
     }
 
@@ -164,38 +172,42 @@ pub(crate) fn discover(root: &Path, sink: &mut ErrorSink) -> Discovered {
     }
 
     for folder in [Folder::Rules, Folder::Start] {
-        if let Some(abs) = &folders[folder.order()] {
-            let mut found = Vec::new();
-            walk(abs, folder.dir_name(), folder, &mut found, sink);
-            found.sort_by(|a, b| a.rel.cmp(&b.rel));
-            data_files.extend(found);
+        match &folders[folder.order()] {
+            Some(abs) => {
+                let mut found = Vec::new();
+                complete &= walk(abs, folder.dir_name(), folder, &mut found, sink);
+                found.sort_by(|a, b| a.rel.cmp(&b.rel));
+                data_files.extend(found);
+            }
+            // Missing, or a file instead of a folder: its data files can't be seen.
+            None => complete = false,
         }
     }
 
     Discovered {
         manifest,
         data_files,
+        complete,
     }
 }
 
 /// Walks a data folder recursively, collecting `.toml` files and reporting other files.
+/// Returns false if some folder couldn't be listed or some entry had to be left out.
 fn walk(
     abs_dir: &Path,
     rel_dir: &str,
     folder: Folder,
     found: &mut Vec<DataFile>,
     sink: &mut ErrorSink,
-) {
-    let Some(entries) = list_dir(abs_dir, rel_dir, sink) else {
-        return;
-    };
+) -> bool {
+    let (entries, mut complete) = list_dir(abs_dir, rel_dir, sink);
     for entry in entries {
         if is_ignored(&entry.name, entry.is_dir) {
             continue;
         }
         let rel = join(rel_dir, &entry.name);
         if entry.is_dir {
-            walk(&entry.abs, &rel, folder, found, sink);
+            complete &= walk(&entry.abs, &rel, folder, found, sink);
         } else if entry.name == "README.md" {
             // Allowed, and not read.
         } else if entry.name.ends_with(".toml") {
@@ -211,6 +223,7 @@ fn walk(
             );
         }
     }
+    complete
 }
 
 #[cfg(test)]
@@ -321,6 +334,108 @@ mod tests {
         let (found, errors) = errors_of(root);
         assert!(errors.is_empty(), "{errors:?}");
         assert!(found.data_files.is_empty());
+    }
+
+    /// A minimal complete setting folder: the manifest and both data folders.
+    fn minimal(root: &Path) {
+        touch(root, "setting.toml");
+        touch(root, "rules/README.md");
+        touch(root, "start/README.md");
+    }
+
+    #[test]
+    fn discovery_is_complete_when_every_data_file_was_seen() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/settings");
+        for name in [
+            "valid_nested",
+            "missing_manifest",
+            "unexpected_root_entry",
+            "non_toml_file",
+        ] {
+            let (found, _) = errors_of(&root.join(name));
+            assert!(found.complete, "{name} should be complete");
+        }
+    }
+
+    #[test]
+    fn discovery_is_incomplete_when_a_data_folder_is_missing_or_not_a_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        touch(dir.path(), "setting.toml");
+        touch(dir.path(), "start/README.md");
+        assert!(!errors_of(dir.path()).0.complete, "no rules/");
+
+        let dir = tempfile::tempdir().unwrap();
+        touch(dir.path(), "setting.toml");
+        touch(dir.path(), "rules/README.md");
+        assert!(!errors_of(dir.path()).0.complete, "no start/");
+
+        let dir = tempfile::tempdir().unwrap();
+        touch(dir.path(), "setting.toml");
+        touch(dir.path(), "start/README.md");
+        touch(dir.path(), "rules");
+        assert!(!errors_of(dir.path()).0.complete, "rules as a file");
+    }
+
+    #[test]
+    fn walking_a_folder_that_cannot_be_listed_is_reported_and_incomplete() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("nowhere");
+        let mut sink = ErrorSink::new();
+        let mut found = Vec::new();
+        let complete = walk(&missing, "rules/sub", Folder::Rules, &mut found, &mut sink);
+        assert!(!complete);
+        assert!(found.is_empty());
+        let errors = sink.into_result(()).unwrap_err();
+        let shown: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+        assert_eq!(shown.len(), 1);
+        assert!(
+            shown[0].starts_with("rules/sub: could not read folder: "),
+            "{shown:?}"
+        );
+    }
+
+    /// Creates `rules/<bad name>.toml` where the name is not valid UTF-8, then checks
+    /// discovery reports it and is incomplete.
+    fn check_bad_file_name(bad_name: std::ffi::OsString) {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        minimal(root);
+        let path = root.join("rules").join(&bad_name);
+        if let Err(error) = fs::write(&path, "") {
+            panic!(
+                "this platform refused to create a file whose name is not valid UTF-8 ({error}); \
+                 the non-UTF-8 file name test cannot run here"
+            );
+        }
+        let (found, errors) = errors_of(root);
+        assert!(!found.complete);
+        assert!(found.data_files.is_empty());
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].starts_with("rules/bad")
+                && errors[0].ends_with(": file name is not valid UTF-8"),
+            "{errors:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_name_that_is_not_utf8_is_reported_and_incomplete() {
+        use std::os::unix::ffi::OsStrExt;
+        check_bad_file_name(std::ffi::OsStr::from_bytes(b"bad\xFF.toml").to_os_string());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_name_that_is_not_utf8_is_reported_and_incomplete() {
+        use std::os::windows::ffi::OsStringExt;
+        // 0xD800 is an unpaired surrogate: valid on Windows file systems, not valid UTF-16.
+        let units: Vec<u16> = "bad"
+            .encode_utf16()
+            .chain([0xD800])
+            .chain(".toml".encode_utf16())
+            .collect();
+        check_bad_file_name(std::ffi::OsString::from_wide(&units));
     }
 
     #[test]

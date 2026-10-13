@@ -1,0 +1,4 @@
+[[good]]
+name = "labor"
+perishes_after = 1
+movable = false

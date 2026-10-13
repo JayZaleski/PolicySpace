@@ -194,3 +194,69 @@ fn phase_two_is_skipped_after_a_broken_file() {
         vec!["rules/zz.toml:1:8: invalid TOML: unclosed array table, expected `]]`"]
     );
 }
+
+/// Creates a temp setting with a valid manifest and a `start/places.toml` that places a
+/// thing named `thing`. Returns the folder; the caller adds whatever `rules/` should hold.
+fn temp_setting_placing(thing: &str) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    std::fs::write(
+        root.join("setting.toml"),
+        "name = \"T\"\nformat_version = 1\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(root.join("start")).unwrap();
+    std::fs::write(
+        root.join("start/places.toml"),
+        format!("[[placed_thing]]\nthing = \"{thing}\"\n"),
+    )
+    .unwrap();
+    dir
+}
+
+fn error_lines(root: &Path) -> Vec<String> {
+    match load_with::<TestContent>(root) {
+        Ok(_) => panic!("should fail"),
+        Err(errors) => errors.iter().map(|e| e.to_string()).collect(),
+    }
+}
+
+#[test]
+fn phase_two_is_skipped_when_rules_is_missing() {
+    let dir = temp_setting_placing("copper");
+    assert_eq!(
+        error_lines(dir.path()),
+        vec!["rules/: missing required folder"]
+    );
+}
+
+#[test]
+fn phase_two_is_skipped_when_rules_is_a_file() {
+    let dir = temp_setting_placing("copper");
+    std::fs::write(dir.path().join("rules"), "").unwrap();
+    assert_eq!(
+        error_lines(dir.path()),
+        vec!["rules: expected a folder, found a file"]
+    );
+}
+
+#[test]
+fn phase_two_still_runs_after_problems_that_hide_no_definitions() {
+    let dir = temp_setting_placing("bronze");
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("rules")).unwrap();
+    std::fs::write(
+        root.join("rules/a.toml"),
+        "[[thing]]\nname = \"iron\"\ncolour = \"red\"\n",
+    )
+    .unwrap();
+    std::fs::write(root.join("rules/notes.txt"), "notes").unwrap();
+    assert_eq!(
+        error_lines(root),
+        vec![
+            "rules/a.toml:3:1: unknown key 'colour' in thing",
+            "rules/notes.txt: unexpected file (only .toml files and README.md are allowed here)",
+            "start/places.toml:2:9: unknown thing 'bronze'",
+        ]
+    );
+}

@@ -1,0 +1,37 @@
+# Goods: everything an actor can own. Every good comes from a [[good]] section here;
+# the engine has no built-in goods. A good needs a `name` (lowercase snake_case) and may
+# set two properties:
+#
+#   perishes_after  A whole number, 1 or more. A unit of the good survives that many
+#                   turn-ends, counting the turn it appears in: with 1 it is gone when
+#                   the turn it appears in ends; with 3, a unit appearing in turn 5 is
+#                   gone at the end of turn 7. Leave it out and the good never perishes.
+#   movable         true or false. Whether the good can be moved between places (no
+#                   effect yet). Leave it out and the good is movable (true).
+
+# Labor (used from Stage 02): gone at the end of the turn, and tied to where it is.
+[[good]]
+name = "unskilled_labor"
+perishes_after = 1
+movable = false
+
+# Resource output (used by Step 05): what copper deposits yield each turn.
+[[good]]
+name = "unimproved_copper"
+perishes_after = 1
+movable = false
+
+# Resource output (used by Step 05): what arable land yields each turn.
+[[good]]
+name = "unimproved_grain"
+perishes_after = 1
+movable = false
+
+# An intermediate good: durable and movable, so only a name is needed.
+[[good]]
+name = "copper"
+
+# A perishable, movable good: a unit lasts three turn-ends.
+[[good]]
+name = "grain"
+perishes_after = 3

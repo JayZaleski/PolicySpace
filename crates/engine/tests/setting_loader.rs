@@ -152,8 +152,8 @@ fn unknown_sections() {
     assert_eq!(
         failures_of("unknown_section"),
         vec![
-            "rules/goods.toml:1:3: unknown section 'good'",
-            "start/map.toml:3:3: unknown section 'hex'",
+            "rules/widgets.toml:1:3: unknown section 'widget'",
+            "start/gadgets.toml:3:3: unknown section 'gadget'",
         ]
     );
 }
@@ -198,7 +198,7 @@ fn many_errors_are_all_reported_in_order_and_no_setting_is_produced() {
         lines(&errors),
         vec![
             "setting.toml:2:18: unsupported format_version 3 (this engine supports format version 1)",
-            "rules/a.toml:1:3: unknown section 'good'",
+            "rules/a.toml:1:3: unknown section 'widget'",
             "rules/b.txt: unexpected file (only .toml files and README.md are allowed here)",
             "start/: missing required folder",
         ]

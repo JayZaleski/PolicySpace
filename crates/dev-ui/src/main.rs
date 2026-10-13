@@ -3,14 +3,20 @@
 //! With no argument it only prints the engine's name and version, which shows that the UI
 //! crate builds against the engine's public interface. Given the path to a setting folder
 //! it works as a setting checker: it loads the setting through the engine's public API,
-//! and either prints the setting's name and format version, or prints every error found
-//! and exits with a failure code.
+//! and either prints the setting's name, format version and counts of what it defines
+//! (so far, goods), or prints every error found and exits with a failure code.
 //!
 //! Exit codes: 0 = success; 1 = the setting has errors; 2 = wrong usage.
 
 use std::process::ExitCode;
 
 use policyspace_engine::{ENGINE_NAME, ENGINE_VERSION, load_setting};
+
+/// "1 good", "0 goods", "5 goods": the count with the singular or plural word.
+fn count(n: usize, singular: &str, plural: &str) -> String {
+    let word = if n == 1 { singular } else { plural };
+    format!("{n} {word}")
+}
 
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
@@ -22,8 +28,10 @@ fn main() -> ExitCode {
         [path] => match load_setting(path) {
             Ok(setting) => {
                 println!(
-                    "Loaded setting '{}' (format version {})",
-                    setting.manifest.name, setting.manifest.format_version
+                    "Loaded setting '{}' (format version {}): {}",
+                    setting.manifest.name,
+                    setting.manifest.format_version,
+                    count(setting.rules.goods.len(), "good", "goods")
                 );
                 ExitCode::SUCCESS
             }

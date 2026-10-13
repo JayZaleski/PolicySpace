@@ -23,8 +23,6 @@ impl<K: IdKind> Definitions<K> {
 
     /// Registers the name. On a duplicate, reports an error at the new definition that
     /// names the first one's location, and returns `None`.
-    // Used by section types from Step 03 on; until then only by tests.
-    #[allow(dead_code)]
     pub fn define(&mut self, name: &Located<String>, sink: &mut ErrorSink) -> Option<Id<K>> {
         match self.registry.register(&name.value) {
             Ok(id) => {
@@ -50,7 +48,7 @@ impl<K: IdKind> Definitions<K> {
 
     /// Looks up a reference. If the name is unknown, reports an error at the reference
     /// and returns `None`.
-    // Used by section types from Step 03 on; until then only by tests.
+    // Not used by any real section type yet (Step 05 on); until then only by tests.
     #[allow(dead_code)]
     pub fn resolve(&self, reference: &Located<String>, sink: &mut ErrorSink) -> Option<Id<K>> {
         match self.registry.id(&reference.value) {
@@ -63,22 +61,20 @@ impl<K: IdKind> Definitions<K> {
     }
 
     /// The registry of names defined so far.
-    // Used by section types from Step 03 on; until then only by tests.
+    // Not used by any real section type yet (Step 05 on); until then only by tests.
     #[allow(dead_code)]
     pub fn registry(&self) -> &NameRegistry<K> {
         &self.registry
     }
 
     /// Where `id` was defined.
-    // Used by section types from Step 03 on; until then only by tests.
+    // Not used by any real section type yet (Step 05 on); until then only by tests.
     #[allow(dead_code)]
     pub fn location(&self, id: Id<K>) -> &Location {
         &self.locations[id.index()]
     }
 
     /// Gives up the location information and returns just the registry.
-    // Used by section types from Step 03 on; until then only by tests.
-    #[allow(dead_code)]
     pub fn into_registry(self) -> NameRegistry<K> {
         self.registry
     }

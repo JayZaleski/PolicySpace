@@ -24,7 +24,26 @@ fn checks_the_sample_setting() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Sample Setting' (format version 1)"
+        "Loaded setting 'Sample Setting' (format version 1): 5 goods"
+    );
+}
+
+#[test]
+fn says_1_good_for_one_good_and_0_goods_for_none() {
+    let one = run(&[&repo_path("crates/engine/tests/settings/goods_one")]);
+    assert_eq!(one.status.code(), Some(0));
+    let stdout = String::from_utf8(one.stdout).unwrap();
+    assert_eq!(
+        stdout.trim(),
+        "Loaded setting 'Goods Test' (format version 1): 1 good"
+    );
+
+    let none = run(&[&repo_path("crates/engine/tests/settings/valid_minimal")]);
+    assert_eq!(none.status.code(), Some(0));
+    let stdout = String::from_utf8(none.stdout).unwrap();
+    assert_eq!(
+        stdout.trim(),
+        "Loaded setting 'Minimal Setting' (format version 1): 0 goods"
     );
 }
 
@@ -37,7 +56,7 @@ fn reports_every_error_of_a_broken_setting() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     let expected = [
         "setting.toml:2:18: unsupported format_version 3 (this engine supports format version 1)",
-        "rules/a.toml:1:3: unknown section 'good'",
+        "rules/a.toml:1:3: unknown section 'widget'",
         "rules/b.txt: unexpected file (only .toml files and README.md are allowed here)",
         "start/: missing required folder",
     ];

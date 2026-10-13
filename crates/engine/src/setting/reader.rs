@@ -87,7 +87,7 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     }
 
     /// The entry's header (or the start of the file, for the manifest).
-    // Used by section types from Step 03 on; until then only by tests.
+    // Not used by any real section type yet (Step 05 on); until then only by tests.
     #[allow(dead_code)]
     pub fn location(&self) -> &Location {
         &self.entry
@@ -196,8 +196,6 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     }
 
     /// A string value that must be present and be a valid name (see [`valid_name`]).
-    // Used by section types from Step 03 on; until then only by tests.
-    #[allow(dead_code)]
     pub fn required_name(&mut self, key: &str) -> Option<Located<String>> {
         let name = self.required_string(key)?;
         if valid_name(&name.value) {
@@ -220,22 +218,18 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     }
 
     /// An integer value that may be absent.
-    // Used by section types from Step 03 on; until then only by tests.
-    #[allow(dead_code)]
     pub fn optional_integer(&mut self, key: &str) -> Option<Located<i64>> {
         self.integer(key, false)
     }
 
     /// A boolean value that must be present.
-    // Used by section types from Step 03 on; until then only by tests.
+    // Not used by any real section type yet (Step 05 on); until then only by tests.
     #[allow(dead_code)]
     pub fn required_bool(&mut self, key: &str) -> Option<Located<bool>> {
         self.boolean(key, true)
     }
 
     /// A boolean value that may be absent.
-    // Used by section types from Step 03 on; until then only by tests.
-    #[allow(dead_code)]
     pub fn optional_bool(&mut self, key: &str) -> Option<Located<bool>> {
         self.boolean(key, false)
     }

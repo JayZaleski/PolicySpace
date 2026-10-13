@@ -7,7 +7,10 @@
 //!
 //! A setting is a folder of TOML files. [`load_setting`] reads and strictly checks one,
 //! and returns a [`LoadedSetting`] or every problem found (see the [`setting`] module).
+//! Goods are defined by the setting (see the [`goods`] module).
 
+pub mod goods;
+pub use goods::{Good, GoodId, GoodKind, Goods, Perishes};
 pub mod id;
 pub use id::{Id, IdError, IdKind, NameRegistry};
 pub mod setting;
