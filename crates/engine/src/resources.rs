@@ -10,8 +10,9 @@
 //!   several types.
 //! - Deposits have no names. They are identified in setting files by hex and resource
 //!   type; [`DepositId`]s are valid only within the [`Deposits`] that produced them.
-//! - Nothing is produced yet (Step 06), there is no ownership (Stage 02), and there is no
-//!   stock, depletion, or regeneration (later).
+//! - Each deposit emits its type's `output` every turn into its hex's stockpile (see the
+//!   [`world`](crate::world) module). There is no ownership (Stage 02), and there is no
+//!   depletion or regeneration (later).
 //!
 //! This module knows nothing about files: the setting loader builds [`ResourceTypes`] and
 //! [`Deposits`] from a checked setting, and everything else only reads them.

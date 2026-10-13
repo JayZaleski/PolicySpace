@@ -1,0 +1,11 @@
+[[good]]
+name = "daily"
+perishes_after = 1
+movable = false
+
+[[good]]
+name = "stew"
+perishes_after = 3
+
+[[good]]
+name = "gold"

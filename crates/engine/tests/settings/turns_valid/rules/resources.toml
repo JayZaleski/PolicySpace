@@ -1,0 +1,19 @@
+[[resource]]
+name = "field"
+produces = "daily"
+output = 2
+
+[[resource]]
+name = "meadow"
+produces = "daily"
+output = 0.5
+
+[[resource]]
+name = "pot"
+produces = "stew"
+output = 5
+
+[[resource]]
+name = "mine"
+produces = "gold"
+output = 1.5

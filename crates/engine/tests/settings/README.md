@@ -20,6 +20,11 @@ Valid settings:
   `farmland` at (0, 0), then 3 `iron_ore` at (1, 0).
 - `resources_one`: one good, one hex, one resource type and one deposit (for the setting
   checker's `1 resource` and `1 deposit`).
+- `turns_valid`: for the turn clock tests (`crates/engine/tests/world.rs`). Goods: `daily`
+  (perishes after 1), `stew` (perishes after 3), `gold` (never perishes). Resource types:
+  `field` (2 `daily`), `meadow` (0.5 `daily`), `pot` (5 `stew`), `mine` (1.5 `gold`).
+  Hexes: (0, 0), (1, 0), (2, 0). Deposits: 2 `field`, 1 `meadow` and 1 `pot` at (0, 0),
+  then 1 `field` and 1 `mine` at (1, 0); (2, 0) has none.
 
 Folder-structure errors:
 - `missing_manifest`, `missing_rules`, `missing_start`: a required entry is absent.

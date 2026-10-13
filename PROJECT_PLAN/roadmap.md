@@ -30,7 +30,7 @@
 - Description: Define resource types in the rules (which unimproved good they produce, and how much one deposit outputs per period) and place whole numbers of deposits on hexes in the starting state. Each deposit is a separate unit for a single future owner. There is no ownership, depletion, or regeneration yet. Add deposits to the sample setting.
 
 ### Step 06: turn-clock
-- Status: specified
+- Status: done
 - Tags: #turn-loop #goods #natural-resources
 - Description: Add world state and the turn step: the clock advances, deposits emit their goods, and goods perish when they reach their period limit. Emitted goods are held somewhere that Stage 02 can replace with an owner. Where exactly is a design question for this Step.
 

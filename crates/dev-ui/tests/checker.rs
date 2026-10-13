@@ -97,5 +97,124 @@ fn two_arguments_print_usage_and_exit_2() {
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert_eq!(stderr.trim(), "usage: dev-ui [SETTING_FOLDER]");
+    assert_eq!(stderr.trim(), USAGE);
+}
+
+const USAGE: &str = "usage: dev-ui [SETTING_FOLDER [--turns N]]";
+
+const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 5 goods, 19 hexes, 2 resources, 10 deposits";
+
+/// Runs with the setting folder (relative to the repository) and then extra arguments.
+fn run_with(folder: &str, extra: &[&str]) -> Output {
+    let mut args = vec![repo_path(folder)];
+    args.extend(extra.iter().map(PathBuf::from));
+    let args: Vec<&Path> = args.iter().map(PathBuf::as_path).collect();
+    run(&args)
+}
+
+fn stdout_lines(output: &Output) -> Vec<String> {
+    String::from_utf8(output.stdout.clone())
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+#[test]
+fn turns_prints_a_line_for_each_turn() {
+    let output = run_with("settings/sample", &["--turns", "2"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    let steady = "perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain";
+    assert_eq!(
+        stdout_lines(&output),
+        vec![
+            SAMPLE_LINE.to_string(),
+            "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain"
+                .to_string(),
+            format!("Turn 1: {steady}"),
+            format!("Turn 2: {steady}"),
+        ]
+    );
+}
+
+#[test]
+fn turns_zero_only_runs_turn_0() {
+    let output = run_with("settings/sample", &["--turns", "0"]);
+    assert_eq!(output.status.code(), Some(0));
+    let lines = stdout_lines(&output);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0], SAMPLE_LINE);
+    assert!(lines[1].starts_with("Turn 0: "));
+}
+
+#[test]
+fn empty_lists_print_nothing_and_decimals_print_as_is() {
+    let output = run_with(
+        "crates/engine/tests/settings/valid_minimal",
+        &["--turns", "1"],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let lines = stdout_lines(&output);
+    assert_eq!(
+        &lines[1..],
+        [
+            "Turn 0: perished nothing; emitted nothing",
+            "Turn 1: perished nothing; emitted nothing"
+        ]
+    );
+
+    let output = run_with(
+        "crates/engine/tests/settings/turns_valid",
+        &["--turns", "3"],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let lines = stdout_lines(&output);
+    assert_eq!(
+        lines.last().unwrap(),
+        "Turn 3: perished 6.5 daily, 5 stew; emitted 6.5 daily, 5 stew, 1.5 gold"
+    );
+}
+
+#[test]
+fn bad_turn_arguments_print_usage_and_exit_2() {
+    let cases: [&[&str]; 9] = [
+        &["--turns"],
+        &["--turns", "10001"],
+        &["--turns", "-1"],
+        &["--turns", "+5"],
+        &["--turns", "abc"],
+        &["--turns", "99999999999"],
+        &["--turns", "1", "extra"],
+        &["--steps", "1"],
+        &["--turns", ""],
+    ];
+    for extra in cases {
+        let output = run_with("settings/sample", extra);
+        assert_eq!(output.status.code(), Some(2), "{extra:?}");
+        assert!(output.stdout.is_empty(), "{extra:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert_eq!(stderr.trim(), USAGE, "{extra:?}");
+    }
+}
+
+#[test]
+fn leading_zeros_are_fine() {
+    let output = run_with("settings/sample", &["--turns", "007"]);
+    assert_eq!(output.status.code(), Some(0));
+    // The success line, then turns 0 to 7.
+    assert_eq!(stdout_lines(&output).len(), 9);
+}
+
+#[test]
+fn a_broken_setting_with_turns_prints_the_same_errors_and_runs_no_turns() {
+    let path = repo_path("crates/engine/tests/settings/many_errors");
+    let plain = run(&[&path]);
+    let with_turns = run_with(
+        "crates/engine/tests/settings/many_errors",
+        &["--turns", "2"],
+    );
+    assert_eq!(with_turns.status.code(), Some(1));
+    assert!(with_turns.stdout.is_empty());
+    assert_eq!(with_turns.stderr, plain.stderr);
 }

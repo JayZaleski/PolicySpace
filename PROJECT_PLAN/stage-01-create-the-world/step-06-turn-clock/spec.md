@@ -338,3 +338,6 @@ Run everything with `python tools/check.py` (or `.venv/Scripts/python tools/chec
 
 ## Done When
 All tasks are complete, every test in the Test Plan passes, `python tools/check.py` exits 0, and every Acceptance Criterion in design.md is met.
+
+## Follow-ups for comp-review
+- **(build-review F1, minor docs wording):** the `crates/engine/src/resources.rs` module docs (lines 13–15) dropped "stock" when the "Nothing is produced yet (Step 06)" part was replaced. Deposit stock is still postponed (Step 05 design, Out of Scope). Restore it: "There is no ownership (Stage 02), and there is no stock, depletion, or regeneration (later)."

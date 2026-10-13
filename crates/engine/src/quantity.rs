@@ -4,7 +4,7 @@
 //! are continuous. They're stored as `f64` for now, behind this type, so every system uses
 //! one representation that can be swapped later (for example, to fixed decimal for
 //! cross-platform determinism) in one place. A [`Quantity`] is always finite and never
-//! negative. Arithmetic is added when a system needs it.
+//! negative. Arithmetic is added when a system needs it; so far, only `saturating_add`.
 
 use std::fmt;
 
@@ -30,6 +30,13 @@ impl Quantity {
     /// The value as an `f64`.
     pub fn get(self) -> f64 {
         self.0
+    }
+
+    /// `self + other`, clamped to the largest finite `f64` so the result stays finite.
+    pub fn saturating_add(self, other: Quantity) -> Quantity {
+        // Both values are finite and non-negative, so only overflow to infinity needs
+        // the clamp.
+        Quantity((self.0 + other.0).min(f64::MAX))
     }
 }
 
@@ -82,5 +89,22 @@ mod tests {
     #[test]
     fn quantities_compare_by_value() {
         assert!(Quantity::new(1.0).unwrap() < Quantity::new(2.0).unwrap());
+    }
+
+    #[test]
+    fn saturating_add_sums_normal_values() {
+        let a = Quantity::new(2.5).unwrap();
+        let b = Quantity::new(4.0).unwrap();
+        assert_eq!(a.saturating_add(b).get(), 6.5);
+        assert_eq!(a.saturating_add(Quantity::ZERO), a);
+        assert_eq!(Quantity::ZERO.saturating_add(a), a);
+    }
+
+    #[test]
+    fn saturating_add_clamps_at_the_largest_finite_value() {
+        let max = Quantity::new(f64::MAX).unwrap();
+        let sum = max.saturating_add(max);
+        assert_eq!(sum.get(), f64::MAX);
+        assert!(sum.get().is_finite());
     }
 }

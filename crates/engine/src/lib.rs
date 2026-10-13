@@ -11,6 +11,10 @@
 //! in the setting's starting state (see the [`map`] module). Natural resources (resource
 //! types in the rules, deposits on hexes in the starting state) are in the [`resources`]
 //! module, and amounts of goods are [`Quantity`] values (see the [`quantity`] module).
+//!
+//! A running world is built from a loaded setting and stepped turn by turn (see the
+//! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
+//! and turn numbers are [`Turn`] values (see the [`turn`] module).
 
 pub mod goods;
 pub use goods::{Good, GoodId, GoodKind, Goods, Perishes};
@@ -30,6 +34,12 @@ pub use setting::{
     LoadError, LoadErrors, LoadedSetting, Manifest, Rules, SUPPORTED_FORMAT_VERSION, StartState,
     load_setting,
 };
+pub mod stockpile;
+pub use stockpile::{PerishesAt, Stockpile};
+pub mod turn;
+pub use turn::Turn;
+pub mod world;
+pub use world::{StepError, TurnReport, World};
 
 /// Human-readable name of the engine.
 pub const ENGINE_NAME: &str = "PolicySpace Engine";
