@@ -41,6 +41,8 @@ Read before starting:
 - `crates/engine/tests/settings/README.md` — describe the new goods/currencies in `hexes_valid`, `hexes_one`, `hexes_errors`, and the hex added to `resources_broken_file`.
 - Test settings (exact contents in Interfaces & Data): `hexes_valid/start/{a.toml,a/z.toml,b.toml}`, `hexes_one/start/map.toml`, `hexes_errors/start/{a.toml,b.toml}`, `deposits_errors/start/h.toml`, `resources_one/start/s.toml`, `resources_valid/start/hexes.toml`, `turns_valid/start/map.toml`, `resources_broken_file/start/s.toml`.
 - `settings/sample/rules/goods.toml` — add `silver`; `settings/sample/start/map.toml` — `currency = "silver"` on every hex, and a header comment.
+- `crates/engine/tests/goods.rs` — the sample now has six goods: the sample-goods test expects `silver` as the sixth (never perishes, movable) and is renamed accordingly.
+- `crates/dev-ui/src/text.rs` (tests only) — the good-rows test expects `silver` as the sixth name with `0` held.
 - `crates/dev-ui/tests/checker.rs` — `says_1_hex_for_one_hex` expects `1 good, 1 hex, 0 resources, 0 deposits`; `checks_the_sample_setting` and `SAMPLE_LINE` expect `6 goods, 19 hexes, 2 resources, 10 deposits`.
 - `crates/dev-ui/src/session.rs` (tests only) — the temporary settings must stay valid: add a `rules/goods.toml` with one good `coin` wherever a `rules/README.md` is written next to a hex map, and add `currency = "coin"` to every hex in `ONE_HEX_MAP` and `TWO_HEX_MAP`.
 - `crates/engine/src/setting/test_content.rs` — only if any test there writes a `[[hex]]`; otherwise untouched.

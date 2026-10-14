@@ -167,10 +167,12 @@ mod tests {
     const MANIFEST: &str = "name = \"Edited\"\nformat_version = 1\n";
     /// A manifest with an unsupported format version.
     const BAD_MANIFEST: &str = "name = \"Edited\"\nformat_version = 99\n";
+    /// One good, the currency of the test maps' hexes.
+    const COIN_GOOD: &str = "[[good]]\nname = \"coin\"\n";
     /// A map with the hex (0, 0).
-    const ONE_HEX_MAP: &str = "[[hex]]\nq = 0\nr = 0\n";
+    const ONE_HEX_MAP: &str = "[[hex]]\nq = 0\nr = 0\ncurrency = \"coin\"\n";
     /// A map with the hexes (0, 0) and (1, 0).
-    const TWO_HEX_MAP: &str = "[[hex]]\nq = 0\nr = 0\n\n[[hex]]\nq = 1\nr = 0\n";
+    const TWO_HEX_MAP: &str = "[[hex]]\nq = 0\nr = 0\ncurrency = \"coin\"\n\n[[hex]]\nq = 1\nr = 0\ncurrency = \"coin\"\n";
 
     /// The world a session holds, or a failure if it holds errors or nothing.
     fn world(session: &Session) -> &World {
@@ -236,6 +238,7 @@ mod tests {
         fs::create_dir_all(root.join("rules")).unwrap();
         fs::create_dir_all(root.join("start")).unwrap();
         fs::write(root.join("rules/README.md"), "rules\n").unwrap();
+        fs::write(root.join("rules/goods.toml"), COIN_GOOD).unwrap();
         fs::write(root.join("setting.toml"), MANIFEST).unwrap();
         fs::write(root.join("start/map.toml"), ONE_HEX_MAP).unwrap();
 
@@ -295,6 +298,7 @@ mod tests {
         fs::create_dir_all(root.join("rules")).unwrap();
         fs::create_dir_all(root.join("start")).unwrap();
         fs::write(root.join("rules/README.md"), "rules\n").unwrap();
+        fs::write(root.join("rules/goods.toml"), COIN_GOOD).unwrap();
         fs::write(root.join("setting.toml"), MANIFEST).unwrap();
         fs::write(root.join("start/map.toml"), TWO_HEX_MAP).unwrap();
     }

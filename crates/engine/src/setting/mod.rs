@@ -45,7 +45,8 @@
 //!   unresolved.
 //! - **Phase 2** (`SettingContent::resolve`) checks the references once every file has
 //!   been read, so a reference can point into any file. Resource types refer to goods by
-//!   name, and deposits refer to resource types by name and to hexes by coordinates.
+//!   name, deposits refer to resource types by name and to hexes by coordinates, and each
+//!   hex's currency refers to a good by name.
 //!   A reader's `finish` that depends on phase 2 (such as `ResourcesReader::finish`) is
 //!   only called after a successful load.
 //!
@@ -86,6 +87,7 @@ use toml::de::DeTable;
 
 pub use error::{LoadError, LoadErrors};
 
+use crate::currency::HexCurrencies;
 use crate::goods::Goods;
 use crate::map::HexMap;
 use crate::resources::{Deposits, ResourceTypes};
@@ -135,6 +137,8 @@ pub struct Rules {
 pub struct StartState {
     /// Every hex in the setting's map, in load order.
     pub map: HexMap,
+    /// Each hex's currency good, by hex ID (one per hex in `map`).
+    pub currencies: HexCurrencies,
     /// Every deposit, in load order.
     pub deposits: Deposits,
 }
@@ -143,7 +147,7 @@ pub struct StartState {
 /// is returned, or every problem found is returned (sorted; see the module docs).
 pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors> {
     let (manifest, content) = load_with::<WorldContent>(path.as_ref())?;
-    let map = content.map.finish();
+    let (map, currencies) = content.map.finish();
     let deposits = content.deposits.finish(map.len());
     Ok(LoadedSetting {
         manifest,
@@ -151,7 +155,11 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
             goods: content.goods.finish(),
             resources: content.resources.finish(),
         },
-        start: StartState { map, deposits },
+        start: StartState {
+            map,
+            currencies,
+            deposits,
+        },
     })
 }
 
@@ -244,9 +252,10 @@ impl SettingContent for WorldContent {
         ]
     }
 
-    // Goods and hexes refer to nothing. Resource types refer to goods, and deposits refer
-    // to resource types and hexes.
+    // Goods refer to nothing. Hexes refer to goods (their currency), resource types refer
+    // to goods, and deposits refer to resource types and hexes.
     fn resolve(&mut self, sink: &mut ErrorSink) {
+        self.map.resolve(self.goods.defs(), sink);
         self.resources.resolve(self.goods.defs(), sink);
         self.deposits
             .resolve(self.resources.defs(), &self.map, sink);

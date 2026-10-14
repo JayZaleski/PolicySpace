@@ -288,3 +288,47 @@ fn hex_stockpile_panics_on_a_foreign_hex() {
     let (world, _) = world_of(&test_setting("turns_valid"));
     world.hex_stockpile(foreign);
 }
+
+#[test]
+fn hex_currencies_are_readable_and_unchanged_by_stepping() {
+    let (mut world, _) = world_of(&test_setting("turns_valid"));
+    let gold = good(&world, "gold");
+    let hexes: Vec<HexId> = (0..3).map(|q| hex(&world, q, 0)).collect();
+    let check = |world: &World| {
+        assert_eq!(world.hex_currencies().len(), 3);
+        for &h in &hexes {
+            assert_eq!(world.hex_currency(h), gold);
+        }
+    };
+    check(&world);
+    for _ in 0..3 {
+        world.step().unwrap();
+        check(&world);
+    }
+}
+
+#[test]
+fn every_sample_hex_still_has_silver_after_a_step() {
+    let (mut world, _) = world_of(&sample_setting());
+    let silver = good(&world, "silver");
+    world.step().unwrap();
+    assert_eq!(world.hex_currencies().len(), 19);
+    for (h, _) in world.map().iter() {
+        assert_eq!(world.hex_currency(h), silver);
+    }
+}
+
+#[test]
+#[should_panic(expected = "is not from this list")]
+fn hex_currency_panics_on_a_foreign_hex() {
+    let sample = load(&sample_setting());
+    let foreign = sample
+        .start
+        .map
+        .iter()
+        .map(|(id, _)| id)
+        .find(|id| id.index() >= 3)
+        .unwrap();
+    let (world, _) = world_of(&test_setting("turns_valid"));
+    world.hex_currency(foreign);
+}

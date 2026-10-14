@@ -1,11 +1,16 @@
-//! Reading `[[hex]]` sections (phase 1). The domain types live in [`crate::map`]; this
-//! module only turns setting entries into them.
+//! Reading `[[hex]]` sections (phase 1). The domain types live in [`crate::map`] (the
+//! hexes) and [`crate::currency`] (each hex's currency); this module only turns setting
+//! entries into them. It reads the `currency` key of each hex too, keeps it unresolved in
+//! phase 1, and resolves it against the goods in phase 2.
 
 use std::collections::HashMap;
 
+use crate::currency::HexCurrencies;
+use crate::goods::{GoodId, GoodKind};
 use crate::map::{HexCoord, HexId, HexMap};
 
-use super::error::Location;
+use super::defs::Definitions;
+use super::error::{ErrorSink, Located, Location};
 use super::reader::EntryReader;
 
 /// Collects hexes during phase 1.
@@ -17,6 +22,10 @@ pub(crate) struct MapReader {
     locations: Vec<Location>,
     /// Coordinates to their index in `coords`. Lookup only; never iterated.
     by_coord: HashMap<HexCoord, usize>,
+    /// Each placed hex's currency as written. None if the key was missing or not a string.
+    currencies: Vec<Option<Located<String>>>,
+    /// Filled in phase 2, indexed like `coords`.
+    currency_ids: Vec<Option<GoodId>>,
 }
 
 /// Reads one coordinate key as an `i32`. A value outside `i32` is reported at the value.
@@ -37,10 +46,12 @@ impl MapReader {
     /// Reads one `[[hex]]` entry.
     pub fn read(&mut self, reader: &mut EntryReader<'_, '_>) {
         let at = reader.location().clone();
-        // Read both keys even if the first failed, so neither is falsely reported as
+        // Read every key even if an earlier one failed, so none is falsely reported as
         // unknown.
         let q = coordinate(reader, "q");
         let r = coordinate(reader, "r");
+        // Not name-checked: a bad value is simply an unknown good in phase 2.
+        let currency = reader.required_string("currency");
         // A hex with a missing or invalid coordinate is not placed, so it can't produce a
         // duplicate error. The load fails anyway.
         let (Some(q), Some(r)) = (q, r) else {
@@ -60,6 +71,7 @@ impl MapReader {
         self.by_coord.insert(coord, self.coords.len());
         self.coords.push(coord);
         self.locations.push(at);
+        self.currencies.push(currency);
     }
 
     /// The ID the hex at `coord` will have in the finished map, or None if there is none.
@@ -69,8 +81,35 @@ impl MapReader {
         Some(HexId::from_usize(index))
     }
 
-    /// The finished map.
-    pub fn finish(self) -> HexMap {
-        HexMap::from_coords(self.coords)
+    /// Phase 2: resolves each placed hex's currency against the goods. An unknown name is
+    /// reported at the value (`unknown good '<name>'`) by `Definitions::resolve`.
+    pub fn resolve(&mut self, goods: &Definitions<GoodKind>, sink: &mut ErrorSink) {
+        self.currency_ids = self
+            .currencies
+            .iter()
+            .map(|currency| {
+                currency
+                    .as_ref()
+                    .and_then(|currency| goods.resolve(currency, sink))
+            })
+            .collect();
+    }
+
+    /// The finished map and currencies. Only call this after a successful load, when
+    /// phase 2 has resolved every currency.
+    pub fn finish(self) -> (HexMap, HexCurrencies) {
+        let currencies = self
+            .currency_ids
+            .iter()
+            .map(|currency| {
+                currency.expect(
+                    "internal error: a hex's currency was not resolved in a successful load",
+                )
+            })
+            .collect();
+        (
+            HexMap::from_coords(self.coords),
+            HexCurrencies::from_vec(currencies),
+        )
     }
 }

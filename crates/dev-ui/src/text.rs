@@ -365,11 +365,12 @@ mod tests {
                     "unimproved_copper",
                     "unimproved_grain",
                     "copper",
-                    "grain"
+                    "grain",
+                    "silver"
                 ]
             );
             let held: Vec<&str> = rows.iter().map(|row| row.held.as_str()).collect();
-            assert_eq!(held, ["0", "10", "24", "0", "0"]);
+            assert_eq!(held, ["0", "10", "24", "0", "0", "0"]);
             assert_eq!(rows[4].lasts, "perishes after 3 turns");
             assert_eq!(rows[4].movable, "movable");
             assert_eq!(rows[0].movable, "fixed");

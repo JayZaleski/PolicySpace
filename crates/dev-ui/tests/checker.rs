@@ -32,7 +32,7 @@ fn checks_the_sample_setting() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Sample Setting' (format version 1): 5 goods, 19 hexes, 2 resources, 10 deposits"
+        "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits"
     );
 }
 
@@ -62,7 +62,7 @@ fn says_1_hex_for_one_hex() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Hexes Test' (format version 1): 0 goods, 1 hex, 0 resources, 0 deposits"
+        "Loaded setting 'Hexes Test' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits"
     );
 }
 
@@ -112,7 +112,7 @@ const USAGE: &str = "usage: dev-ui [SETTING_FOLDER]
        dev-ui check SETTING_FOLDER [--turns N]
        dev-ui --version";
 
-const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 5 goods, 19 hexes, 2 resources, 10 deposits";
+const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits";
 
 /// Runs with the setting folder (relative to the repository) and then extra arguments.
 fn run_with(folder: &str, extra: &[&str]) -> Output {

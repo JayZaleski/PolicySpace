@@ -13,7 +13,10 @@ Valid settings:
 - `goods_one`: exactly one good (for the setting checker's `1 good`).
 - `hexes_valid`: hexes across several files and a nested folder, with negative coordinates
   and the extremes of `i32`. Load order: (0, 0), (1, -1), (-3, 2), (i32::MAX, i32::MIN).
-- `hexes_one`: exactly one hex (for the setting checker's `1 hex`).
+  Goods: `coin` and `shell`, designated as the currencies of those hexes in that order
+  (`coin`, `shell`, `coin`, `shell`).
+- `hexes_one`: exactly one hex (for the setting checker's `1 hex`), with one good, `coin`,
+  as its currency.
 - `resources_valid`: resource types and deposits across several files and nested folders,
   with the goods and hexes they refer to defined in files read after them. Resource
   types: `copper_ore`, `iron_ore`, `farmland`, `unused`. Deposits: 2 `copper_ore` and 1
@@ -39,8 +42,10 @@ File-content errors:
 - `goods_errors`: every kind of `[[good]]` error, including one good with several problems,
   a duplicate across files, and a `[[good]]` in `start/`.
 - `hexes_errors`: every kind of `[[hex]]` error, including hexes with a missing, wrongly
-  typed or out-of-range coordinate, an unknown key, one hex with several problems, a
-  duplicate across files, and a `[[hex]]` in `rules/`.
+  typed or out-of-range coordinate, a missing, wrongly typed or unknown currency, an unknown
+  key, one hex with several problems, a duplicate across files, and a `[[hex]]` in `rules/`.
+  Its one good is `coin`. A hex with invalid coordinates is not placed, so its unknown
+  currency is not reported.
 - `resources_errors`: every kind of `[[resource]]` error, including a missing, invalid or
   wrongly typed key, an output that is not a finite number above 0, an unknown good, one
   resource with several problems, a duplicate across files, and a `[[resource]]` in
@@ -50,7 +55,8 @@ File-content errors:
   resource, a coordinate with no hex, one deposit with several problems, a duplicate across
   files, and a `[[deposit]]` in `rules/`.
 - `resources_broken_file`: a broken TOML file next to resources that refer to a good and a
-  hex that don't exist: only the syntax error is reported.
+  hex that don't exist, plus a hex whose currency is an unknown good: only the syntax error
+  is reported.
 - `resources_missing_start`: no `start/` folder, and a resource that refers to a good that
   doesn't exist: only the missing folder is reported.
 - `many_errors`: several kinds of problem at once, to check that all are reported in order.

@@ -16,7 +16,7 @@ fn good(perishes: Perishes, movable: bool) -> Good {
 }
 
 #[test]
-fn the_sample_setting_has_its_five_goods_in_order() {
+fn the_sample_setting_has_its_six_goods_in_order() {
     let goods = load(&sample_setting()).rules.goods;
     let listed: Vec<(usize, &str, Good)> = goods
         .iter()
@@ -30,6 +30,7 @@ fn the_sample_setting_has_its_five_goods_in_order() {
             (2, "unimproved_grain", good(after(1), false)),
             (3, "copper", good(Perishes::Never, true)),
             (4, "grain", good(after(3), true)),
+            (5, "silver", good(Perishes::Never, true)),
         ]
     );
 }

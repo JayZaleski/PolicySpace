@@ -1,35 +1,63 @@
 [[hex]]
 q = 0
 r = 0
+currency = "coin"
 
 [[hex]]
 r = 1
+currency = "coin"
 
 [[hex]]
 q = 0
+currency = "coin"
 
 [[hex]]
 q = 1.5
 r = 0
+currency = "coin"
 
 [[hex]]
 q = "2"
 r = 0
+currency = "coin"
 
 [[hex]]
 q = 2147483648
 r = 0
+currency = "coin"
 
 [[hex]]
 q = 0
 r = -2147483649
+currency = "coin"
 
 [[hex]]
 q = 3
 r = 0
+currency = "coin"
 terrain = "hills"
+
+[[hex]]
+q = 4
+r = 0
+
+[[hex]]
+q = 5
+r = 0
+currency = 7
+
+[[hex]]
+q = 6
+r = 0
+currency = "Coin"
+
+[[hex]]
+q = 7
+r = 0
+currency = "tin"
 
 [[hex]]
 q = 1.5
 r = 9999999999
+currency = "tin"
 terrain = "x"

@@ -17,6 +17,10 @@
 //!   a north-south rule (torus or pole crossing); the fixed orientation is what makes that
 //!   possible. A true geodesic globe is not supported by axial coordinates.
 //!
+//! A hex entry in a setting also names the hex's currency good. The map reader reads it,
+//! but it is stored in [`crate::currency::HexCurrencies`], not in the map: the designation
+//! can change during play, while the map does not.
+//!
 //! This module knows nothing about files: the setting loader builds a [`HexMap`] from a
 //! checked setting, and everything else only reads it.
 

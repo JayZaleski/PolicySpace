@@ -1,5 +1,7 @@
 # The map: the hex tiles of the starting state. Every [[hex]] needs two whole numbers,
-# `q` and `r`, its axial coordinates. Nothing else is allowed yet (terrain and other
+# `q` and `r`, its axial coordinates, and a `currency`: the name of a good from rules/,
+# the good that prices on that hex are posted in. Different hexes may name different
+# goods; this map uses `silver` everywhere. Nothing else is allowed yet (terrain and other
 # attributes come later).
 #
 # The engine fixes the orientation; the setting doesn't choose it. Hexes are pointy-top.
@@ -18,83 +20,102 @@
 [[hex]]
 q = 0
 r = -2
+currency = "silver"
 
 [[hex]]
 q = 1
 r = -2
+currency = "silver"
 
 [[hex]]
 q = 2
 r = -2
+currency = "silver"
 
 
 # Row r = -1
 [[hex]]
 q = -1
 r = -1
+currency = "silver"
 
 [[hex]]
 q = 0
 r = -1
+currency = "silver"
 
 [[hex]]
 q = 1
 r = -1
+currency = "silver"
 
 [[hex]]
 q = 2
 r = -1
+currency = "silver"
 
 
 # Row r = 0
 [[hex]]
 q = -2
 r = 0
+currency = "silver"
 
 [[hex]]
 q = -1
 r = 0
+currency = "silver"
 
 [[hex]]
 q = 0
 r = 0
+currency = "silver"
 
 [[hex]]
 q = 1
 r = 0
+currency = "silver"
 
 [[hex]]
 q = 2
 r = 0
+currency = "silver"
 
 
 # Row r = 1
 [[hex]]
 q = -2
 r = 1
+currency = "silver"
 
 [[hex]]
 q = -1
 r = 1
+currency = "silver"
 
 [[hex]]
 q = 0
 r = 1
+currency = "silver"
 
 [[hex]]
 q = 1
 r = 1
+currency = "silver"
 
 
 # Row r = 2
 [[hex]]
 q = -2
 r = 2
+currency = "silver"
 
 [[hex]]
 q = -1
 r = 2
+currency = "silver"
 
 [[hex]]
 q = 0
 r = 2
+currency = "silver"

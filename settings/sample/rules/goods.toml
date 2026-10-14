@@ -35,3 +35,8 @@ name = "copper"
 [[good]]
 name = "grain"
 perishes_after = 3
+
+# A durable, movable good, so only a name is needed. It is the currency every hex
+# designates (see start/map.toml).
+[[good]]
+name = "silver"

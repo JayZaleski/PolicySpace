@@ -2,9 +2,9 @@
 //!
 //! - A [`World`] is a running world, built from a [`LoadedSetting`]. The rules (goods,
 //!   resource types) never change. The world holds what does: the clock, the hexes, the
-//!   deposits, and one stockpile of unowned goods per hex. Hexes and deposits don't change
-//!   yet, but they are world state because later Stages change them (deposit ownership in
-//!   Stage 02).
+//!   deposits, each hex's currency, and one stockpile of unowned goods per hex. Hexes,
+//!   currencies and deposits don't change yet, but they are world state because later
+//!   Stages change them (deposit ownership in Stage 02).
 //! - A turn has three parts:
 //!   1. start of turn: every deposit emits its type's `output` of its good into its hex's
 //!      stockpile;
@@ -23,6 +23,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
+use crate::currency::HexCurrencies;
 use crate::goods::GoodId;
 use crate::id::IdVec;
 use crate::map::{HexId, HexKind, HexMap};
@@ -73,6 +74,8 @@ pub struct World {
     map: HexMap,
     deposits: Deposits,
     turn: Turn,
+    /// One per hex, by `HexId`. Nothing changes it yet.
+    hex_currencies: HexCurrencies,
     /// One per hex, by `HexId`.
     hex_stockpiles: IdVec<HexKind, Stockpile>,
 }
@@ -93,6 +96,7 @@ impl World {
             map: start.map,
             deposits: start.deposits,
             turn: Turn::ZERO,
+            hex_currencies: start.currencies,
             hex_stockpiles,
         };
         let emitted = world.emit();
@@ -141,6 +145,19 @@ impl World {
     /// The deposits.
     pub fn deposits(&self) -> &Deposits {
         &self.deposits
+    }
+
+    /// Every hex's currency.
+    pub fn hex_currencies(&self) -> &HexCurrencies {
+        &self.hex_currencies
+    }
+
+    /// The currency good of `hex`.
+    ///
+    /// # Panics
+    /// Panics if `hex` isn't from this world's map.
+    pub fn hex_currency(&self, hex: HexId) -> GoodId {
+        self.hex_currencies.get(hex)
     }
 
     /// The stockpile of unowned goods on `hex`.

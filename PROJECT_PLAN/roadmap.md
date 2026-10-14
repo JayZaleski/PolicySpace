@@ -49,7 +49,7 @@
 - Goal: POPs live on hexes, sell unskilled labor to a dummy market and buy goods from it at fixed prices posted in the hex's currency good, consume according to Stone-Geary utility with leisure, and grow or shrink with their utility. POPs own their own goods only; deposits keep emitting into unowned stockpiles.
 
 ### Step 01: currency
-- Status: specified
+- Status: done
 - Tags: #currency #setting-data #hex-map
 - Description: Designate one good per hex as its currency, in the starting state. Decide whether every hex must have one and what the designated good may be. The designation is state, not a rule, because it can change during the simulation. Add a currency good to the sample setting.
 
