@@ -40,7 +40,7 @@
 - Description: Build a developer UI that loads a setting folder and draws its hex grid. It's a developer tool, not a player UI, and talks to the engine only through the engine's public interface.
 
 ### Step 08: dev-ui-inspect-and-step
-- Status: planned
+- Status: specified
 - Tags: #dev-ui #turn-loop
 - Description: Let the developer inspect hexes, deposits, goods, and stockpiles in the dev UI, and step turns from it, so the minimal turn can be watched working.
 
