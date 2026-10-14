@@ -4,7 +4,9 @@
 //! Forms:
 //! - `dev-ui [SETTING_FOLDER]` opens the window (with that setting loaded, if given). The
 //!   window draws the setting's hex map, which can be panned and zoomed, and shows load
-//!   errors; a setting can be opened and reloaded from it.
+//!   errors; a setting can be opened and reloaded from it. The window also inspects hexes
+//!   (deposits and stockpile), lists the world's goods, resource types and turn log, and
+//!   steps turns.
 //! - `dev-ui check SETTING_FOLDER [--turns N]` is the headless setting checker. It loads the
 //!   setting through the engine's public API, and either prints the setting's name, format
 //!   version and counts of what it defines (so far, goods, hexes, resources, and deposits),
@@ -21,6 +23,7 @@ mod app;
 mod check;
 mod cli;
 mod geometry;
+mod inspect;
 mod session;
 
 use std::process::ExitCode;

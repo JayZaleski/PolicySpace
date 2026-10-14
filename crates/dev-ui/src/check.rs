@@ -68,8 +68,8 @@ fn list(world: &World, entries: &[(GoodId, Quantity)]) -> String {
         .join(", ")
 }
 
-/// The line printed for a turn.
-fn turn_line(world: &World, report: &TurnReport) -> String {
+/// The line printed for a turn. `pub(crate)`: the window's turn log uses it too.
+pub(crate) fn turn_line(world: &World, report: &TurnReport) -> String {
     format!(
         "Turn {}: perished {}; emitted {}",
         report.turn,
