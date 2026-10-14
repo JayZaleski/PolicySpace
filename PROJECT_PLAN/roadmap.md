@@ -35,7 +35,7 @@
 - Description: Add world state and the turn step: the clock advances, deposits emit their goods, and goods perish when they reach their period limit. Emitted goods are held somewhere that Stage 02 can replace with an owner. Where exactly is a design question for this Step.
 
 ### Step 07: dev-ui-map
-- Status: planned
+- Status: specified
 - Tags: #dev-ui #hex-map
 - Description: Build a developer UI that loads a setting folder and draws its hex grid. It's a developer tool, not a player UI, and talks to the engine only through the engine's public interface.
 
