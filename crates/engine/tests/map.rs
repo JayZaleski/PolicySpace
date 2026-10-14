@@ -1,18 +1,9 @@
 //! Integration tests for the map, through the engine's public API only.
 
-use std::path::{Path, PathBuf};
+mod common;
 
-use policyspace_engine::{HexCoord, LoadedSetting, load_setting};
-
-fn test_setting(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/settings")
-        .join(name)
-}
-
-fn load(path: &Path) -> LoadedSetting {
-    load_setting(path).unwrap_or_else(|errors| panic!("{} should load:\n{errors}", path.display()))
-}
+use common::{failures_of, load, sample_setting, test_setting};
+use policyspace_engine::{HexCoord, LoadedSetting};
 
 fn list(setting: &LoadedSetting) -> Vec<(usize, HexCoord)> {
     setting
@@ -25,8 +16,7 @@ fn list(setting: &LoadedSetting) -> Vec<(usize, HexCoord)> {
 
 #[test]
 fn the_sample_setting_has_its_nineteen_hexes_in_order() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../settings/sample");
-    let setting = load(&path);
+    let setting = load(&sample_setting());
     assert_eq!(setting.start.map.len(), 19);
     let rows: [(i32, &[i32]); 5] = [
         (-2, &[0, 1, 2]),
@@ -85,11 +75,7 @@ fn a_setting_with_no_hexes_loads() {
 
 #[test]
 fn every_hex_error_is_reported_at_its_place() {
-    let errors = match load_setting(test_setting("hexes_errors")) {
-        Ok(_) => panic!("hexes_errors must not load"),
-        Err(errors) => errors,
-    };
-    let shown: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+    let shown = failures_of("hexes_errors");
     let expected = vec![
         "rules/h.toml:1:3: section 'hex' belongs in start/, not rules/",
         "start/a.toml:5:1: missing required key 'q' in hex",

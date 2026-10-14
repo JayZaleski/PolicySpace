@@ -68,6 +68,17 @@ impl<K: IdKind> Id<K> {
         }
     }
 
+    /// Creates an ID from a position in a list. Crate-private, like `from_index`.
+    ///
+    /// # Panics
+    /// Panics if `index` is greater than `u32::MAX`.
+    pub(crate) fn from_usize(index: usize) -> Self {
+        match u32::try_from(index) {
+            Ok(index) => Id::from_index(index),
+            Err(_) => panic!("{} index {index} does not fit in a u32 ID", K::LABEL),
+        }
+    }
+
     /// The ID's position in its registry (0-based), for indexing per-kind Vecs.
     pub fn index(self) -> usize {
         self.index as usize
@@ -177,8 +188,7 @@ impl<K: IdKind> NameRegistry<K> {
                 name: name.to_string(),
             });
         }
-        let index = u32::try_from(self.names.len()).expect("name registry exceeded u32::MAX names");
-        let id = Id::from_index(index);
+        let id = Id::from_usize(self.names.len());
         self.names.push(name.to_string());
         self.by_name.insert(name.to_string(), id);
         Ok(id)
@@ -225,10 +235,10 @@ impl<K: IdKind> NameRegistry<K> {
 
     /// All (ID, name) pairs in registration order.
     pub fn iter(&self) -> impl Iterator<Item = (Id<K>, &str)> + '_ {
-        self.names.iter().enumerate().map(|(index, name)| {
-            let index = u32::try_from(index).expect("name registry exceeded u32::MAX names");
-            (Id::from_index(index), name.as_str())
-        })
+        self.names
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (Id::from_usize(index), name.as_str()))
     }
 }
 
@@ -243,6 +253,214 @@ impl<K: IdKind> fmt::Debug for NameRegistry<K> {
         f.debug_struct("NameRegistry")
             .field("kind", &K::LABEL)
             .field("names", &self.names)
+            .finish()
+    }
+}
+
+/// A list with one `T` per ID of kind `K`: element `i` belongs to the ID with index `i`.
+///
+/// Use it for per-ID data (per hex, per deposit, ...) so that lookups by ID panic with one
+/// message when the ID isn't from this list. IDs are only valid inside the list (the world)
+/// that produced them. The trait impls are written by hand, for the same reason as `Id`'s.
+pub(crate) struct IdVec<K: IdKind, T> {
+    items: Vec<T>,
+    _kind: PhantomData<fn() -> K>,
+}
+
+impl<K: IdKind, T> IdVec<K, T> {
+    /// Wraps `items`, giving IDs 0, 1, 2, ... in order.
+    ///
+    /// # Panics
+    /// Panics if the last index doesn't fit in a `u32` ID.
+    pub(crate) fn from_vec(items: Vec<T>) -> Self {
+        if let Some(last) = items.len().checked_sub(1) {
+            Id::<K>::from_usize(last);
+        }
+        IdVec {
+            items,
+            _kind: PhantomData,
+        }
+    }
+
+    /// Adds `item` at the end and returns its new ID.
+    // Only tests use this so far; remove `#[cfg(test)]` when a section type needs it.
+    #[cfg(test)]
+    pub(crate) fn push(&mut self, item: T) -> Id<K> {
+        let id = Id::from_usize(self.items.len());
+        self.items.push(item);
+        id
+    }
+
+    /// Number of items.
+    pub(crate) fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// True if there are no items.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// The item for `id`.
+    ///
+    /// # Panics
+    /// Panics if `id` isn't from this list (index out of range).
+    pub(crate) fn get(&self, id: Id<K>) -> &T {
+        match self.items.get(id.index()) {
+            Some(item) => item,
+            None => Self::foreign(id, self.items.len()),
+        }
+    }
+
+    /// The item for `id`, mutably.
+    ///
+    /// # Panics
+    /// Panics if `id` isn't from this list (index out of range).
+    pub(crate) fn get_mut(&mut self, id: Id<K>) -> &mut T {
+        let len = self.items.len();
+        match self.items.get_mut(id.index()) {
+            Some(item) => item,
+            None => Self::foreign(id, len),
+        }
+    }
+
+    /// Every item as (ID, item), in index order.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (Id<K>, &T)> + '_ {
+        self.items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (Id::from_usize(index), item))
+    }
+
+    /// Every item, mutably, in index order.
+    pub(crate) fn values_mut(&mut self) -> impl Iterator<Item = &mut T> + '_ {
+        self.items.iter_mut()
+    }
+
+    fn foreign(id: Id<K>, len: usize) -> ! {
+        panic!(
+            "{:?} is not from this list (it has {} {} entries)",
+            id,
+            len,
+            K::LABEL
+        )
+    }
+}
+
+impl<K: IdKind, T> Default for IdVec<K, T> {
+    fn default() -> Self {
+        IdVec {
+            items: Vec::new(),
+            _kind: PhantomData,
+        }
+    }
+}
+
+impl<K: IdKind, T: Clone> Clone for IdVec<K, T> {
+    fn clone(&self) -> Self {
+        IdVec {
+            items: self.items.clone(),
+            _kind: PhantomData,
+        }
+    }
+}
+
+impl<K: IdKind, T: PartialEq> PartialEq for IdVec<K, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.items == other.items
+    }
+}
+
+impl<K: IdKind, T: fmt::Debug> fmt::Debug for IdVec<K, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(&self.items).finish()
+    }
+}
+
+/// A list of named things of kind `K`, each with its data: a [`NameRegistry`] plus one `T`
+/// per name.
+///
+/// IDs are handed out in load order, and [`iter`](Self::iter) yields entries in that same
+/// order (which is also ID order). An ID is only valid inside the list that produced it.
+pub struct NamedList<K: IdKind, T> {
+    names: NameRegistry<K>,
+    items: IdVec<K, T>,
+}
+
+impl<K: IdKind, T> NamedList<K, T> {
+    /// Builds the list from the registered names and one item per name, in the same order.
+    /// Crate-private: only the setting loader builds named lists.
+    ///
+    /// # Panics
+    /// Panics if `names` and `items` have different lengths (a programming error).
+    pub(crate) fn from_parts(names: NameRegistry<K>, items: Vec<T>) -> Self {
+        assert_eq!(
+            names.len(),
+            items.len(),
+            "every {} name needs exactly one entry",
+            K::LABEL
+        );
+        NamedList {
+            names,
+            items: IdVec::from_vec(items),
+        }
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// True if the list has no entries.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// The ID of the entry named `name`, or [`IdError::UnknownName`].
+    pub fn id(&self, name: &str) -> Result<Id<K>, IdError> {
+        self.names.id(name)
+    }
+
+    /// The name of `id`.
+    ///
+    /// # Panics
+    /// Panics if `id` isn't from this list.
+    pub fn name(&self, id: Id<K>) -> &str {
+        self.names.name(id)
+    }
+
+    /// The data of `id`.
+    ///
+    /// # Panics
+    /// Panics if `id` isn't from this list.
+    pub fn get(&self, id: Id<K>) -> &T {
+        self.items.get(id)
+    }
+
+    /// Every entry as (ID, name, data), in load order.
+    pub fn iter(&self) -> impl Iterator<Item = (Id<K>, &str, &T)> + '_ {
+        self.names
+            .iter()
+            .zip(self.items.iter())
+            .map(|((id, name), (_, item))| (id, name, item))
+    }
+}
+
+impl<K: IdKind, T> Default for NamedList<K, T> {
+    fn default() -> Self {
+        NamedList {
+            names: NameRegistry::new(),
+            items: IdVec::default(),
+        }
+    }
+}
+
+impl<K: IdKind, T: fmt::Debug> fmt::Debug for NamedList<K, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NamedList")
+            .field("kind", &K::LABEL)
+            .field("names", &self.names)
+            .field("items", &self.items)
             .finish()
     }
 }
@@ -348,5 +566,165 @@ mod tests {
     fn debug_output_uses_label() {
         let id: Id<TestGood> = Id::from_index(3);
         assert_eq!(format!("{id:?}"), "Id<good>(3)");
+    }
+
+    #[test]
+    fn id_vec_push_hands_out_sequential_ids_and_get_returns_each_item() {
+        let mut list: IdVec<TestGood, &str> = IdVec::default();
+        assert!(list.is_empty());
+        let a = list.push("a");
+        let b = list.push("b");
+        let c = list.push("c");
+        assert_eq!((a.index(), b.index(), c.index()), (0, 1, 2));
+        assert_eq!(list.len(), 3);
+        assert!(!list.is_empty());
+        assert_eq!((*list.get(a), *list.get(b), *list.get(c)), ("a", "b", "c"));
+    }
+
+    #[test]
+    fn id_vec_get_mut_changes_the_right_item() {
+        let mut list: IdVec<TestGood, i32> = IdVec::from_vec(vec![10, 20, 30]);
+        let middle = Id::from_index(1);
+        *list.get_mut(middle) += 5;
+        assert_eq!(
+            list.iter().map(|(_, v)| *v).collect::<Vec<_>>(),
+            [10, 25, 30]
+        );
+        for value in list.values_mut() {
+            *value += 1;
+        }
+        assert_eq!(
+            list.iter().map(|(_, v)| *v).collect::<Vec<_>>(),
+            [11, 26, 31]
+        );
+    }
+
+    #[test]
+    fn id_vec_iter_is_in_index_order() {
+        let list: IdVec<TestGood, char> = IdVec::from_vec(vec!['x', 'y', 'z']);
+        let listed: Vec<(usize, char)> = list.iter().map(|(id, c)| (id.index(), *c)).collect();
+        assert_eq!(listed, vec![(0, 'x'), (1, 'y'), (2, 'z')]);
+    }
+
+    #[test]
+    fn id_vec_from_vec_gives_the_same_ids_as_pushing() {
+        let built: IdVec<TestGood, i32> = IdVec::from_vec(vec![7, 8, 9]);
+        let mut pushed: IdVec<TestGood, i32> = IdVec::default();
+        for value in [7, 8, 9] {
+            pushed.push(value);
+        }
+        assert_eq!(built, pushed);
+        for (id, value) in built.iter() {
+            assert_eq!(pushed.get(id), value);
+        }
+    }
+
+    #[test]
+    fn id_vec_clone_and_equality_work() {
+        let list: IdVec<TestGood, i32> = IdVec::from_vec(vec![1, 2]);
+        let mut copy = list.clone();
+        assert_eq!(list, copy);
+        *copy.get_mut(Id::from_index(0)) = 99;
+        assert_ne!(list, copy);
+        assert_eq!(format!("{list:?}"), "[1, 2]");
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from this list")]
+    fn id_vec_get_with_a_foreign_id_panics() {
+        let list: IdVec<TestGood, i32> = IdVec::from_vec(vec![1, 2]);
+        list.get(Id::from_index(2));
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from this list")]
+    fn id_vec_get_mut_with_a_foreign_id_panics() {
+        let mut list: IdVec<TestGood, i32> = IdVec::default();
+        list.get_mut(Id::from_index(0));
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    #[should_panic(expected = "does not fit in a u32 ID")]
+    fn from_usize_panics_beyond_u32_max() {
+        Id::<TestGood>::from_usize(u32::MAX as usize + 1);
+    }
+
+    #[test]
+    fn from_usize_matches_from_index() {
+        assert_eq!(Id::<TestGood>::from_usize(4), Id::from_index(4));
+    }
+
+    fn named_sample() -> NamedList<TestGood, i32> {
+        let mut names = NameRegistry::new();
+        names.register("zinc").unwrap();
+        names.register("copper").unwrap();
+        NamedList::from_parts(names, vec![10, 20])
+    }
+
+    #[test]
+    fn named_list_accessors_and_ids_in_order() {
+        let list = named_sample();
+        assert_eq!(list.len(), 2);
+        assert!(!list.is_empty());
+        let copper = list.id("copper").unwrap();
+        assert_eq!(copper.index(), 1);
+        assert_eq!(list.name(copper), "copper");
+        assert_eq!(*list.get(copper), 20);
+        assert_eq!(list.id("zinc").unwrap().index(), 0);
+    }
+
+    #[test]
+    fn the_default_named_list_is_empty() {
+        let list: NamedList<TestGood, i32> = NamedList::default();
+        assert_eq!(list.len(), 0);
+        assert!(list.is_empty());
+        assert_eq!(list.iter().count(), 0);
+    }
+
+    #[test]
+    fn named_list_unknown_name_is_an_error() {
+        assert_eq!(
+            named_sample().id("iron"),
+            Err(IdError::UnknownName {
+                kind: "good",
+                name: "iron".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn named_list_iter_is_in_load_order() {
+        let list = named_sample();
+        let listed: Vec<(usize, &str, i32)> = list
+            .iter()
+            .map(|(id, name, value)| (id.index(), name, *value))
+            .collect();
+        assert_eq!(listed, vec![(0, "zinc", 10), (1, "copper", 20)]);
+    }
+
+    /// An ID that is out of range for `named_sample()` (which has two entries).
+    fn foreign_good() -> Id<TestGood> {
+        Id::from_index(2)
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from this list")]
+    fn named_list_get_panics_on_a_foreign_id() {
+        named_sample().get(foreign_good());
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from this registry")]
+    fn named_list_name_panics_on_a_foreign_id() {
+        named_sample().name(foreign_good());
+    }
+
+    #[test]
+    #[should_panic(expected = "exactly one entry")]
+    fn named_list_from_parts_panics_on_mismatched_lengths() {
+        let mut names: NameRegistry<TestGood> = NameRegistry::new();
+        names.register("a").unwrap();
+        NamedList::<TestGood, i32>::from_parts(names, Vec::new());
     }
 }

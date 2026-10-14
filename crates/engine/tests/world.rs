@@ -1,25 +1,12 @@
 //! Integration tests for the world and its turn clock, through the engine's public API
 //! only.
 
-use std::path::{Path, PathBuf};
+mod common;
 
-use policyspace_engine::{
-    GoodId, HexCoord, HexId, LoadedSetting, PerishesAt, Turn, TurnReport, World, load_setting,
-};
+use std::path::Path;
 
-fn test_setting(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/settings")
-        .join(name)
-}
-
-fn sample_setting() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../settings/sample")
-}
-
-fn load(path: &Path) -> LoadedSetting {
-    load_setting(path).unwrap_or_else(|errors| panic!("{} should load:\n{errors}", path.display()))
-}
+use common::{load, sample_setting, test_setting};
+use policyspace_engine::{GoodId, HexCoord, HexId, PerishesAt, Turn, TurnReport, World};
 
 fn world_of(path: &Path) -> (World, TurnReport) {
     World::new(load(path))
@@ -288,7 +275,7 @@ fn world_accessors() {
 }
 
 #[test]
-#[should_panic(expected = "is not from this map")]
+#[should_panic(expected = "is not from this list")]
 fn hex_stockpile_panics_on_a_foreign_hex() {
     let sample = load(&sample_setting());
     let foreign = sample

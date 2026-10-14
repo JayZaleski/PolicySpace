@@ -181,6 +181,25 @@ impl ErrorSink {
     }
 }
 
+#[cfg(test)]
+impl ErrorSink {
+    /// The sorted error lines (empty if nothing was reported). For tests.
+    pub fn into_lines(self) -> Vec<String> {
+        match self.into_result(()) {
+            Ok(()) => Vec::new(),
+            Err(errors) => errors.lines(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl LoadErrors {
+    /// Each error as one line of text, in order. For tests.
+    pub(crate) fn lines(&self) -> Vec<String> {
+        self.0.iter().map(|e| e.to_string()).collect()
+    }
+}
+
 /// The sort key for an error: path group, path, line (None first), column.
 ///
 /// Groups: no path = 0; `setting.toml` = 1; `rules/...` = 3; `start/...` = 4; anything

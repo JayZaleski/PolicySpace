@@ -1,7 +1,7 @@
 # PolicySpace: Roadmap
 
 ## Stage 01: create-the-world
-- Status: in-progress
+- Status: done
 - Goal: A setting folder loads into a Rust engine as hexes, goods, and natural resources. A minimal turn advances the clock, resources emit their goods, and unused goods perish. A developer UI shows the hex grid and the world's data, and steps turns.
 
 ### Step 01: engine-workspace

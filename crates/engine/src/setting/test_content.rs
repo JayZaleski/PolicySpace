@@ -75,7 +75,7 @@ fn test_setting(name: &str) -> PathBuf {
 fn errors_of(name: &str) -> Vec<String> {
     match load_with::<TestContent>(&test_setting(name)) {
         Ok(_) => Vec::new(),
-        Err(errors) => errors.iter().map(|e| e.to_string()).collect(),
+        Err(errors) => errors.lines(),
     }
 }
 
@@ -217,7 +217,7 @@ fn temp_setting_placing(thing: &str) -> tempfile::TempDir {
 fn error_lines(root: &Path) -> Vec<String> {
     match load_with::<TestContent>(root) {
         Ok(_) => panic!("should fail"),
-        Err(errors) => errors.iter().map(|e| e.to_string()).collect(),
+        Err(errors) => errors.lines(),
     }
 }
 

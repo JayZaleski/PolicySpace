@@ -23,8 +23,10 @@ mod app;
 mod check;
 mod cli;
 mod geometry;
-mod inspect;
 mod session;
+#[cfg(test)]
+mod test_support;
+mod text;
 
 use std::process::ExitCode;
 

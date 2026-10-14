@@ -1,19 +1,11 @@
 //! Integration tests for goods, through the engine's public API only.
 
+mod common;
+
 use std::num::NonZeroU32;
-use std::path::{Path, PathBuf};
 
-use policyspace_engine::{Good, IdError, LoadedSetting, Perishes, load_setting};
-
-fn test_setting(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/settings")
-        .join(name)
-}
-
-fn load(path: &Path) -> LoadedSetting {
-    load_setting(path).unwrap_or_else(|errors| panic!("{} should load:\n{errors}", path.display()))
-}
+use common::{failures_of, load, sample_setting, test_setting};
+use policyspace_engine::{Good, IdError, Perishes};
 
 fn after(n: u32) -> Perishes {
     Perishes::After(NonZeroU32::new(n).unwrap())
@@ -25,8 +17,7 @@ fn good(perishes: Perishes, movable: bool) -> Good {
 
 #[test]
 fn the_sample_setting_has_its_five_goods_in_order() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../settings/sample");
-    let goods = load(&path).rules.goods;
+    let goods = load(&sample_setting()).rules.goods;
     let listed: Vec<(usize, &str, Good)> = goods
         .iter()
         .map(|(id, name, good)| (id.index(), name, *good))
@@ -107,11 +98,7 @@ fn looking_up_a_missing_name_is_an_error() {
 
 #[test]
 fn every_good_error_is_reported_at_its_place() {
-    let errors = match load_setting(test_setting("goods_errors")) {
-        Ok(_) => panic!("goods_errors must not load"),
-        Err(errors) => errors,
-    };
-    let shown: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+    let shown = failures_of("goods_errors");
     let invalid_name = |name: &str| {
         format!(
             "invalid name '{name}' (names must start with a lowercase letter and contain only lowercase letters, digits, and underscores)"

@@ -1,8 +1,54 @@
-//! The text the window's panels show, built from a [`World`] without egui types so it can be
-//! tested. The wording follows the Step 08 design. Amounts are written with `Quantity`'s
-//! `Display`, the same way `check --turns` writes them.
+//! All the text the dev UI shows: the `check` output (load errors, counts, turn lines) and
+//! the window's panels. It's built from engine types without egui, so it can be tested. The
+//! wording follows the Step 02–08 designs. Amounts are written with `Quantity`'s `Display`,
+//! the same way `check --turns` writes them.
 
-use policyspace_engine::{HexId, Perishes, PerishesAt, Quantity, Turn, World};
+use std::path::Path;
+
+use policyspace_engine::{
+    GoodId, HexId, LoadErrors, Perishes, PerishesAt, Quantity, Turn, TurnReport, World,
+};
+
+/// The lines reported for a failed load: each error's `Display`, in order, then
+/// `"{n} error(s) found in {folder.display()}"`. The `check` command prints them to stderr
+/// and the window's error view shows them, so both show the same lines.
+pub fn error_lines(errors: &LoadErrors, folder: &Path) -> Vec<String> {
+    let mut lines: Vec<String> = errors.iter().map(ToString::to_string).collect();
+    lines.push(format!(
+        "{} error(s) found in {}",
+        errors.len(),
+        folder.display()
+    ));
+    lines
+}
+
+/// "1 hex", "19 hexes": the count with the singular or plural word.
+pub fn count(n: usize, singular: &str, plural: &str) -> String {
+    let word = if n == 1 { singular } else { plural };
+    format!("{n} {word}")
+}
+
+/// "10 copper, 24 grain", or "nothing" for an empty list.
+fn list(world: &World, entries: &[(GoodId, Quantity)]) -> String {
+    if entries.is_empty() {
+        return "nothing".to_string();
+    }
+    entries
+        .iter()
+        .map(|(good, amount)| format!("{amount} {}", world.rules().goods.name(*good)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The line printed for a turn, by `check` and in the window's turn log.
+pub fn turn_line(world: &World, report: &TurnReport) -> String {
+    format!(
+        "Turn {}: perished {}; emitted {}",
+        report.turn,
+        list(world, &report.perished),
+        list(world, &report.emitted)
+    )
+}
 
 /// When a group perishes, as a countdown from turn `now`: "perishes this turn",
 /// "perishes in 1 turn", "perishes in {n} turns", or "never perishes".
@@ -89,20 +135,21 @@ pub struct GoodRow {
 
 /// Every good, in good ID order.
 pub fn good_rows(world: &World) -> Vec<GoodRow> {
-    world
-        .rules()
-        .goods
+    let goods = &world.rules().goods;
+    // Walk the hexes once, adding each stockpile's totals into the good's slot.
+    let mut held = vec![Quantity::ZERO; goods.len()];
+    for (hex, _) in world.map().iter() {
+        for (good, total) in world.hex_stockpile(hex).iter() {
+            held[good.index()] = held[good.index()].saturating_add(total);
+        }
+    }
+    goods
         .iter()
-        .map(|(id, name, good)| {
-            let held = world.map().iter().fold(Quantity::ZERO, |sum, (hex, _)| {
-                sum.saturating_add(world.hex_stockpile(hex).total(id))
-            });
-            GoodRow {
-                name: name.to_string(),
-                lasts: lasts(good.perishes),
-                movable: if good.movable { "movable" } else { "fixed" },
-                held: held.to_string(),
-            }
+        .map(|(id, name, good)| GoodRow {
+            name: name.to_string(),
+            lasts: lasts(good.perishes),
+            movable: if good.movable { "movable" } else { "fixed" },
+            held: held[id.index()].to_string(),
         })
         .collect()
 }
@@ -142,20 +189,11 @@ pub fn resource_rows(world: &World) -> Vec<ResourceRow> {
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU32;
-    use std::path::Path;
 
     use policyspace_engine::{HexCoord, load_setting};
 
     use super::*;
-
-    /// A world at turn 0 for the setting at `relative` (from the repository root).
-    fn world_at(relative: &str) -> World {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .join(relative);
-        let setting = load_setting(&path).unwrap_or_else(|e| panic!("should load:\n{e}"));
-        World::new(setting).0
-    }
+    use crate::test_support::world_at;
 
     /// The sample world at turn 0.
     fn sample() -> World {
@@ -188,6 +226,24 @@ mod tests {
     /// Strings from literals.
     fn strings(items: &[&str]) -> Vec<String> {
         items.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn error_lines_lists_each_error_then_a_summary() {
+        let folder =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../engine/tests/settings/many_errors");
+        let errors = load_setting(&folder).expect_err("many_errors has errors");
+        let lines = error_lines(&errors, &folder);
+        assert_eq!(
+            lines,
+            vec![
+                "setting.toml:2:18: unsupported format_version 3 (this engine supports format version 1)".to_string(),
+                "rules/a.toml:1:3: unknown section 'widget'".to_string(),
+                "rules/b.txt: unexpected file (only .toml files and README.md are allowed here)".to_string(),
+                "start/: missing required folder".to_string(),
+                format!("4 error(s) found in {}", folder.display()),
+            ]
+        );
     }
 
     #[test]
@@ -319,6 +375,27 @@ mod tests {
             assert_eq!(rows[0].movable, "fixed");
             assert_eq!(rows[3].lasts, "never perishes");
         }
+    }
+
+    #[test]
+    fn good_rows_held_matches_the_per_hex_totals_on_turns_valid() {
+        let world = turns_valid_at_2();
+        let expected: Vec<String> = world
+            .rules()
+            .goods
+            .iter()
+            .map(|(id, _, _)| {
+                world
+                    .map()
+                    .iter()
+                    .fold(Quantity::ZERO, |sum, (hex, _)| {
+                        sum.saturating_add(world.hex_stockpile(hex).total(id))
+                    })
+                    .to_string()
+            })
+            .collect();
+        let held: Vec<String> = good_rows(&world).into_iter().map(|row| row.held).collect();
+        assert_eq!(held, expected);
     }
 
     #[test]

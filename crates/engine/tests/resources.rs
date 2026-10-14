@@ -1,29 +1,10 @@
 //! Integration tests for natural resources (resource types and deposits), through the
 //! engine's public API only.
 
-use std::path::{Path, PathBuf};
+mod common;
 
-use policyspace_engine::{
-    DepositId, HexCoord, IdError, LoadErrors, LoadedSetting, Quantity, load_setting,
-};
-
-fn test_setting(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/settings")
-        .join(name)
-}
-
-fn load(path: &Path) -> LoadedSetting {
-    load_setting(path).unwrap_or_else(|errors| panic!("{} should load:\n{errors}", path.display()))
-}
-
-fn failures_of(name: &str) -> Vec<String> {
-    let errors: LoadErrors = match load_setting(test_setting(name)) {
-        Ok(_) => panic!("{name} must not load"),
-        Err(errors) => errors,
-    };
-    errors.iter().map(|e| e.to_string()).collect()
-}
+use common::{failures_of, load, sample_setting, test_setting};
+use policyspace_engine::{DepositId, HexCoord, IdError, LoadedSetting, Quantity};
 
 /// Resource types as (index, name, produced good's name, output).
 fn types_of(setting: &LoadedSetting) -> Vec<(usize, String, String, f64)> {
@@ -68,7 +49,7 @@ fn indexes(ids: impl IntoIterator<Item = DepositId>) -> Vec<usize> {
 
 #[test]
 fn the_sample_setting_has_its_resource_types_and_ten_deposits() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../settings/sample");
+    let path = sample_setting();
     let setting = load(&path);
     assert_eq!(
         types_of(&setting),

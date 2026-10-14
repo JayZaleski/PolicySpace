@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use policyspace_engine::{HexCoord, HexId, World, load_setting};
 
-use crate::check::{error_lines, turn_line};
+use crate::text::{error_lines, turn_line};
 
 /// How many steps Step ×10 takes.
 pub const STEP_MANY: u32 = 10;
@@ -17,9 +17,9 @@ pub const STEP_MANY: u32 = 10;
 // only add indirection.
 #[allow(clippy::large_enum_variant)]
 pub enum Loaded {
-    /// The setting loaded; its world is at turn 0.
+    /// The setting loaded; this is its world (at turn 0 after a load, later after steps).
     World(World),
-    /// The setting has errors: the lines from `check::error_lines`.
+    /// The setting has errors: the lines from `text::error_lines`.
     Errors(Vec<String>),
 }
 
@@ -30,7 +30,7 @@ pub struct Session {
     folder: Option<PathBuf>,
     /// What loading the current folder gave.
     loaded: Option<Loaded>,
-    /// Every turn line since the last load, oldest first (`check::turn_line`). Empty
+    /// Every turn line since the last load, oldest first (`text::turn_line`). Empty
     /// unless a world is loaded.
     log: Vec<String>,
     /// The error from the last refused step, if any, since the last load.
@@ -61,7 +61,7 @@ impl Session {
             return;
         };
         self.load(&folder);
-        if let (Some(coord), Some(Loaded::World(world))) = (self.selected, &self.loaded)
+        if let (Some(coord), Some(world)) = (self.selected, self.world())
             && world.map().id(coord).is_none()
         {
             self.selected = None;
@@ -76,6 +76,14 @@ impl Session {
     /// What the last load gave; None if no folder was chosen.
     pub fn loaded(&self) -> Option<&Loaded> {
         self.loaded.as_ref()
+    }
+
+    /// The loaded world; None when nothing is loaded or the setting has errors.
+    pub fn world(&self) -> Option<&World> {
+        match &self.loaded {
+            Some(Loaded::World(world)) => Some(world),
+            _ => None,
+        }
     }
 
     /// Steps the world up to `times` times, adding each report's line to the log. Stops at
@@ -114,8 +122,8 @@ impl Session {
     /// Selects `hex` (a hex of the current world's map), or clears the selection with None.
     /// Without a world, `Some` is ignored and `None` clears.
     pub fn select(&mut self, hex: Option<HexId>) {
-        match (hex, &self.loaded) {
-            (Some(hex), Some(Loaded::World(world))) => {
+        match (hex, self.world()) {
+            (Some(hex), Some(world)) => {
                 self.selected = Some(world.map().coord(hex));
             }
             (Some(_), _) => {}
@@ -126,10 +134,8 @@ impl Session {
     /// The selected hex in the current world's map; None when nothing is selected, no
     /// world is loaded, or the selected coordinates aren't on the map.
     pub fn selected(&self) -> Option<HexId> {
-        match (self.selected, &self.loaded) {
-            (Some(coord), Some(Loaded::World(world))) => world.map().id(coord),
-            _ => None,
-        }
+        let coord = self.selected?;
+        self.world()?.map().id(coord)
     }
 
     /// Loads the setting in `folder`: a world at turn 0 with a log of turn 0's line, or the
@@ -155,21 +161,38 @@ mod tests {
     use std::fs;
 
     use super::*;
+    use crate::test_support::repo_path;
 
-    /// A setting folder in the repository (relative to the repository root).
-    fn repo_path(relative: &str) -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .join(relative)
-    }
+    /// A valid manifest.
+    const MANIFEST: &str = "name = \"Edited\"\nformat_version = 1\n";
+    /// A manifest with an unsupported format version.
+    const BAD_MANIFEST: &str = "name = \"Edited\"\nformat_version = 99\n";
+    /// A map with the hex (0, 0).
+    const ONE_HEX_MAP: &str = "[[hex]]\nq = 0\nr = 0\n";
+    /// A map with the hexes (0, 0) and (1, 0).
+    const TWO_HEX_MAP: &str = "[[hex]]\nq = 0\nr = 0\n\n[[hex]]\nq = 1\nr = 0\n";
 
     /// The world a session holds, or a failure if it holds errors or nothing.
     fn world(session: &Session) -> &World {
-        match session.loaded() {
-            Some(Loaded::World(world)) => world,
-            Some(Loaded::Errors(lines)) => panic!("expected a world, got errors: {lines:?}"),
-            None => panic!("expected a world, got nothing"),
+        if let Some(world) = session.world() {
+            return world;
         }
+        match session.loaded() {
+            Some(Loaded::Errors(lines)) => panic!("expected a world, got errors: {lines:?}"),
+            _ => panic!("expected a world, got nothing"),
+        }
+    }
+
+    #[test]
+    fn world_is_none_without_a_world_and_the_world_otherwise() {
+        let mut session = Session::new();
+        assert!(session.world().is_none());
+        session.open(repo_path("crates/engine/tests/settings/many_errors"));
+        assert!(session.world().is_none());
+        session.open(repo_path("settings/sample"));
+        let world = session.world().expect("the sample loads");
+        assert_eq!(world.map().len(), 19);
+        assert_eq!(world.turn().get(), 0);
     }
 
     #[test]
@@ -213,32 +236,23 @@ mod tests {
         fs::create_dir_all(root.join("rules")).unwrap();
         fs::create_dir_all(root.join("start")).unwrap();
         fs::write(root.join("rules/README.md"), "rules\n").unwrap();
-        let valid_manifest = "name = \"Edited\"\nformat_version = 1\n";
-        fs::write(root.join("setting.toml"), valid_manifest).unwrap();
-        fs::write(root.join("start/map.toml"), "[[hex]]\nq = 0\nr = 0\n").unwrap();
+        fs::write(root.join("setting.toml"), MANIFEST).unwrap();
+        fs::write(root.join("start/map.toml"), ONE_HEX_MAP).unwrap();
 
         let mut session = Session::new();
         session.open(root.to_path_buf());
         assert_eq!(world(&session).map().len(), 1);
 
-        fs::write(
-            root.join("start/map.toml"),
-            "[[hex]]\nq = 0\nr = 0\n\n[[hex]]\nq = 1\nr = 0\n",
-        )
-        .unwrap();
+        fs::write(root.join("start/map.toml"), TWO_HEX_MAP).unwrap();
         session.reload();
         assert_eq!(world(&session).map().len(), 2);
 
-        fs::write(
-            root.join("setting.toml"),
-            "name = \"Edited\"\nformat_version = 99\n",
-        )
-        .unwrap();
+        fs::write(root.join("setting.toml"), BAD_MANIFEST).unwrap();
         session.reload();
         assert!(matches!(session.loaded(), Some(Loaded::Errors(_))));
         assert_eq!(session.folder(), Some(root));
 
-        fs::write(root.join("setting.toml"), valid_manifest).unwrap();
+        fs::write(root.join("setting.toml"), MANIFEST).unwrap();
         session.reload();
         assert_eq!(world(&session).map().len(), 2);
     }
@@ -280,31 +294,9 @@ mod tests {
     fn two_hex_setting(root: &Path) {
         fs::create_dir_all(root.join("rules")).unwrap();
         fs::create_dir_all(root.join("start")).unwrap();
-        fs::write(
-            root.join("rules/README.md"),
-            "rules
-",
-        )
-        .unwrap();
-        fs::write(
-            root.join("setting.toml"),
-            "name = \"Edited\"
-format_version = 1
-",
-        )
-        .unwrap();
-        fs::write(
-            root.join("start/map.toml"),
-            "[[hex]]
-q = 0
-r = 0
-
-[[hex]]
-q = 1
-r = 0
-",
-        )
-        .unwrap();
+        fs::write(root.join("rules/README.md"), "rules\n").unwrap();
+        fs::write(root.join("setting.toml"), MANIFEST).unwrap();
+        fs::write(root.join("start/map.toml"), TWO_HEX_MAP).unwrap();
     }
 
     #[test]
@@ -408,29 +400,11 @@ r = 0
         session.select(Some(hex_at(&session, 1, 0)));
         assert!(session.selected().is_some());
 
-        fs::write(
-            root.join("start/map.toml"),
-            "[[hex]]
-q = 0
-r = 0
-",
-        )
-        .unwrap();
+        fs::write(root.join("start/map.toml"), ONE_HEX_MAP).unwrap();
         session.reload();
         assert_eq!(session.selected(), None);
 
-        fs::write(
-            root.join("start/map.toml"),
-            "[[hex]]
-q = 0
-r = 0
-
-[[hex]]
-q = 1
-r = 0
-",
-        )
-        .unwrap();
+        fs::write(root.join("start/map.toml"), TWO_HEX_MAP).unwrap();
         session.reload();
         assert_eq!(session.selected(), None);
     }
@@ -444,25 +418,13 @@ r = 0
         session.open(root.to_path_buf());
         session.select(Some(hex_at(&session, 0, 0)));
 
-        fs::write(
-            root.join("setting.toml"),
-            "name = \"Edited\"
-format_version = 99
-",
-        )
-        .unwrap();
+        fs::write(root.join("setting.toml"), BAD_MANIFEST).unwrap();
         session.reload();
         assert!(matches!(session.loaded(), Some(Loaded::Errors(_))));
         assert_eq!(session.selected(), None);
         assert!(session.log().is_empty());
 
-        fs::write(
-            root.join("setting.toml"),
-            "name = \"Edited\"
-format_version = 1
-",
-        )
-        .unwrap();
+        fs::write(root.join("setting.toml"), MANIFEST).unwrap();
         session.reload();
         assert_eq!(session.selected(), Some(hex_at(&session, 0, 0)));
     }

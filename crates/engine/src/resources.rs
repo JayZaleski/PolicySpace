@@ -18,8 +18,8 @@
 //! [`Deposits`] from a checked setting, and everything else only reads them.
 
 use crate::goods::GoodId;
-use crate::id::{Id, IdError, IdKind, NameRegistry};
-use crate::map::HexId;
+use crate::id::{Id, IdKind, IdVec, NamedList};
+use crate::map::{HexId, HexKind};
 use crate::quantity::Quantity;
 
 /// Marker kind for resource types.
@@ -42,73 +42,7 @@ pub struct ResourceType {
 }
 
 /// Every resource type in a setting, in load order (which is also ID order).
-#[derive(Debug, Default)]
-pub struct ResourceTypes {
-    names: NameRegistry<ResourceKind>,
-    /// Indexed by `ResourceId::index`.
-    types: Vec<ResourceType>,
-}
-
-impl ResourceTypes {
-    /// Builds the list. Crate-private: only the setting loader builds resource types.
-    ///
-    /// # Panics
-    /// Panics if `names` and `types` have different lengths (a programming error).
-    pub(crate) fn from_parts(names: NameRegistry<ResourceKind>, types: Vec<ResourceType>) -> Self {
-        assert_eq!(
-            names.len(),
-            types.len(),
-            "every resource name needs exactly one resource type"
-        );
-        ResourceTypes { names, types }
-    }
-
-    /// Number of resource types.
-    pub fn len(&self) -> usize {
-        self.types.len()
-    }
-
-    /// True if the setting defines no resource types.
-    pub fn is_empty(&self) -> bool {
-        self.types.is_empty()
-    }
-
-    /// The ID of the resource type named `name`, or [`IdError::UnknownName`].
-    pub fn id(&self, name: &str) -> Result<ResourceId, IdError> {
-        self.names.id(name)
-    }
-
-    /// The name of `id`.
-    ///
-    /// # Panics
-    /// Panics if `id` isn't from this list.
-    pub fn name(&self, id: ResourceId) -> &str {
-        self.names.name(id)
-    }
-
-    /// The resource type `id`.
-    ///
-    /// # Panics
-    /// Panics if `id` isn't from this list.
-    pub fn get(&self, id: ResourceId) -> &ResourceType {
-        match self.types.get(id.index()) {
-            Some(resource) => resource,
-            None => panic!(
-                "{:?} is not from this list (it has {} resource types)",
-                id,
-                self.types.len()
-            ),
-        }
-    }
-
-    /// Every resource type as (ID, name, data), in load order.
-    pub fn iter(&self) -> impl Iterator<Item = (ResourceId, &str, &ResourceType)> + '_ {
-        self.names
-            .iter()
-            .zip(&self.types)
-            .map(|((id, name), resource)| (id, name, resource))
-    }
-}
+pub type ResourceTypes = NamedList<ResourceKind, ResourceType>;
 
 /// Marker kind for deposits.
 pub enum DepositKind {}
@@ -135,10 +69,10 @@ pub struct Deposit {
 /// panics on it for any hex.
 #[derive(Debug, Default)]
 pub struct Deposits {
-    /// Indexed by `DepositId::index`.
-    deposits: Vec<Deposit>,
-    /// Indexed by `HexId::index`: the deposits on each hex, in ID order.
-    by_hex: Vec<Vec<DepositId>>,
+    /// One entry per deposit, by `DepositId`.
+    deposits: IdVec<DepositKind, Deposit>,
+    /// One entry per hex, by `HexId`: the deposits on each hex, in ID order.
+    by_hex: IdVec<HexKind, Vec<DepositId>>,
 }
 
 impl Deposits {
@@ -150,16 +84,16 @@ impl Deposits {
     /// Panics if a deposit's hex index is `>= hex_count`, or if there are more than
     /// `u32::MAX` deposits.
     pub(crate) fn from_deposits(deposits: Vec<Deposit>, hex_count: usize) -> Self {
-        let mut by_hex: Vec<Vec<DepositId>> = vec![Vec::new(); hex_count];
-        for (index, deposit) in deposits.iter().enumerate() {
-            let index = u32::try_from(index).expect("more than u32::MAX deposits");
-            let hex = deposit.hex.index();
+        let deposits = IdVec::from_vec(deposits);
+        let mut by_hex: IdVec<HexKind, Vec<DepositId>> =
+            IdVec::from_vec(vec![Vec::new(); hex_count]);
+        for (id, deposit) in deposits.iter() {
             assert!(
-                hex < hex_count,
+                deposit.hex.index() < hex_count,
                 "{:?} is not from a map of {hex_count} hexes",
                 deposit.hex
             );
-            by_hex[hex].push(DepositId::from_index(index));
+            by_hex.get_mut(deposit.hex).push(id);
         }
         Deposits { deposits, by_hex }
     }
@@ -179,23 +113,12 @@ impl Deposits {
     /// # Panics
     /// Panics if `id` isn't from this list.
     pub fn get(&self, id: DepositId) -> &Deposit {
-        match self.deposits.get(id.index()) {
-            Some(deposit) => deposit,
-            None => panic!(
-                "{:?} is not from this list (it has {} deposits)",
-                id,
-                self.deposits.len()
-            ),
-        }
+        self.deposits.get(id)
     }
 
     /// Every deposit as (ID, data), in load order.
     pub fn iter(&self) -> impl Iterator<Item = (DepositId, &Deposit)> + '_ {
-        self.deposits.iter().enumerate().map(|(index, deposit)| {
-            // `from_deposits` checked that every index fits in a u32.
-            let index = u32::try_from(index).expect("more than u32::MAX deposits");
-            (DepositId::from_index(index), deposit)
-        })
+        self.deposits.iter()
     }
 
     /// The deposits on `hex`, in ID order; empty if it has none.
@@ -203,14 +126,7 @@ impl Deposits {
     /// # Panics
     /// Panics if `hex` isn't from the map these deposits were built with.
     pub fn on_hex(&self, hex: HexId) -> &[DepositId] {
-        match self.by_hex.get(hex.index()) {
-            Some(ids) => ids,
-            None => panic!(
-                "{:?} is not from this map (it has {} hexes)",
-                hex,
-                self.by_hex.len()
-            ),
-        }
+        self.by_hex.get(hex)
     }
 
     /// The deposits of `resource` on `hex`, in ID order.
@@ -225,26 +141,14 @@ impl Deposits {
         self.on_hex(hex)
             .iter()
             .copied()
-            .filter(move |id| self.deposits[id.index()].resource == resource)
+            .filter(move |id| self.deposits.get(*id).resource == resource)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::goods::GoodKind;
-    use crate::map::HexKind;
-
-    fn q(value: f64) -> Quantity {
-        Quantity::new(value).unwrap()
-    }
-
-    fn good_ids(count: usize) -> Vec<GoodId> {
-        let mut names: NameRegistry<GoodKind> = NameRegistry::new();
-        (0..count)
-            .map(|i| names.register(&format!("g{i}")).unwrap())
-            .collect()
-    }
+    use crate::id::NameRegistry;
 
     fn resource_ids(count: usize) -> Vec<ResourceId> {
         let mut names: NameRegistry<ResourceKind> = NameRegistry::new();
@@ -258,78 +162,6 @@ mod tests {
         (0..count)
             .map(|i| names.register(&format!("h{i}")).unwrap())
             .collect()
-    }
-
-    fn sample_types() -> ResourceTypes {
-        let goods = good_ids(2);
-        let mut names = NameRegistry::new();
-        names.register("copper_ore").unwrap();
-        names.register("farmland").unwrap();
-        ResourceTypes::from_parts(
-            names,
-            vec![
-                ResourceType {
-                    produces: goods[0],
-                    output: q(2.5),
-                },
-                ResourceType {
-                    produces: goods[1],
-                    output: q(4.0),
-                },
-            ],
-        )
-    }
-
-    #[test]
-    fn resource_type_accessors_and_iter_order() {
-        let types = sample_types();
-        assert_eq!(types.len(), 2);
-        assert!(!types.is_empty());
-        let farmland = types.id("farmland").unwrap();
-        assert_eq!(farmland.index(), 1);
-        assert_eq!(types.name(farmland), "farmland");
-        assert_eq!(types.get(farmland).output, q(4.0));
-        assert_eq!(types.get(farmland).produces.index(), 1);
-        let listed: Vec<(usize, &str, f64)> = types
-            .iter()
-            .map(|(id, name, t)| (id.index(), name, t.output.get()))
-            .collect();
-        assert_eq!(listed, vec![(0, "copper_ore", 2.5), (1, "farmland", 4.0)]);
-        assert_eq!(
-            types.id("gold"),
-            Err(IdError::UnknownName {
-                kind: "resource",
-                name: "gold".to_string()
-            })
-        );
-    }
-
-    #[test]
-    fn the_default_resource_list_is_empty() {
-        let types = ResourceTypes::default();
-        assert_eq!(types.len(), 0);
-        assert!(types.is_empty());
-        assert_eq!(types.iter().count(), 0);
-    }
-
-    #[test]
-    #[should_panic(expected = "is not from this list")]
-    fn resource_get_panics_on_a_foreign_id() {
-        sample_types().get(resource_ids(3)[2]);
-    }
-
-    #[test]
-    #[should_panic(expected = "is not from this registry")]
-    fn resource_name_panics_on_a_foreign_id() {
-        sample_types().name(resource_ids(3)[2]);
-    }
-
-    #[test]
-    #[should_panic(expected = "exactly one resource type")]
-    fn from_parts_panics_on_mismatched_lengths() {
-        let mut names = NameRegistry::new();
-        names.register("copper_ore").unwrap();
-        ResourceTypes::from_parts(names, Vec::new());
     }
 
     /// Three hexes; deposits: 0 r0@h0, 1 r1@h0, 2 r0@h2, 3 r0@h0.
@@ -421,13 +253,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "is not from this map")]
+    #[should_panic(expected = "is not from this list")]
     fn on_hex_panics_on_a_hex_beyond_the_map() {
         sample_deposits().on_hex(hex_ids(4)[3]);
     }
 
     #[test]
-    #[should_panic(expected = "is not from this map")]
+    #[should_panic(expected = "is not from this list")]
     fn on_hex_panics_on_the_default_list() {
         Deposits::default().on_hex(hex_ids(1)[0]);
     }

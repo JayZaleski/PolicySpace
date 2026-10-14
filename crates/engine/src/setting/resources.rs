@@ -244,11 +244,7 @@ mod tests {
             reader.finish();
             count
         };
-        let errors = match sink.into_result(()) {
-            Ok(()) => Vec::new(),
-            Err(errors) => errors.iter().map(|e| e.to_string()).collect(),
-        };
-        (count, errors)
+        (count, sink.into_lines())
     }
 
     #[test]

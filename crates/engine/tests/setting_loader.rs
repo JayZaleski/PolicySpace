@@ -2,30 +2,19 @@
 //! (The framework rules that need the test-only section types are tested inside the
 //! crate, in `src/setting/test_content.rs`.)
 
+mod common;
+
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
+use common::{failures_of, lines, sample_setting, test_setting};
 use policyspace_engine::{LoadErrors, SUPPORTED_FORMAT_VERSION, load_setting};
-
-fn test_setting(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/settings")
-        .join(name)
-}
-
-fn lines(errors: &LoadErrors) -> Vec<String> {
-    errors.iter().map(|e| e.to_string()).collect()
-}
 
 fn failure_of(path: &Path) -> LoadErrors {
     match load_setting(path) {
         Ok(_) => panic!("{} should not load", path.display()),
         Err(errors) => errors,
     }
-}
-
-fn failures_of(name: &str) -> Vec<String> {
-    lines(&failure_of(&test_setting(name)))
 }
 
 const MANIFEST: &str = "name = \"Temp\"\nformat_version = 1\n";
@@ -41,8 +30,7 @@ fn temp_setting() -> tempfile::TempDir {
 
 #[test]
 fn sample_setting_loads() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../settings/sample");
-    let setting = load_setting(&path).expect("the sample setting should load");
+    let setting = load_setting(sample_setting()).expect("the sample setting should load");
     assert_eq!(setting.manifest.name, "Sample Setting");
     assert_eq!(setting.manifest.format_version, 1);
     assert_eq!(setting.manifest.format_version, SUPPORTED_FORMAT_VERSION);

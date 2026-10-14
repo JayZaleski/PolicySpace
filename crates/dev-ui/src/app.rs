@@ -2,7 +2,7 @@
 //! [`Session`]. The window also has the world panel (turn log, goods, resource types) and the
 //! hex panel (the selected hex's deposits and stockpile), and steps turns. The drawing is
 //! checked by hand (see the Step 07 and Step 08 specs); the map math it uses is tested in
-//! `geometry`, and the panel text in `inspect`.
+//! `geometry`, and the panel text in `text`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -14,12 +14,11 @@ use eframe::egui::{
 };
 use policyspace_engine::{ENGINE_NAME, ENGINE_VERSION, HexId, World};
 
-use crate::check::count;
 use crate::geometry::{
     DOT_RADIUS_PX, HexShape, Point, View, Viewport, hex_at, hex_center, hex_corners, is_visible,
 };
-use crate::inspect::{deposit_lines, good_rows, resource_rows, stockpile_lines};
 use crate::session::{Loaded, STEP_MANY, Session};
+use crate::text::{count, deposit_lines, good_rows, resource_rows, stockpile_lines};
 
 /// How much one unit of scroll-wheel input zooms: the factor is `exp(scroll · this)`.
 const SCROLL_ZOOM_PER_UNIT: f64 = 0.0015;
@@ -111,11 +110,9 @@ impl DevApp {
 
     /// The window title for what is loaded.
     fn title(&self) -> String {
-        match self.session.loaded() {
-            Some(Loaded::World(world)) => {
-                format!("{} — {}", base_title(), world.manifest().name)
-            }
-            _ => base_title(),
+        match self.session.world() {
+            Some(world) => format!("{} — {}", base_title(), world.manifest().name),
+            None => base_title(),
         }
     }
 
@@ -124,7 +121,7 @@ impl DevApp {
     /// start of a frame, before any widget is drawn, so a focused button doesn't also react
     /// to Space.
     fn shortcuts(&mut self, ui: &mut Ui) {
-        if !matches!(self.session.loaded(), Some(Loaded::World(_))) {
+        if self.session.world().is_none() {
             return;
         }
         // Both Space keys are consumed every frame, Shift+Space first because `consume_key`
@@ -149,7 +146,7 @@ impl DevApp {
     /// The world panel (left) and the hex panel (right), when a world is loaded. They must
     /// be shown before the central panel.
     fn side_panels(&self, ui: &mut Ui) {
-        let Some(Loaded::World(world)) = self.session.loaded() else {
+        let Some(world) = self.session.world() else {
             return;
         };
         Panel::left("world")
@@ -280,14 +277,14 @@ impl DevApp {
                     self.session.reload();
                     self.hovered = None;
                 }
-                let can_fit = matches!(
-                    self.session.loaded(),
-                    Some(Loaded::World(world)) if !world.map().is_empty()
-                );
+                let can_fit = self
+                    .session
+                    .world()
+                    .is_some_and(|world| !world.map().is_empty());
                 if ui.add_enabled(can_fit, Button::new("Fit")).clicked() {
                     self.view = None;
                 }
-                let can_step = matches!(self.session.loaded(), Some(Loaded::World(_)));
+                let can_step = self.session.world().is_some();
                 if ui
                     .add_enabled(can_step, Button::new("Step"))
                     .on_hover_text("Space")
@@ -468,7 +465,7 @@ fn draw_map(
         paint_hex(
             &painter,
             shape,
-            to_pos(center),
+            center,
             view.scale,
             HexLook {
                 foreground,
@@ -521,29 +518,26 @@ struct HexLook {
     has_deposits: bool,
 }
 
-/// Paints one visible hex at screen position `center`, in the style for `shape`.
+/// Paints one visible hex centered at the screen point `center`, in the style for `shape`.
 fn paint_hex(
     painter: &egui::Painter,
     shape: HexShape,
-    center: Pos2,
+    center: Point,
     scale: f64,
     look: HexLook,
     (q, r): (i32, i32),
 ) {
+    let pos = to_pos(center);
     match shape {
         HexShape::Dot => {
             if let Some(highlight) = look.highlight {
-                painter.circle_filled(center, HOVER_DOT_RADIUS_PX, highlight);
+                painter.circle_filled(pos, HOVER_DOT_RADIUS_PX, highlight);
             } else {
-                painter.circle_filled(center, DOT_RADIUS_PX as f32, look.foreground);
+                painter.circle_filled(pos, DOT_RADIUS_PX as f32, look.foreground);
             }
         }
         HexShape::Hexagon | HexShape::LabelledHexagon => {
-            let corners: Vec<Pos2> =
-                hex_corners(Point::new(f64::from(center.x), f64::from(center.y)), scale)
-                    .into_iter()
-                    .map(to_pos)
-                    .collect();
+            let corners: Vec<Pos2> = hex_corners(center, scale).into_iter().map(to_pos).collect();
             match look.highlight {
                 Some(highlight) => {
                     painter.add(Shape::convex_polygon(corners, highlight, look.stroke));
@@ -555,7 +549,7 @@ fn paint_hex(
             if shape == HexShape::LabelledHexagon {
                 let size = (scale * 0.3).min(MAX_LABEL_SIZE) as f32;
                 painter.text(
-                    center,
+                    pos,
                     Align2::CENTER_CENTER,
                     format!("{q}, {r}"),
                     FontId::proportional(size),
@@ -569,7 +563,7 @@ fn paint_hex(
                 let radius = ((0.12 * scale) as f32)
                     .clamp(2.0, 6.0)
                     .min((0.35 * scale) as f32);
-                painter.circle_filled(center + egui::vec2(0.0, offset), radius, look.foreground);
+                painter.circle_filled(pos + egui::vec2(0.0, offset), radius, look.foreground);
             }
         }
     }

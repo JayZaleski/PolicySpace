@@ -1,0 +1,98 @@
+# Natural resources
+
+Natural resources are the first data in a setting that refers to other data. A **resource type** is defined in `rules/` and names the good it produces. A **deposit** is placed in `start/` on a hex and names its resource type. The domain types are in `crates/engine/src/resources.rs`, amounts are `Quantity` values (`crates/engine/src/quantity.rs`), and the reading code is in `crates/engine/src/setting/resources.rs`.
+
+Each deposit emits its resource type's `output` of its good into its hex's stockpile at the start of every turn (see [world.md](world.md)). There is no ownership (Stage 02), and no deposit stock, depletion, or regeneration (later). The engine does not require the produced good to be unmovable or to perish after one period; the setting decides.
+
+## Setting format
+
+Resource types (`[[resource]]`, `rules/` only). Each has exactly three required keys:
+
+| Key | Meaning |
+|---|---|
+| `name` | Lowercase `snake_case`, unique across the setting. Resource type names and good names are separate namespaces. |
+| `produces` | The name of the one good a deposit produces. Must be a good the setting defines. |
+| `output` | How much of that good one deposit produces per period. A whole number or a decimal, finite and greater than 0. |
+
+Deposits (`[[deposit]]`, `start/` only). Keys:
+
+| Key | Meaning |
+|---|---|
+| `resource` | Required. The name of a resource type. |
+| `q`, `r` | Required. Axial coordinates, read and range-checked exactly as for `[[hex]]` (see [map.md](map.md)). A hex must exist there. |
+| `count` | Optional, default 1. A whole number from 1 to 1,000,000. |
+
+An entry with `count = 3` places three separate deposits. They are identical at the start, each has its own `DepositId`, and in Stage 02 each can have a different single owner. A hex may hold deposits of several resource types, but each resource type may appear in at most one entry per hex (raise `count` instead). The `count` cap of 1,000,000 turns a typo into a clear error instead of an attempt to allocate billions of deposits.
+
+Example:
+
+```toml
+# rules/resources.toml
+[[resource]]
+name = "copper_ore"
+produces = "unimproved_copper"
+output = 2.5
+
+# start/deposits.toml
+[[deposit]]
+resource = "copper_ore"
+q = 1
+r = -1
+count = 2
+```
+
+## Types
+
+`quantity.rs`:
+- `Quantity` wraps an `f64` and is always finite and never negative. `Quantity::new(f64) -> Option<Quantity>` rejects negative, NaN, and infinite values and turns `-0.0` into `0.0`; `get()` returns the `f64`; `ZERO` and `Default` are zero; `Display` prints like `f64` (`4`, `2.5`). It derives `PartialEq` and `PartialOrd` but not `Eq`, `Ord`, or `Hash`. Its only arithmetic is `saturating_add`, which clamps at `f64::MAX` so the result stays finite. Every system should use this type for amounts of goods, so the representation can be swapped later (for example to fixed decimal for cross-platform determinism) in one place.
+
+`resources.rs` (depends on `goods`, `map`, `quantity`, `id`; knows nothing about files):
+- `ResourceKind` / `ResourceId`: a named ID kind (label `"resource"`).
+- `ResourceType { produces: GoodId, output: Quantity }`.
+- `ResourceTypes`: `NamedList<ResourceKind, ResourceType>` (see [ids.md](ids.md)), with `id(name)`, `name(id)`, `get(id)`, `len`, `is_empty`, and `iter()` (ID, name, data, in load order). `get` panics with `is not from this list`; `name` panics with `is not from this registry`. `from_parts` is `pub(crate)` and panics if the lengths differ.
+- `DepositKind` / `DepositId`: an unnamed ID kind (label `"deposit"`). `DepositId`s are valid only within the `Deposits` that produced them.
+- `Deposit { resource: ResourceId, hex: HexId }`.
+- `Deposits`: an `IdVec<DepositKind, Deposit>` plus `by_hex`, an `IdVec<HexKind, Vec<DepositId>>` indexed by `HexId` (hex IDs are dense, so no hash map is needed). `get`, `len`, `is_empty`, `iter()`, `on_hex(hex) -> &[DepositId]`, and `of_type_on_hex(hex, resource)`; lists are in ID order. `get` panics with `is not from this list`, and `on_hex` panics the same way for a hex beyond the map the deposits were built with, so `Deposits::default()` (which has no hexes) panics for any hex. `from_deposits(deposits, hex_count)` is `pub(crate)`; it numbers deposits 0, 1, 2, ... in the order given and panics (`is not from a map of N hexes`) on a hex index `>= hex_count`.
+
+The loaded setting exposes them as `Rules::resources: ResourceTypes` and `StartState::deposits: Deposits`; all are re-exported from the crate root.
+
+## How resources are loaded
+
+`setting/resources.rs` holds two crate-private readers, both registered as section types in `WorldContent` (`resource` in `rules/`, `deposit` in `start/`).
+
+`ResourcesReader` (resource types are a named kind, so it uses `Definitions<ResourceKind>`, like goods):
+- `read` reads all three keys first, then defines the name if it is valid. `output` is read with `EntryReader::required_number` and must be finite and greater than 0, otherwise `key 'output' in resource must be a finite number greater than 0` is reported at the value. `produces` is only read as a string; a bad value is simply an unknown good in phase 2. The name is defined even when another key is bad, so a later duplicate is still caught and a deposit that refers to it does not get a misleading unknown-resource error. Parallel vectors `produces` and `outputs` are pushed exactly when `define` returns an ID (a placeholder `Quantity::ZERO` stands in for an invalid output).
+- `resolve` (phase 2) resolves each `produces` against the goods `Definitions` (`unknown good 'x'` at the `produces` value).
+- `finish` builds `ResourceTypes::from_parts`. It `expect`s each `produces` to be resolved, which is an internal invariant: `finish` is only called after a successful load, when phase 2 has run.
+
+`DepositsReader` (deposits have no names, so, like hexes, it keeps its own duplicate table):
+- `read` reads `resource`, `q`, `r` (the `q`/`r` through `map::coordinate`, shared with hexes, whose message uses `EntryReader::label()`, so `key 'q' in deposit is out of range`), and `count` (`deposit_count`: absent gives 1; below 1 gives `must be at least 1`; above `MAX_DEPOSIT_COUNT` gives `is out of range (the most is 1000000)`). If `resource`, `q`, or `r` is missing or invalid, nothing is stored and no duplicate check runs. Otherwise a second entry for the same (resource name as written, coordinates) is reported at its header as `duplicate deposit of 'x' at (q, r) (first defined at ...)`. The `seen` table is lookup only and is never iterated. An invalid `count` stores 1 so phase 2 still checks the references.
+- `resolve` (phase 2) resolves each entry's resource through the resource types' `Definitions`, and its hex through `MapReader::id` (`no hex at (9, 9)` at the `[[deposit]]` header, because the coordinates are two keys). If both resolve, it pushes `count` copies of `Deposit { resource, hex }`, so deposits are numbered in file order and, within an entry, consecutively. A running total guards against more than `u32::MAX` deposits (`too many deposits in total ...` at the header), so `from_deposits` can never panic on setting data.
+- `finish(hex_count)` builds `Deposits::from_deposits`. `load_setting` builds the map first and passes `map.len()`.
+
+References are checked in `WorldContent::resolve`, so they may point into any file: resources first against goods, then deposits against resource types and the map. As for all references, phase 2 is skipped when a file was rejected or discovery was incomplete (see [setting-loader.md](setting-loader.md)).
+
+## Using resources
+
+```rust
+let setting = load_setting(path)?;
+let types = &setting.rules.resources;
+let copper = types.id("copper_ore")?;
+let good = types.get(copper).produces;      // GoodId
+let output = types.get(copper).output.get(); // f64, per deposit per period
+for (id, deposit) in setting.start.deposits.iter() { /* load order */ }
+let here = setting.start.deposits.on_hex(hex);
+```
+
+Output is per deposit; a hex's total is the sum over its deposits (the number of deposits times `output` for a single type). Output is emitted per deposit per turn, in deposit ID order, so a hex's stockpile holds the sum over its deposits.
+
+## The sample setting and tests
+
+- `settings/sample/rules/resources.toml`: `copper_ore` (produces `unimproved_copper`, output 2.5) and `arable_land` (produces `unimproved_grain`, output 4).
+- `settings/sample/start/deposits.toml`: six entries placing 10 deposits on the 19-hex map, with IDs 0-2 `arable_land` at (0, 0), 3 `copper_ore` at (0, 0), 4-5 `arable_land` at (-1, 0), 6 `arable_land` at (1, 0), 7-8 `copper_ore` at (1, -1), 9 `copper_ore` at (-2, 1).
+- Test settings under `crates/engine/tests/settings/`: `resources_valid` (several files and nested folders, references to goods and hexes defined in later files, two types producing one good, a type with no deposits), `resources_one`, `resources_errors`, `deposits_errors`, `resources_broken_file` and `resources_missing_start` (reference errors must not appear after a broken file or an incomplete discovery).
+- Integration tests: `crates/engine/tests/resources.rs`. Unit tests: `quantity.rs`, `resources.rs` (the `Deposits` behavior), `setting/resources.rs` (`deposit_count`), and `setting/reader.rs` (`required_number`). The `ResourceTypes` list behavior is covered by the `NamedList` tests in `id.rs`.
+
+## Planned extensions
+
+A resource type may later get an optional `stock` (how much a fresh deposit holds; leaving it out means it never depletes) and regeneration, both as optional data on the resource type. Per-deposit remaining stock will be world state. Each deposit already emits its resource type's `output` every turn (see [world.md](world.md)), with no depletion. Stage 02 gives each deposit one owner, and an owned deposit's output then goes to its owner instead of the hex stockpile.

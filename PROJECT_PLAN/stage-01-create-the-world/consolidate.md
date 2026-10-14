@@ -12,7 +12,7 @@ Files `build` must read before starting:
 ## Recommendations
 
 ### C01: Typed ID-indexed list (`IdVec`)
-- **Status:** approved
+- **Status:** applied
 - **Summary:** Six places keep "a `Vec` indexed by a typed ID" and hand-write the same lookup that panics on a foreign ID, and five places repeat the `u32::try_from(index).expect(..)` conversion (one, `HexMap::iter`, uses an unchecked `as u32`). One crate-private `IdVec<K, T>` and one `Id::from_usize` replace them, and Stage 02's per-POP and per-deposit data can use it.
 - **Changes:**
   - `crates/engine/src/id.rs`:
@@ -20,7 +20,7 @@ Files `build` must read before starting:
     - `NameRegistry::register` and `NameRegistry::iter` use `Id::from_usize` instead of their own `u32::try_from(..).expect(..)`. `NameRegistry` otherwise keeps its own `Vec<String>` storage and its existing "not from this registry" panic.
     - Add `pub(crate) struct IdVec<K: IdKind, T>`: a `Vec<T>` where element `i` belongs to the ID with index `i`. The impls are hand-written (no `#[derive]`, for the same reason as `Id`): `Default`; `Clone` where `T: Clone`; `PartialEq` where `T: PartialEq`; `Debug` where `T: Debug`. Methods (add only those that the call sites below use):
       - `from_vec(items: Vec<T>) -> Self`. Panics (through `Id::from_usize`) if the last index doesn't fit in a `u32`.
-      - `push(&mut self, item: T) -> Id<K>`, returning the new item's ID.
+      - `push(&mut self, item: T) -> Id<K>`, returning the new item's ID. No non-test code calls it yet, so it is `#[cfg(test)]`, following the C06 convention: "Only tests use this so far; remove `#[cfg(test)]` when a section type needs it."
       - `len`, `is_empty`.
       - `get(&self, id: Id<K>) -> &T` and `get_mut(&mut self, id: Id<K>) -> &mut T`. Both panic with `"{id:?} is not from this list (it has {len} {K::LABEL} entries)"` when `id` is out of range.
       - `iter(&self) -> impl Iterator<Item = (Id<K>, &T)>` in index order.
@@ -49,7 +49,7 @@ Files `build` must read before starting:
   - All existing tests pass, with only the expected strings in Task 4 changed.
 
 ### C02: One named-list type for goods and resource types (`NamedList`)
-- **Status:** approved
+- **Status:** applied
 - **Summary:** `Goods` and `ResourceTypes` are the same code twice: a `NameRegistry` plus a list of data, with identical `from_parts`, `len`, `is_empty`, `id`, `name`, `get`, and `iter`. One generic `NamedList<K, T>` replaces both. The names `Goods` and `ResourceTypes` stay as public type aliases, so nothing outside these modules changes. Stage 02 and Stage 03 named kinds (POP types, industries) reuse it.
 - **Changes:**
   - `crates/engine/src/id.rs`: add `pub struct NamedList<K: IdKind, T>` with private fields `names: NameRegistry<K>` and `items: IdVec<K, T>` (from C01). Methods:
@@ -87,7 +87,7 @@ Files `build` must read before starting:
   Every integration test in `crates/engine/tests/` and every dev UI test passes unchanged.
 
 ### C03: Goods panel world totals in one pass
-- **Status:** approved
+- **Status:** applied
 - **Summary:** `inspect::good_rows` runs every frame. For each good it walks every hex and calls `Stockpile::total`, so the cost is goods × hexes stockpile lookups per frame. Walking the hexes once and adding each stockpile's totals into a per-good array gives the same numbers, added in the same order: for each good, over hexes in hex ID order.
 - **Changes:** `crates/dev-ui/src/inspect.rs` `good_rows`:
   - Before building rows, make `held: Vec<Quantity>` of length `goods.len()`, all `Quantity::ZERO`.
@@ -98,7 +98,7 @@ Files `build` must read before starting:
 - **Tests:** The existing `good_rows_list_every_good_with_properties_and_world_totals` test passes unchanged. Add one test on `turns_valid` stepped to turn 2 that checks every good's `held` string. Compute the expected values by summing `Stockpile::total` per good over every hex in the test, the way the old code did.
 
 ### C04: Shared helpers for the engine's tests
-- **Status:** approved
+- **Status:** applied
 - **Summary:** The five engine integration test files each define the same `test_setting`, `load`, and sample-path helpers, and several define `failures_of` / `lines`. The engine unit tests repeat "turn an `ErrorSink` or `LoadErrors` into `Vec<String>` lines" in several modules. Each pattern moves to one place.
 - **Changes:**
   - New `crates/engine/tests/common/mod.rs`:
@@ -124,7 +124,7 @@ Files `build` must read before starting:
 - **Tests:** No test is added or removed. The same number of engine tests pass with the same assertions.
 
 ### C05: Shared helpers for the dev UI's tests
-- **Status:** approved
+- **Status:** applied
 - **Summary:** The `geometry`, `inspect`, and `session` test modules each define "a path from the repository root" and/or "load a setting as a world". The `session` tests also write the same manifest and map text in several tests, some as string literals that run across several source lines. One test-support module and a few named constants replace them.
 - **Changes:**
   - New `crates/dev-ui/src/test_support.rs`, declared in `main.rs` as `#[cfg(test)] mod test_support;`. It has:
@@ -143,7 +143,7 @@ Files `build` must read before starting:
 - **Tests:** No test is added or removed. All dev UI tests pass with the same assertions.
 
 ### C06: Engine leftovers
-- **Status:** approved
+- **Status:** applied
 - **Summary:**
   - Three helpers are marked `#[allow(dead_code)]` "until a real section type uses them", and only tests use them.
   - Discovery has an `unwrap_or(Folder::Rules)` fallback that can never run.
@@ -164,7 +164,7 @@ Files `build` must read before starting:
 - **Tests:** No new tests. The existing discovery, reader, defs, `test_content`, world unit tests, and `crates/engine/tests/world.rs` (exact report amounts, determinism) all pass unchanged. The clippy run has no warnings, which shows the `#[cfg(test)]` items aren't dead code.
 
 ### C07: Dev UI leftovers and `Session::world()`
-- **Status:** approved
+- **Status:** applied
 - **Summary:**
   - `app.rs` checks "is a world loaded?" six times with `matches!` / `let Some(Loaded::World(world))`. A `Session::world()` accessor makes each check one call, which matters as Stage 02 adds panels.
   - `Loaded::World`'s doc still says the world is at turn 0, which stopped being true in Step 08.
@@ -190,7 +190,7 @@ Files `build` must read before starting:
   - The window is checked by hand at Code Review: hover, select, the outline, labels, deposit marks, and the Step buttons and Space/Shift+Space enabling work as before.
 
 ### C08: All dev UI wording in one module
-- **Status:** approved
+- **Status:** applied
 - **Summary:** `check.rs` holds the wording that the `check` command and the window share (`error_lines`, `count`, `list`, `turn_line`), and `inspect.rs` holds the panels' wording. The designs require `check` and the window to use the same wording, so all of it moves into one module named for what it is. `check.rs` keeps only the headless checker.
 - **Changes:**
   - Rename `crates/dev-ui/src/inspect.rs` to `crates/dev-ui/src/text.rs`. Its module doc becomes: "All the text the dev UI shows: the `check` output (load errors, counts, turn lines) and the window's panels. It's built from engine types without egui, so it can be tested. The wording follows the Step 02–08 designs."

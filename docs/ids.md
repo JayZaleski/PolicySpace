@@ -1,0 +1,37 @@
+# IDs, name registries, and ID-indexed lists
+
+Source: `crates/engine/src/id.rs`, re-exported from the engine crate root: `Id`, `IdError`, `IdKind`, `NameRegistry`, `NamedList`. `IdVec` is crate-private.
+
+## Rules
+
+- Setting files refer to most things (goods, resource types) by readable text names (for example `copper_ore`). A `NameRegistry` turns each name into a compact numeric ID when the setting is loaded, and the engine uses IDs internally from then on.
+- Some kinds have no name and are identified by other data, such as hexes by their coordinates. Their list hands out IDs directly in load order with the crate-private `Id::from_index` / `Id::from_usize`.
+- Each kind of thing has its own ID type, so a good's ID cannot be used where a hex's ID is expected. This is a compile-time error.
+- IDs are meaningful only inside the registry or list (the world) that created them. They must never be persisted: save files and anything long-term store text names, or the identifying data (such as hex coordinates).
+- Text names appear only at the edges: reading settings, error messages, and UIs.
+
+## Types
+
+- **`IdKind`** is a marker trait with one constant, `LABEL`, a lower-case human label (`"good"`, `"resource"`) used in messages. Implement it on a zero-sized, uninhabited marker type, for example `pub enum GoodKind {}`.
+- **`Id<K: IdKind>`** wraps a `u32` index and a `PhantomData<fn() -> K>` (which keeps `Id<K>` `Copy`, `Send` and `Sync` for any `K`). `Id::index()` returns the 0-based position as `usize`, so an ID can index a per-kind `Vec` directly. `Clone`, `Copy`, `PartialEq`, `Eq`, `Hash`, `PartialOrd`, `Ord` and `Debug` are implemented by hand so they place no bounds on `K`; comparison and hashing use the index only. `Debug` prints `Id<good>(3)`. Creating IDs is crate-private: `Id::from_index(u32)`, and `Id::from_usize(usize)`, which panics with `"{LABEL} index {n} does not fit in a u32 ID"` if the position is above `u32::MAX`. Use `from_usize` for list positions.
+- **`NameRegistry<K>`** maps names to IDs and back for one kind. IDs are handed out as `0, 1, 2...` in registration order, and `iter()` yields `(Id<K>, &str)` in that order, so iteration is deterministic. Internally it holds a `Vec<String>` (index = ID) and a `HashMap<String, Id<K>>` that is used only for lookup, never for iteration.
+  - `register(name)` returns the new ID, or `IdError::DuplicateName` (leaving the registry unchanged). Any string is accepted, including an empty one; validating name syntax is the setting loader's job.
+  - `id(name)` returns the ID, or `IdError::UnknownName`.
+  - `name(id)` returns the text name. It panics (`not from this registry`) if the ID did not come from this registry, which is a programming error.
+  - `len()`, `is_empty()`, and a hand-written `Default`.
+- **`IdError`** has `DuplicateName { kind, name }` and `UnknownName { kind, name }`, where `kind` is `K::LABEL`. `Display` gives `duplicate good name 'copper'` and `unknown good 'copper'`; `std::error::Error` is implemented by hand (no `thiserror`).
+- **`IdVec<K, T>`** (crate-private) is a `Vec<T>` where element `i` belongs to the ID with index `i`. Use it for any per-ID data (per hex, per deposit, ...), so that every lookup by ID goes through one check. `Default`, `Clone` (when `T: Clone`), `PartialEq` and `Debug` are hand-written. Methods: `from_vec(items)` (IDs 0, 1, 2 ... in order; panics through `Id::from_usize` if too many), `len`, `is_empty`, `get(id)`, `get_mut(id)` (both panic with `"{id:?} is not from this list (it has {len} {LABEL} entries)"` for an out-of-range ID), `iter()` as `(Id<K>, &T)` and `values_mut()` in index order. `push(item)`, which returns the new ID, exists only under `#[cfg(test)]` until a section type needs it. `HexMap`, `Deposits` and `World` use it.
+- **`NamedList<K, T>`** is a `NameRegistry<K>` plus an `IdVec<K, T>` holding one `T` per name. It is the type for every named kind in a setting. Methods: `len`, `is_empty`, `id(name) -> Result<Id<K>, IdError>`, `name(id)` (panics with `not from this registry`), `get(id)` (panics with `is not from this list`), and `iter()` as `(Id<K>, &str, &T)` in load order, which is also ID order. `Default` is the empty list. It is built only by the setting loader through the crate-private `from_parts(names, items)`, which panics (`every {LABEL} name needs exactly one entry`) if the lengths differ. `Goods` and `ResourceTypes` are aliases of it.
+
+The same name may be registered in registries of two different kinds without conflict.
+
+## Adding a new ID kind
+
+1. Declare a marker type and implement `IdKind` with a `LABEL`, and add a type alias for the ID, for example `pub type GoodId = Id<GoodKind>;`. `GoodKind` / `GoodId` (in `goods.rs`) is the pattern to follow for a named kind; see [goods.md](goods.md).
+2. For a named kind, define `pub type Things = NamedList<ThingKind, Thing>;` and have the setting loader build it. Registration happens in the loader through `Definitions<K>`, which wraps the registry and records where each name was defined; see [setting-loader.md](setting-loader.md). Name syntax (lowercase `snake_case`) is checked by the loader's `valid_name` before a name reaches the registry. Register names in a deterministic order (the order they appear in the setting files).
+3. If the kind has no name, the list type assigns sequential IDs itself, usually with an `IdVec`, and keeps its own lookup from the identifying data to the ID. `HexKind` / `HexId` is the example (hexes are identified by coordinates; see [map.md](map.md)). `DepositKind` / `DepositId` is an unnamed kind with no identifying data at all: an entry's `count` makes several identical deposits, so `Deposits::from_deposits` simply numbers them in load order (see [resources.md](resources.md)). `ResourceKind` / `ResourceId` is a second named kind.
+4. Use `Id<YourKind>` everywhere internally, and the list's `name(id)` only when producing text for errors or UIs.
+
+## Tests
+
+Unit tests in `id.rs` cover registration order, round trips, duplicate and unknown-name errors and their messages, same name across kinds, the out-of-range panic, the `Debug` format, `IdVec` (IDs, `get`/`get_mut`, order, foreign-ID panic, `Clone`/`PartialEq`, and on 64-bit targets the `from_usize` overflow panic) and `NamedList` (accessors, order, default, unknown name, both foreign-ID panics, mismatched `from_parts`). A `compile_fail` doc test on `Id` shows that an `Id<HexKind>` cannot be passed where an `Id<GoodKind>` is expected. That example still registers a hex by name even though real hexes have no names, and the item docs for `from_index` and `index` still say "registries"; both are harmless leftovers.

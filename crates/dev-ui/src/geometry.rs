@@ -255,11 +255,10 @@ pub fn is_visible(view: &View, viewport: Viewport, center: Point) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
-    use policyspace_engine::{World, load_setting};
+    use policyspace_engine::World;
 
     use super::*;
+    use crate::test_support::world_at;
 
     /// A canvas that doesn't start at the screen's origin.
     const VIEWPORT: Viewport = Viewport {
@@ -267,15 +266,6 @@ mod tests {
         width: 800.0,
         height: 600.0,
     };
-
-    /// Loads the setting at `relative` (to the repository root) as a world.
-    fn world(relative: &str) -> World {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .join(relative);
-        let setting = load_setting(&path).expect("the test setting loads");
-        World::new(setting).0
-    }
 
     /// Every hex coordinate of the world's map.
     fn coords(world: &World) -> Vec<HexCoord> {
@@ -425,7 +415,7 @@ mod tests {
 
     #[test]
     fn fit_the_sample_puts_every_hex_inside_the_viewport() {
-        let sample = world("settings/sample");
+        let sample = world_at("settings/sample");
         let coords = coords(&sample);
         assert_eq!(coords.len(), 19);
         let view = View::fit(coords.iter().copied(), VIEWPORT);
@@ -438,7 +428,7 @@ mod tests {
 
     #[test]
     fn fit_extreme_coordinates_gives_a_finite_positive_scale_and_shows_every_hex() {
-        let extreme = world("crates/engine/tests/settings/hexes_valid");
+        let extreme = world_at("crates/engine/tests/settings/hexes_valid");
         let coords = coords(&extreme);
         let view = View::fit(coords.iter().copied(), VIEWPORT);
         assert!(view.scale.is_finite() && view.scale > MIN_SCALE);
@@ -451,7 +441,7 @@ mod tests {
 
     #[test]
     fn fit_a_zero_size_viewport_is_finite_and_positive() {
-        let sample = world("settings/sample");
+        let sample = world_at("settings/sample");
         for (width, height) in [(0.0, 0.0), (0.0, 500.0), (500.0, 0.0), (-5.0, -5.0)] {
             let viewport = Viewport {
                 min: Point::new(0.0, 0.0),
@@ -481,7 +471,7 @@ mod tests {
             "settings/sample",
             "crates/engine/tests/settings/hexes_valid",
         ] {
-            let world = world(relative);
+            let world = world_at(relative);
             let view = View::fit(coords(&world), VIEWPORT);
             for (id, coord) in world.map().iter() {
                 let screen = view.world_to_screen(hex_center(coord), VIEWPORT);
@@ -496,7 +486,7 @@ mod tests {
 
     #[test]
     fn hex_at_finds_nothing_between_islands() {
-        let world = world("crates/engine/tests/settings/hexes_valid");
+        let world = world_at("crates/engine/tests/settings/hexes_valid");
         let view = View {
             center: Point::new(0.0, 0.0),
             scale: 32.0,
@@ -510,7 +500,7 @@ mod tests {
 
     #[test]
     fn hex_at_snaps_to_dots_within_the_hover_distance() {
-        let world = world("crates/engine/tests/settings/hexes_valid");
+        let world = world_at("crates/engine/tests/settings/hexes_valid");
         // Hexes at this scale are dots; (-3, 2) is centered at world (-√3 · 2, 3).
         let view = View {
             center: Point::new(0.0, 0.0),

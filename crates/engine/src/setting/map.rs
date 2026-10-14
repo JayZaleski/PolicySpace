@@ -66,7 +66,7 @@ impl MapReader {
     pub fn id(&self, coord: HexCoord) -> Option<HexId> {
         let index = *self.by_coord.get(&coord)?;
         // `finish` gives each hex the ID of its index (and checks that it fits).
-        u32::try_from(index).ok().map(HexId::from_index)
+        Some(HexId::from_usize(index))
     }
 
     /// The finished map.

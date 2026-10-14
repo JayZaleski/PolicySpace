@@ -24,7 +24,8 @@ use std::error::Error;
 use std::fmt;
 
 use crate::goods::GoodId;
-use crate::map::{HexId, HexMap};
+use crate::id::IdVec;
+use crate::map::{HexId, HexKind, HexMap};
 use crate::quantity::Quantity;
 use crate::resources::Deposits;
 use crate::setting::{LoadedSetting, Manifest, Rules};
@@ -72,8 +73,8 @@ pub struct World {
     map: HexMap,
     deposits: Deposits,
     turn: Turn,
-    /// Indexed by `HexId::index`; one per hex.
-    hex_stockpiles: Vec<Stockpile>,
+    /// One per hex, by `HexId`.
+    hex_stockpiles: IdVec<HexKind, Stockpile>,
 }
 
 impl World {
@@ -85,7 +86,7 @@ impl World {
             rules,
             start,
         } = setting;
-        let hex_stockpiles = vec![Stockpile::new(); start.map.len()];
+        let hex_stockpiles = IdVec::from_vec(vec![Stockpile::new(); start.map.len()]);
         let mut world = World {
             manifest,
             rules,
@@ -147,49 +148,51 @@ impl World {
     /// # Panics
     /// Panics if `hex` isn't from this world's map.
     pub fn hex_stockpile(&self, hex: HexId) -> &Stockpile {
-        match self.hex_stockpiles.get(hex.index()) {
-            Some(stockpile) => stockpile,
-            None => panic!(
-                "{:?} is not from this map (it has {} hexes)",
-                hex,
-                self.hex_stockpiles.len()
-            ),
-        }
+        self.hex_stockpiles.get(hex)
     }
 
     /// Start of turn: every deposit, in ID order, adds its type's output to its hex's
     /// stockpile. Returns the total emitted per good, in good ID order.
     fn emit(&mut self) -> Vec<(GoodId, Quantity)> {
-        let mut totals: BTreeMap<GoodId, Quantity> = BTreeMap::new();
+        let mut emitted = Vec::new();
         for (_, deposit) in self.deposits.iter() {
             let resource = self.rules.resources.get(deposit.resource);
             let good = resource.produces;
             let at = PerishesAt::for_good(self.rules.goods.get(good).perishes, self.turn);
-            self.hex_stockpiles[deposit.hex.index()].add(good, resource.output, at);
-            let total = totals.entry(good).or_insert(Quantity::ZERO);
-            *total = total.saturating_add(resource.output);
+            self.hex_stockpiles
+                .get_mut(deposit.hex)
+                .add(good, resource.output, at);
+            emitted.push((good, resource.output));
         }
-        totals
-            .into_iter()
-            .filter(|(_, amount)| *amount > Quantity::ZERO)
-            .collect()
+        totals_by_good(emitted)
     }
 
     /// End of turn: removes whatever perishes at the end of the current turn from every
     /// hex's stockpile. Returns the total removed per good, in good ID order.
     fn perish(&mut self) -> Vec<(GoodId, Quantity)> {
-        let mut totals: BTreeMap<GoodId, Quantity> = BTreeMap::new();
-        for stockpile in &mut self.hex_stockpiles {
-            for (good, amount) in stockpile.remove_perishing(self.turn) {
-                let total = totals.entry(good).or_insert(Quantity::ZERO);
-                *total = total.saturating_add(amount);
-            }
-        }
-        totals
-            .into_iter()
-            .filter(|(_, amount)| *amount > Quantity::ZERO)
-            .collect()
+        let turn = self.turn;
+        totals_by_good(
+            self.hex_stockpiles
+                .values_mut()
+                .flat_map(|stockpile| stockpile.remove_perishing(turn)),
+        )
     }
+}
+
+/// Sums `amounts` per good (saturating) and returns the totals in good ID order, leaving
+/// out goods whose total is zero.
+fn totals_by_good(
+    amounts: impl IntoIterator<Item = (GoodId, Quantity)>,
+) -> Vec<(GoodId, Quantity)> {
+    let mut totals: BTreeMap<GoodId, Quantity> = BTreeMap::new();
+    for (good, amount) in amounts {
+        let total = totals.entry(good).or_insert(Quantity::ZERO);
+        *total = total.saturating_add(amount);
+    }
+    totals
+        .into_iter()
+        .filter(|(_, amount)| *amount > Quantity::ZERO)
+        .collect()
 }
 
 #[cfg(test)]
@@ -218,7 +221,7 @@ mod tests {
         let mut world = turns_valid_world();
         world.step().unwrap();
         world.turn = Turn::MAX;
-        let before: Vec<Stockpile> = world.hex_stockpiles.clone();
+        let before: IdVec<HexKind, Stockpile> = world.hex_stockpiles.clone();
         assert_eq!(world.step(), Err(StepError::ClockAtMaximum));
         assert_eq!(world.turn(), Turn::MAX);
         assert_eq!(world.hex_stockpiles, before);

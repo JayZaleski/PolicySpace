@@ -260,8 +260,8 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     }
 
     /// A boolean value that must be present.
-    // Not used by any real section type yet; until then only by tests.
-    #[allow(dead_code)]
+    // Only tests use this so far; remove `#[cfg(test)]` when a section type needs it.
+    #[cfg(test)]
     pub fn required_bool(&mut self, key: &str) -> Option<Located<bool>> {
         self.boolean(key, true)
     }
@@ -328,10 +328,7 @@ mod tests {
             f(&mut reader);
             reader.finish();
         }
-        match sink.into_result(()) {
-            Ok(()) => Vec::new(),
-            Err(errors) => errors.iter().map(|e| e.to_string()).collect(),
-        }
+        sink.into_lines()
     }
 
     #[test]
@@ -477,8 +474,7 @@ i = -inf
             assert!(reader.required_string("name").is_none());
             reader.finish();
         }
-        let errors = sink.into_result(()).unwrap_err();
-        let shown: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+        let shown = sink.into_lines();
         assert_eq!(
             shown,
             vec![

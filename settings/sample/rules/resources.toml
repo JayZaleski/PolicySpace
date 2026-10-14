@@ -10,7 +10,8 @@
 # goods.toml), so output has to be used where it appears. The engine doesn't require
 # this. Several resource types may produce the same good.
 #
-# Nothing is produced yet: deposits only sit on the map for now.
+# Each turn, every deposit emits its type's output into its hex's stockpile of unowned
+# goods. Deposits have no owners yet.
 
 # Copper ore yields 2.5 units of unimproved copper per deposit per period.
 [[resource]]

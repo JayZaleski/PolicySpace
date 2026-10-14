@@ -7796,29 +7796,538 @@ a.anchor-link {
 <!-- End of mermaid configuration --></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=44735c23">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="PolicySpace-Manual">PolicySpace Manual<a class="anchor-link" href="#PolicySpace-Manual">¶</a></h1><p><em>This manual is a placeholder. It will grow as each Stage of the project is completed.</em></p>
+<h1 id="PolicySpace-Manual">PolicySpace Manual<a class="anchor-link" href="#PolicySpace-Manual">¶</a></h1><p>PolicySpace is a game about economies and policy. It is being built one system at a time, and so far the first system exists: <strong>the world</strong>. A <em>setting</em> describes a world (its goods, its map, and its natural resources), the engine loads it and runs turns, and a developer tool lets you look at the result. There is no player-facing game yet, so this manual is written for <strong>setting authors</strong> and developers.</p>
+<p><em>This manual grows as each part of the project is completed.</em></p>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8825b069">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="Contents">Contents<a class="anchor-link" href="#Contents">¶</a></h2><ul>
+<li><a href="#Project-overview">Project overview</a></li>
+<li><a href="#Writing-a-setting">Writing a setting</a><ul>
+<li><a href="#The-folder-layout">The folder layout</a></li>
+<li><a href="#Naming-rules">Naming rules</a></li>
+<li><a href="#Goods">Goods</a></li>
+<li><a href="#The-map">The map</a></li>
+<li><a href="#Natural-resources">Natural resources</a></li>
+<li><a href="#Running-a-setting">Running a setting</a></li>
+<li><a href="#Checking-a-setting">Checking a setting</a></li>
+<li><a href="#The-developer-UI">The developer UI</a></li>
+</ul>
+</li>
 <li><a href="#Technical-documentation">Technical documentation</a></li>
 </ul>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2d23a179">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Project-overview">Project overview<a class="anchor-link" href="#Project-overview">¶</a></h2><p>The project is a Rust workspace with two parts: an <strong>engine</strong> library, which holds the rules and runs the world, and a <strong>developer UI</strong> program, which loads settings and shows them. The engine never depends on the developer UI. Details are in <a href="docs/workspace.md">docs/workspace.md</a>, and the way names become internal IDs is explained in <a href="docs/ids.md">docs/ids.md</a>.</p>
+<p>Two commands matter day to day, both run from the project's root folder:</p>
+<ul>
+<li><code>cargo run -p policyspace-dev-ui -- &lt;folder&gt;</code> opens the developer UI on a setting (see <a href="#The-developer-UI">The developer UI</a>).</li>
+<li><code>python tools/check.py</code> runs formatting checks, lint checks and all the tests.</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=102d4229">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Writing-a-setting">Writing a setting<a class="anchor-link" href="#Writing-a-setting">¶</a></h2><p>A <strong>setting</strong> is a folder of plain-text <a href="https://toml.io">TOML</a> files that describes a world: what goods exist, what the map looks like, and where natural resources lie. The engine has no built-in content, so everything comes from the setting. A complete example lives in <code>settings/sample/</code>; copy it to start your own.</p>
+<p>For the technical side of the format, see <a href="docs/setting-loader.md">docs/setting-loader.md</a>.</p>
+<h3 id="The-folder-layout">The folder layout<a class="anchor-link" href="#The-folder-layout">¶</a></h3><pre><code>my_setting/
+  setting.toml      the manifest
+  rules/            things that never change during play (goods, resource types)
+  start/            what turn 0 looks like (the map, the deposits)
+</code></pre>
+<p><strong>The manifest, <code>setting.toml</code>,</strong> has these keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Required</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>The setting's name</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>no</td>
+<td>A sentence about it</td>
+</tr>
+<tr>
+<td><code>format_version</code></td>
+<td>yes</td>
+<td>Always <code>1</code> for now</td>
+</tr>
+</tbody>
+</table>
+<p>A minimal manifest:</p>
+<div class="highlight"><pre><span></span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Sample Setting"</span>
+<span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The project's sample setting."</span>
+<span class="n">format_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+</pre></div>
+<p>Unknown keys are errors everywhere in a setting, not just in the manifest. A misspelled key is reported instead of silently ignored.</p>
+<p><strong>Files and folders.</strong></p>
+<ul>
+<li>Organize files however you like, nested to any depth. Files are read in sorted path order.</li>
+<li>What a file defines comes from its section headers (such as <code>[[good]]</code>), not from its file name.</li>
+<li><code>README.md</code> files are the place for notes. Hidden files, <code>Thumbs.db</code> and <code>desktop.ini</code> are ignored. Any other file that does not end in <code>.toml</code> is an error.</li>
+<li>Each section type belongs in one of the two folders: <code>[[good]]</code> and <code>[[resource]]</code> in <code>rules/</code>, <code>[[hex]]</code> and <code>[[deposit]]</code> in <code>start/</code>. Putting one in the wrong folder is an error.</li>
+</ul>
+<h3 id="Naming-rules">Naming rules<a class="anchor-link" href="#Naming-rules">¶</a></h3><p>Names of goods and resource types use lowercase letters, digits and underscores, and must start with a letter: <code>copper_ore</code> and <code>grain2</code> are fine; <code>Copper</code>, <code>2grain</code> and <code>copper-ore</code> are not.</p>
+<h3 id="Goods">Goods<a class="anchor-link" href="#Goods">¶</a></h3><p>A <strong>good</strong> is anything an actor can own. The engine has no built-in goods and no built-in categories such as labor or capital: the setting defines them all.</p>
+<p>Define goods with <code>[[good]]</code> sections in <code>rules/</code>, in any file at any depth, as many per file as you like. Goods from all files are merged. A setting with no goods is valid. A <code>[[good]]</code> in <code>start/</code> is an error.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Required</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Lowercase snake_case, unique across the whole setting</td>
+</tr>
+<tr>
+<td><code>perishes_after</code></td>
+<td>no</td>
+<td>A whole number, 1 or more. Leave it out and the good never perishes.</td>
+</tr>
+<tr>
+<td><code>movable</code></td>
+<td>no</td>
+<td><code>true</code> (the default) or <code>false</code>. <strong>It has no effect yet</strong>; movement comes in a later stage.</td>
+</tr>
+</tbody>
+</table>
+<p><code>perishes_after</code> counts the turn a unit appears in. A unit appearing in turn 5 with <code>perishes_after = 1</code> is gone when turn 5 ends; with <code>perishes_after = 3</code> it is gone at the end of turn 7.</p>
+<div class="highlight"><pre><span></span><span class="c1"># Labor: gone at the end of the turn, and tied to where it is.</span>
+<span class="k">[[good]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"unskilled_labor"</span>
+<span class="n">perishes_after</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="n">movable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+
+<span class="c1"># Only a name is needed: durable and movable.</span>
+<span class="k">[[good]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"copper"</span>
+</pre></div>
+<p>The sample setting defines five goods:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th><code>perishes_after</code></th>
+<th><code>movable</code></th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>unskilled_labor</code></td>
+<td>1</td>
+<td>false</td>
+<td>Labor (used in later stages)</td>
+</tr>
+<tr>
+<td><code>unimproved_copper</code></td>
+<td>1</td>
+<td>false</td>
+<td>What copper deposits yield</td>
+</tr>
+<tr>
+<td><code>unimproved_grain</code></td>
+<td>1</td>
+<td>false</td>
+<td>What arable land yields</td>
+</tr>
+<tr>
+<td><code>copper</code></td>
+<td>never</td>
+<td>true</td>
+<td>A durable, movable good</td>
+</tr>
+<tr>
+<td><code>grain</code></td>
+<td>3</td>
+<td>true</td>
+<td>A perishable, movable good</td>
+</tr>
+</tbody>
+</table>
+<p>More detail: <a href="docs/goods.md">docs/goods.md</a>.</p>
+<h3 id="The-map">The map<a class="anchor-link" href="#The-map">¶</a></h3><p>The <strong>map</strong> is the set of hex tiles in the setting's starting state. For now a hex has only a position; terrain and other attributes come later. The map goes in <code>start/</code>, which describes what turn 0 looks like. A <code>[[hex]]</code> in <code>rules/</code> is an error.</p>
+<p>Each <code>[[hex]]</code> has exactly two required whole-number keys, <code>q</code> and <code>r</code>. Any other key (such as <code>terrain</code>) is an error. Hexes have no names: the coordinates are the identity, and two hexes at the same coordinates is an error that names both places. Hexes can sit in any file at any depth and are merged.</p>
+<div class="highlight"><pre><span></span><span class="k">[[hex]]</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+
+<span class="k">[[hex]]</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+</pre></div>
+<p><strong>Coordinates and orientation.</strong> The engine fixes the orientation; a setting cannot change it. Hexes are <em>pointy-top</em>. Each value of <code>r</code> is one straight east-west row; <code>q</code> increases eastward and <code>r</code> increases southward. So <code>(1, 0)</code> is the east neighbor of <code>(0, 0)</code>, and the row <code>r = 1</code> lies south of the row <code>r = 0</code>. Values may be negative, up to about plus or minus 2.1 billion.</p>
+<p><strong>Shape.</strong> There are no shape rules. Holes, islands and negative coordinates are all fine, and a setting with no hexes is valid. Neighbors, distance and wrapping around the edges do not exist yet; wrapping is planned for later as an optional per-setting value.</p>
+<p>The sample map is a hexagon of radius 2 around <code>(0, 0)</code>: 19 hexes. The diagram below shows it, with each hex labelled <code>q, r</code>.</p>
+<p>More detail: <a href="docs/map.md">docs/map.md</a>.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=680cc88c">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMjEiIGhlaWdodD0iMzEyIiB2aWV3Qm94PSItMTYxIC0xNjggMzIxIDMxMiIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiPgo8dGV4dCB4PSItMTU3IiB5PSItMTUyIiBmb250LXNpemU9IjEyIj5xIGdyb3dzIGVhc3QsIHIgZ3Jvd3Mgc291dGg8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTMxLjIsLTEyNi4wIC0zMS4yLC05MC4wIC02Mi40LC03Mi4wIC05My41LC05MC4wIC05My41LC0xMjYuMCAtNjIuNCwtMTQ0LjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTYyLjQiIHk9Ii0xMTAuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MCwgLTI8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMzEuMiwtMTI2LjAgMzEuMiwtOTAuMCAwLjAsLTcyLjAgLTMxLjIsLTkwLjAgLTMxLjIsLTEyNi4wIC0wLjAsLTE0NC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjAuMCIgeT0iLTExMC4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAtMjwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSI5My41LC0xMjYuMCA5My41LC05MC4wIDYyLjQsLTcyLjAgMzEuMiwtOTAuMCAzMS4yLC0xMjYuMCA2Mi40LC0xNDQuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSI2Mi40IiB5PSItMTEwLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIsIC0yPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii02Mi40LC03Mi4wIC02Mi40LC0zNi4wIC05My41LC0xOC4wIC0xMjQuNywtMzYuMCAtMTI0LjcsLTcyLjAgLTkzLjUsLTkwLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTkzLjUiIHk9Ii01Ni4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMSwgLTE8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMC4wLC03Mi4wIDAuMCwtMzYuMCAtMzEuMiwtMTguMCAtNjIuNCwtMzYuMCAtNjIuNCwtNzIuMCAtMzEuMiwtOTAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItMzEuMiIgeT0iLTU2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIC0xPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjYyLjQsLTcyLjAgNjIuNCwtMzYuMCAzMS4yLC0xOC4wIC0wLjAsLTM2LjAgMC4wLC03Mi4wIDMxLjIsLTkwLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMzEuMiIgeT0iLTU2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEsIC0xPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjEyNC43LC03Mi4wIDEyNC43LC0zNi4wIDkzLjUsLTE4LjAgNjIuNCwtMzYuMCA2Mi40LC03Mi4wIDkzLjUsLTkwLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iOTMuNSIgeT0iLTU2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIsIC0xPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii05My41LC0xOC4wIC05My41LDE4LjAgLTEyNC43LDM2LjAgLTE1NS45LDE4LjAgLTE1NS45LC0xOC4wIC0xMjQuNywtMzYuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItMTI0LjciIHk9Ii0yLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0yLCAwPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii0zMS4yLC0xOC4wIC0zMS4yLDE4LjAgLTYyLjQsMzYuMCAtOTMuNSwxOC4wIC05My41LC0xOC4wIC02Mi40LC0zNi4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9Ii02Mi40IiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMSwgMDwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIzMS4yLC0xOC4wIDMxLjIsMTguMCAwLjAsMzYuMCAtMzEuMiwxOC4wIC0zMS4yLC0xOC4wIC0wLjAsLTM2LjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMC4wIiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4wLCAwPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjkzLjUsLTE4LjAgOTMuNSwxOC4wIDYyLjQsMzYuMCAzMS4yLDE4LjAgMzEuMiwtMTguMCA2Mi40LC0zNi4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjYyLjQiIHk9Ii0yLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEsIDA8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMTU1LjksLTE4LjAgMTU1LjksMTguMCAxMjQuNywzNi4wIDkzLjUsMTguMCA5My41LC0xOC4wIDEyNC43LC0zNi4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjEyNC43IiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yLCAwPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii02Mi40LDM2LjAgLTYyLjQsNzIuMCAtOTMuNSw5MC4wIC0xMjQuNyw3Mi4wIC0xMjQuNywzNi4wIC05My41LDE4LjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTkzLjUiIHk9IjUyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0yLCAxPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjAuMCwzNi4wIDAuMCw3Mi4wIC0zMS4yLDkwLjAgLTYyLjQsNzIuMCAtNjIuNCwzNi4wIC0zMS4yLDE4LjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTMxLjIiIHk9IjUyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0xLCAxPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjYyLjQsMzYuMCA2Mi40LDcyLjAgMzEuMiw5MC4wIC0wLjAsNzIuMCAwLjAsMzYuMCAzMS4yLDE4LjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMzEuMiIgeT0iNTIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MCwgMTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIxMjQuNywzNi4wIDEyNC43LDcyLjAgOTMuNSw5MC4wIDYyLjQsNzIuMCA2Mi40LDM2LjAgOTMuNSwxOC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjkzLjUiIHk9IjUyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEsIDE8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTMxLjIsOTAuMCAtMzEuMiwxMjYuMCAtNjIuNCwxNDQuMCAtOTMuNSwxMjYuMCAtOTMuNSw5MC4wIC02Mi40LDcyLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTYyLjQiIHk9IjEwNi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMiwgMjwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIzMS4yLDkwLjAgMzEuMiwxMjYuMCAwLjAsMTQ0LjAgLTMxLjIsMTI2LjAgLTMxLjIsOTAuMCAtMC4wLDcyLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMC4wIiB5PSIxMDYuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+LTEsIDI8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iOTMuNSw5MC4wIDkzLjUsMTI2LjAgNjIuNCwxNDQuMCAzMS4yLDEyNi4wIDMxLjIsOTAuMCA2Mi40LDcyLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iNjIuNCIgeT0iMTA2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIDI8L3RleHQ+Cjwvc3ZnPg=="/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d1486e90">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="Natural-resources">Natural resources<a class="anchor-link" href="#Natural-resources">¶</a></h3><p>Natural resources come in two parts: <strong>resource types</strong> say what kinds of resource exist and what one deposit produces, and <strong>deposits</strong> put them on the map. Each deposit produces its type's output every turn (see <a href="#Running-a-setting">Running a setting</a>). There is no ownership yet (that is a later stage), and no stock or depletion.</p>
+<p><strong>Resource types</strong> are <code>[[resource]]</code> sections in <code>rules/</code> (in <code>start/</code> it is an error), in any file at any depth, merged across files. Three keys are required:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Lowercase snake_case, unique among resource types. It may match a good's name.</td>
+</tr>
+<tr>
+<td><code>produces</code></td>
+<td>The name of a good the setting defines</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td>How much of that good one deposit produces per turn: a whole number or decimal, greater than 0</td>
+</tr>
+</tbody>
+</table>
+<p>Each type produces exactly one good, but several types may produce the same one. By convention the produced good is unmovable and perishes after one turn (like the sample's <code>unimproved_*</code> goods), but the engine does not require that.</p>
+<p><strong>Deposits</strong> are <code>[[deposit]]</code> sections in <code>start/</code> (in <code>rules/</code> it is an error). Keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>resource</code></td>
+<td>The name of a resource type</td>
+</tr>
+<tr>
+<td><code>q</code>, <code>r</code></td>
+<td>A hex that exists on the map</td>
+</tr>
+<tr>
+<td><code>count</code></td>
+<td>Optional, 1 to 1,000,000, default 1</td>
+</tr>
+</tbody>
+</table>
+<p><code>count = 3</code> makes three separate deposits. Each will be ownable by a single owner later, so the total on a hex is <code>count</code> times <code>output</code>. A hex can hold several resource types, but each type may appear only once per hex: raise <code>count</code> instead.</p>
+<div class="highlight"><pre><span></span><span class="c1"># rules/resources.toml</span>
+<span class="k">[[resource]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"copper_ore"</span>
+<span class="n">produces</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"unimproved_copper"</span>
+<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">2.5</span>
+
+<span class="c1"># start/deposits.toml</span>
+<span class="k">[[deposit]]</span>
+<span class="n">resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"copper_ore"</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span>
+<span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+
+<span class="k">[[deposit]]</span>
+<span class="n">resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"copper_ore"</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-2</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+</pre></div>
+<p>A resource's <code>produces</code>, a deposit's <code>resource</code>, and a deposit's hex are checked after all files are read, so the target can be in any file. These reference errors are not shown if part of the setting could not be read (see <a href="#Checking-a-setting">Checking a setting</a>).</p>
+<p><strong>The sample setting</strong> has two resource types:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Produces</th>
+<th>Output per deposit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>copper_ore</code></td>
+<td><code>unimproved_copper</code></td>
+<td>2.5</td>
+</tr>
+<tr>
+<td><code>arable_land</code></td>
+<td><code>unimproved_grain</code></td>
+<td>4</td>
+</tr>
+</tbody>
+</table>
+<p>and six deposit entries that place 10 deposits:</p>
+<table>
+<thead>
+<tr>
+<th>Hex <code>(q, r)</code></th>
+<th>Resource</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>(0, 0)</code></td>
+<td><code>arable_land</code></td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>(0, 0)</code></td>
+<td><code>copper_ore</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>(-1, 0)</code></td>
+<td><code>arable_land</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>(1, 0)</code></td>
+<td><code>arable_land</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>(1, -1)</code></td>
+<td><code>copper_ore</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>(-2, 1)</code></td>
+<td><code>copper_ore</code></td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>Hex <code>(0, 0)</code> holds two resource types at once. In the diagram, hexes with deposits are shaded.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=beab7cf9">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMjEiIGhlaWdodD0iMzEyIiB2aWV3Qm94PSItMTYxIC0xNjggMzIxIDMxMiIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiPgo8dGV4dCB4PSItMTU3IiB5PSItMTUyIiBmb250LXNpemU9IjEyIj5xIGdyb3dzIGVhc3QsIHIgZ3Jvd3Mgc291dGg8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTMxLjIsLTEyNi4wIC0zMS4yLC05MC4wIC02Mi40LC03Mi4wIC05My41LC05MC4wIC05My41LC0xMjYuMCAtNjIuNCwtMTQ0LjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTYyLjQiIHk9Ii0xMTAuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MCwgLTI8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMzEuMiwtMTI2LjAgMzEuMiwtOTAuMCAwLjAsLTcyLjAgLTMxLjIsLTkwLjAgLTMxLjIsLTEyNi4wIC0wLjAsLTE0NC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjAuMCIgeT0iLTExMC4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAtMjwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSI5My41LC0xMjYuMCA5My41LC05MC4wIDYyLjQsLTcyLjAgMzEuMiwtOTAuMCAzMS4yLC0xMjYuMCA2Mi40LC0xNDQuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSI2Mi40IiB5PSItMTEwLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIsIC0yPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii02Mi40LC03Mi4wIC02Mi40LC0zNi4wIC05My41LC0xOC4wIC0xMjQuNywtMzYuMCAtMTI0LjcsLTcyLjAgLTkzLjUsLTkwLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTkzLjUiIHk9Ii01Ni4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMSwgLTE8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMC4wLC03Mi4wIDAuMCwtMzYuMCAtMzEuMiwtMTguMCAtNjIuNCwtMzYuMCAtNjIuNCwtNzIuMCAtMzEuMiwtOTAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItMzEuMiIgeT0iLTU2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIC0xPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjYyLjQsLTcyLjAgNjIuNCwtMzYuMCAzMS4yLC0xOC4wIC0wLjAsLTM2LjAgMC4wLC03Mi4wIDMxLjIsLTkwLjAiIGZpbGw9IiNmZGYzZDAiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMzEuMiIgeT0iLTU2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEsIC0xPC90ZXh0Pgo8dGV4dCB4PSIzMS4yIiB5PSItNDUuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNhNDAiPmNvcHBlcl9vcmUgeDI8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMTI0LjcsLTcyLjAgMTI0LjcsLTM2LjAgOTMuNSwtMTguMCA2Mi40LC0zNi4wIDYyLjQsLTcyLjAgOTMuNSwtOTAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSI5My41IiB5PSItNTYuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MiwgLTE8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTkzLjUsLTE4LjAgLTkzLjUsMTguMCAtMTI0LjcsMzYuMCAtMTU1LjksMTguMCAtMTU1LjksLTE4LjAgLTEyNC43LC0zNi4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9Ii0xMjQuNyIgeT0iLTIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+LTIsIDA8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTMxLjIsLTE4LjAgLTMxLjIsMTguMCAtNjIuNCwzNi4wIC05My41LDE4LjAgLTkzLjUsLTE4LjAgLTYyLjQsLTM2LjAiIGZpbGw9IiNmZGYzZDAiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTYyLjQiIHk9Ii0yLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0xLCAwPC90ZXh0Pgo8dGV4dCB4PSItNjIuNCIgeT0iOS4wIiBmb250LXNpemU9IjguNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2E0MCI+YXJhYmxlX2xhbmQgeDI8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMzEuMiwtMTguMCAzMS4yLDE4LjAgMC4wLDM2LjAgLTMxLjIsMTguMCAtMzEuMiwtMTguMCAtMC4wLC0zNi4wIiBmaWxsPSIjZmRmM2QwIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjAuMCIgeT0iLTIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MCwgMDwvdGV4dD4KPHRleHQgeD0iMC4wIiB5PSI5LjAiIGZvbnQtc2l6ZT0iOC41IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjYTQwIj5hcmFibGVfbGFuZCB4MzwvdGV4dD4KPHRleHQgeD0iMC4wIiB5PSIxOS4wIiBmb250LXNpemU9IjguNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2E0MCI+Y29wcGVyX29yZSB4MTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSI5My41LC0xOC4wIDkzLjUsMTguMCA2Mi40LDM2LjAgMzEuMiwxOC4wIDMxLjIsLTE4LjAgNjIuNCwtMzYuMCIgZmlsbD0iI2ZkZjNkMCIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSI2Mi40IiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAwPC90ZXh0Pgo8dGV4dCB4PSI2Mi40IiB5PSI5LjAiIGZvbnQtc2l6ZT0iOC41IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjYTQwIj5hcmFibGVfbGFuZCB4MTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIxNTUuOSwtMTguMCAxNTUuOSwxOC4wIDEyNC43LDM2LjAgOTMuNSwxOC4wIDkzLjUsLTE4LjAgMTI0LjcsLTM2LjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMTI0LjciIHk9Ii0yLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIsIDA8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTYyLjQsMzYuMCAtNjIuNCw3Mi4wIC05My41LDkwLjAgLTEyNC43LDcyLjAgLTEyNC43LDM2LjAgLTkzLjUsMTguMCIgZmlsbD0iI2ZkZjNkMCIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItOTMuNSIgeT0iNTIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+LTIsIDE8L3RleHQ+Cjx0ZXh0IHg9Ii05My41IiB5PSI2My4wIiBmb250LXNpemU9IjguNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2E0MCI+Y29wcGVyX29yZSB4MTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIwLjAsMzYuMCAwLjAsNzIuMCAtMzEuMiw5MC4wIC02Mi40LDcyLjAgLTYyLjQsMzYuMCAtMzEuMiwxOC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9Ii0zMS4yIiB5PSI1Mi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMSwgMTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSI2Mi40LDM2LjAgNjIuNCw3Mi4wIDMxLjIsOTAuMCAtMC4wLDcyLjAgMC4wLDM2LjAgMzEuMiwxOC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjMxLjIiIHk9IjUyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIDE8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMTI0LjcsMzYuMCAxMjQuNyw3Mi4wIDkzLjUsOTAuMCA2Mi40LDcyLjAgNjIuNCwzNi4wIDkzLjUsMTguMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSI5My41IiB5PSI1Mi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAxPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii0zMS4yLDkwLjAgLTMxLjIsMTI2LjAgLTYyLjQsMTQ0LjAgLTkzLjUsMTI2LjAgLTkzLjUsOTAuMCAtNjIuNCw3Mi4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9Ii02Mi40IiB5PSIxMDYuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+LTIsIDI8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMzEuMiw5MC4wIDMxLjIsMTI2LjAgMC4wLDE0NC4wIC0zMS4yLDEyNi4wIC0zMS4yLDkwLjAgLTAuMCw3Mi4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjAuMCIgeT0iMTA2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0xLCAyPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjkzLjUsOTAuMCA5My41LDEyNi4wIDYyLjQsMTQ0LjAgMzEuMiwxMjYuMCAzMS4yLDkwLjAgNjIuNCw3Mi4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjYyLjQiIHk9IjEwNi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4wLCAyPC90ZXh0Pgo8L3N2Zz4="/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=23daa10e">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>Planned for later: stock, depletion and regeneration as optional data on resource types, so settings written now stay valid.</p>
+<p>More detail: <a href="docs/resources.md">docs/resources.md</a>, with <a href="docs/map.md">docs/map.md</a> for coordinates and <a href="docs/goods.md">docs/goods.md</a> for goods.</p>
+<h3 id="Running-a-setting">Running a setting<a class="anchor-link" href="#Running-a-setting">¶</a></h3><p>A loaded setting becomes a running <strong>world</strong>. The rules stay fixed; the world holds the clock (starting at turn 0) and the goods that exist. Each turn has three parts:</p>
+<ol>
+<li><strong>Emit.</strong> At the start of the turn every deposit produces its resource type's <code>output</code> of its good.</li>
+<li><strong>Actors act.</strong> Nothing acts yet, so this part is empty.</li>
+<li><strong>Perish.</strong> At the end of the turn, goods that have reached their limit are removed.</li>
+</ol>
+<p>The world is observed after the emit and before the perish. Deposits are unowned, so everything lands in an "unowned goods" stockpile on the hex where the deposit sits.</p>
+<p><code>perishes_after</code> takes effect here. With 1, output is usable during the turn it appears and gone when it ends. With 3, it is gone at the end of the third turn it exists. Goods without <code>perishes_after</code> last forever and accumulate. (<code>movable</code> still has no effect.)</p>
+<p>A <strong>stockpile</strong> holds the total of each good, and for each total, how much perishes at the end of which turn. For example, a good with <code>perishes_after = 3</code> produced at 5 per turn:</p>
+<table>
+<thead>
+<tr>
+<th>Turn</th>
+<th>Held during the turn (after the emit)</th>
+<th>Removed when the turn ends</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>5</td>
+<td>0</td>
+</tr>
+<tr>
+<td>1</td>
+<td>10</td>
+<td>0</td>
+</tr>
+<tr>
+<td>2</td>
+<td>15</td>
+<td>5 (the batch from turn 0)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>15</td>
+<td>5 (the batch from turn 1)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>15</td>
+<td>5 (the batch from turn 2)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Turn reports.</strong> Each turn produces a report with totals per good, over the whole map, of what perished (when the previous turn ended) and what was emitted. The sample setting over turns 0 to 2 (see the next section for the command) looks like this:</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=679d4f06">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain
+Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain
+Turn 2: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fe06ab00">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>The four copper deposits give 4 x 2.5 = 10 and the six grain deposits give 6 x 4 = 24 each turn. Both goods last one turn, so each turn's output is gone before the next turn's arrives.</p>
+<p>More detail: <a href="docs/world.md">docs/world.md</a>.</p>
+<h3 id="Checking-a-setting">Checking a setting<a class="anchor-link" href="#Checking-a-setting">¶</a></h3><p>The checker loads a setting and reports every problem in one go, with file, line and column. It never produces a half-loaded setting.</p>
+<pre><code>dev-ui check &lt;folder&gt; [--turns N]
+</code></pre>
+<p>From the project root, that is <code>cargo run -p policyspace-dev-ui -- check settings/sample</code>. On success it prints one line:</p>
+<pre><code>Loaded setting 'Sample Setting' (format version 1): 5 goods, 19 hexes, 2 resources, 10 deposits
+</code></pre>
+<p>(Counts use singular wording where it applies: <code>1 hex</code>, <code>1 resource</code>, <code>1 deposit</code>.) With <code>--turns N</code> (N from 0 to 10,000) it then prints one report line per turn, from turn 0 through turn N; <code>--turns 0</code> prints only turn 0.</p>
+<p>Problems look like this:</p>
+<pre><code>rules/a.toml:3:18: key 'perishes_after' in good must be at least 1
+rules/a.toml:6:6: duplicate good name 'copper' (first defined at rules/a.toml:2:6)
+rules/a.toml:10:10: unknown good 'gold'
+start/m.toml:4:1: unknown key 'terrain' in hex
+start/m.toml:6:1: duplicate hex at (0, 0) (first defined at start/m.toml:1:1)
+5 error(s) found in my_setting
+</code></pre>
+<p>If part of the setting could not be read (a missing folder, or a broken or unreadable file), reference errors such as <code>unknown good</code> are not shown; fix the structural problem first.</p>
+<table>
+<thead>
+<tr>
+<th>Exit code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>The setting loaded</td>
+</tr>
+<tr>
+<td>1</td>
+<td>The setting has errors</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Wrong usage (a three-line usage message is printed)</td>
+</tr>
+</tbody>
+</table>
+<p>The checker never opens a window, so it is the form to use in scripts. <code>dev-ui --version</code> prints the engine's name and version. More detail: <a href="docs/setting-loader.md">docs/setting-loader.md</a>, and <a href="docs/world.md">docs/world.md</a> for <code>--turns</code>.</p>
+<h3 id="The-developer-UI">The developer UI<a class="anchor-link" href="#The-developer-UI">¶</a></h3><p>The developer UI is a window that shows a setting's map and lets you step through turns and inspect the world.</p>
+<ul>
+<li><code>dev-ui &lt;folder&gt;</code> opens the window with a setting loaded.</li>
+<li><code>dev-ui</code> alone opens it with an <strong>Open setting...</strong> button (a system folder picker; cancelling changes nothing).</li>
+</ul>
+<p>For example: <code>cargo run -p policyspace-dev-ui -- settings/sample</code>.</p>
+<h4 id="Reading-the-map">Reading the map<a class="anchor-link" href="#Reading-the-map">¶</a></h4><p>Each hex is a pointy-top hexagon, rows run east-west, <code>q</code> increases eastward and <code>r</code> increases southward, exactly as in <a href="#The-map">The map</a>. The sample setting shows as a hexagon of 19 hexes. Hexes with at least one deposit show a small mark when drawn as hexagons, so you can see where to click.</p>
+<p><strong>Controls</strong></p>
+<ul>
+<li>Drag to pan; scroll to zoom toward the cursor; <strong>Fit</strong> shows the whole map again.</li>
+<li>When zoomed in far enough, each hex shows its coordinates as <code>q, r</code> (the center of the sample is <code>0, 0</code>).</li>
+<li>Hovering highlights a hex and shows its coordinates in the status bar.</li>
+<li>The status bar also shows the setting name, the hex count and the current turn.</li>
+</ul>
+<p>Unusual maps are handled: an empty map shows "This setting has no hexes."; holes, islands and negative coordinates draw correctly; for maps spanning huge distances, hexes too small to see are drawn as dots, and zooming in turns them back into hexagons.</p>
+<h4 id="Inspecting-a-hex">Inspecting a hex<a class="anchor-link" href="#Inspecting-a-hex">¶</a></h4><p>Click a hex to select it (a thick accent-colored outline, distinct from the hover highlight). When hexes are drawn as dots, a click near a dot selects it. Click empty space or press Esc to clear. Dragging to pan never changes the selection.</p>
+<p>The <strong>hex panel</strong> on the right shows, for the selected hex:</p>
+<ul>
+<li>its coordinates;</li>
+<li>its deposits grouped by type, for example <code>arable_land x 3: 4 unimproved_grain each, 12 total</code>;</li>
+<li>its stockpile: each good's total, and the parts of it with a countdown to when they perish: <code>perishes this turn</code>, <code>perishes in N turns</code>, or <code>never perishes</code>.</li>
+</ul>
+<p>Reading the countdown: suppose hex <code>(0, 0)</code> holds 15 of a good that lasts 3 turns, at turn 2, with 5 produced each turn. The panel lists 5 that perish this turn, 5 that perish in 1 turn and 5 that perish in 2 turns: the oldest batch is about to go, the newest has two more turns to live.</p>
+<p>Other messages: "Click a hex to inspect it.", "No deposits.", "Empty." and "This setting has no hexes."</p>
+<h4 id="Stepping-turns">Stepping turns<a class="anchor-link" href="#Stepping-turns">¶</a></h4><p>The <strong>Step</strong> and <strong>Step x10</strong> buttons in the top bar advance the world one or ten turns (shortcuts: Space and Shift+Space). They work whenever the setting loaded without errors, even one with no hexes. The status bar's turn follows. The world starts at turn 0 on every load.</p>
+<h4 id="The-world-panel">The world panel<a class="anchor-link" href="#The-world-panel">¶</a></h4><p>The <strong>world panel</strong> on the left has three sections, which collapse; the panels can be resized.</p>
+<ul>
+<li><strong>Turn log:</strong> every turn report since the load, turn 0 included, newest first, in the same wording as <code>check --turns</code> (see <a href="#Running-a-setting">Running a setting</a>).</li>
+<li><strong>Goods:</strong> each good's name, how long it lasts, whether it is movable or fixed, and the amount held in the whole world.</li>
+<li><strong>Resource types:</strong> each type's name, the good it produces, its output per deposit and its deposit count.</li>
+</ul>
+<h4 id="The-author's-loop">The author's loop<a class="anchor-link" href="#The-author's-loop">¶</a></h4><ol>
+<li>Edit a setting file (for example, change some deposits or goods).</li>
+<li>Click <strong>Reload</strong>. The world returns to turn 0, with a log of one line. Your pan and zoom stay, and so does your selection if the reloaded map still has a hex at those coordinates.</li>
+<li>Step a few turns and check the stockpiles.</li>
+</ol>
+<p>If the setting has errors, the window shows the full error list (the same lines the checker prints) and no map or side panels, and the Step buttons are disabled. Fix the files and Reload again. A failed Reload doesn't lose the selection. A broken folder given on the command line opens the window showing its errors. Opening a different folder clears the selection and the log.</p>
+<h4 id="Not-available-yet">Not available yet<a class="anchor-link" href="#Not-available-yet">¶</a></h4><p>Auto-run, stepping by another number, coloring hexes by data, editing the world, and selecting several hexes.</p>
+<p>More detail: <a href="docs/dev-ui.md">docs/dev-ui.md</a>, with <a href="docs/world.md">docs/world.md</a> for turns and stockpiles.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c014b435">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>

@@ -126,6 +126,15 @@ pub(crate) fn discover(root: &Path, sink: &mut ErrorSink) -> Discovered {
         if is_ignored(&entry.name, entry.is_dir) {
             continue;
         }
+        if let Some(folder) = Folder::from_dir_name(&entry.name) {
+            have_folder[folder.order()] = true;
+            if entry.is_dir {
+                folders[folder.order()] = Some(entry.abs);
+            } else {
+                sink.in_file(&entry.name, "expected a folder, found a file");
+            }
+            continue;
+        }
         match (entry.name.as_str(), entry.is_dir) {
             (MANIFEST_NAME, false) => {
                 have_manifest_entry = true;
@@ -138,15 +147,6 @@ pub(crate) fn discover(root: &Path, sink: &mut ErrorSink) -> Discovered {
             ("README.md", false) => {}
             ("README.md", true) => {
                 sink.in_file("README.md", "expected a file, found a folder");
-            }
-            (name, is_dir) if Folder::from_dir_name(name).is_some() => {
-                let folder = Folder::from_dir_name(name).unwrap_or(Folder::Rules);
-                have_folder[folder.order()] = true;
-                if is_dir {
-                    folders[folder.order()] = Some(entry.abs);
-                } else {
-                    sink.in_file(name, "expected a folder, found a file");
-                }
             }
             (name, false) => sink.in_file(
                 name,
@@ -239,11 +239,7 @@ mod tests {
     fn errors_of(root: &Path) -> (Discovered, Vec<String>) {
         let mut sink = ErrorSink::new();
         let found = discover(root, &mut sink);
-        let shown = match sink.into_result(()) {
-            Ok(()) => Vec::new(),
-            Err(errors) => errors.iter().map(|e| e.to_string()).collect(),
-        };
-        (found, shown)
+        (found, sink.into_lines())
     }
 
     #[test]
@@ -385,8 +381,7 @@ mod tests {
         let complete = walk(&missing, "rules/sub", Folder::Rules, &mut found, &mut sink);
         assert!(!complete);
         assert!(found.is_empty());
-        let errors = sink.into_result(()).unwrap_err();
-        let shown: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+        let shown = sink.into_lines();
         assert_eq!(shown.len(), 1);
         assert!(
             shown[0].starts_with("rules/sub: could not read folder: "),

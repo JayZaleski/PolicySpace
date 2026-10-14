@@ -19,7 +19,7 @@
 pub mod goods;
 pub use goods::{Good, GoodId, GoodKind, Goods, Perishes};
 pub mod id;
-pub use id::{Id, IdError, IdKind, NameRegistry};
+pub use id::{Id, IdError, IdKind, NameRegistry, NamedList};
 pub mod map;
 pub use map::{HexCoord, HexId, HexKind, HexMap};
 pub mod quantity;

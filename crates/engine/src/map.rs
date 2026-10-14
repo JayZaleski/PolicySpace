@@ -23,7 +23,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::id::{Id, IdKind};
+use crate::id::{Id, IdKind, IdVec};
 
 /// Marker kind for hexes.
 pub enum HexKind {}
@@ -61,8 +61,8 @@ impl fmt::Display for HexCoord {
 /// Every hex in a setting, in load order (which is also ID order).
 #[derive(Debug, Default)]
 pub struct HexMap {
-    /// Indexed by `HexId::index`.
-    coords: Vec<HexCoord>,
+    /// One entry per hex, by `HexId`.
+    coords: IdVec<HexKind, HexCoord>,
     /// Lookup only; never iterated (iteration order must not depend on hashing).
     by_coord: HashMap<HexCoord, HexId>,
 }
@@ -75,10 +75,10 @@ impl HexMap {
     /// Panics if two entries have the same coordinates (the loader rejects duplicates
     /// first, so this is a programming error), or if there are more than u32::MAX hexes.
     pub(crate) fn from_coords(coords: Vec<HexCoord>) -> Self {
+        let coords = IdVec::from_vec(coords);
         let mut by_coord = HashMap::with_capacity(coords.len());
-        for (index, coord) in coords.iter().enumerate() {
-            let index = u32::try_from(index).expect("more than u32::MAX hexes");
-            let previous = by_coord.insert(*coord, HexId::from_index(index));
+        for (id, coord) in coords.iter() {
+            let previous = by_coord.insert(*coord, id);
             assert!(previous.is_none(), "duplicate hex at {coord}");
         }
         HexMap { coords, by_coord }
@@ -104,22 +104,12 @@ impl HexMap {
     /// # Panics
     /// Panics if `id` isn't from this map.
     pub fn coord(&self, id: HexId) -> HexCoord {
-        match self.coords.get(id.index()) {
-            Some(coord) => *coord,
-            None => panic!(
-                "{:?} is not from this map (it has {} hexes)",
-                id,
-                self.coords.len()
-            ),
-        }
+        *self.coords.get(id)
     }
 
     /// Every hex as (ID, coordinates), in load order.
     pub fn iter(&self) -> impl Iterator<Item = (HexId, HexCoord)> + '_ {
-        self.coords.iter().enumerate().map(|(index, coord)| {
-            // `from_coords` checked that every index fits in a u32.
-            (HexId::from_index(index as u32), *coord)
-        })
+        self.coords.iter().map(|(id, coord)| (id, *coord))
     }
 }
 
@@ -174,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "is not from this map")]
+    #[should_panic(expected = "is not from this list")]
     fn coord_panics_on_a_foreign_id() {
         sample().coord(HexId::from_index(3));
     }
