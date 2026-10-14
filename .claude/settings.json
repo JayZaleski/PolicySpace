@@ -64,7 +64,7 @@
       "PowerShell(git clean *)"
     ]
   },
-  "model": "opus",
+  "model": "best",
   "hooks": {
     "PostToolUse": [
       {

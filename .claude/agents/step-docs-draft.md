@@ -2,7 +2,7 @@
 name: step-docs-draft
 description: Drafts the documentation changes for a built Step by writing docs_changes.md (proposed changes to docs/) and manual_changes.md (a general description of what the manual should add) in the Step folder. Give it the path to the Step folder. Deploy after the user approves the Code Review.
 tools: Read, Glob, Grep, Bash, Write
-model: sonnet
+model: opus
 effort: medium
 ---
 

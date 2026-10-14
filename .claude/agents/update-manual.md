@@ -2,7 +2,7 @@
 name: update-manual
 description: At the end of a Stage, writes the additions described in the Stage's manual_changes.md files into manual.ipynb, then regenerates manual.html. Give it the path to the Stage folder. Deploy after update-docs has finished.
 tools: Read, Glob, Grep, Bash, Edit, Write, NotebookEdit
-model: sonnet
+model: fable
 effort: medium
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: project-plan
 description: Update PROJECT_PLAN/roadmap.md to reflect changes in vision.md, break the next Stage into Steps, and create its folders. Second step of each Stage in the development loop.
-model: opus
+model: best
 disable-model-invocation: true
 ---
 
@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Turn the changes from the latest brainstorm into an updated `PROJECT_PLAN/roadmap.md`. Break the next Stage into Steps and create its folders. This is the second step of each Stage in the development loop (see `CLAUDE.md`, which also defines the roadmap format, statuses, and tags).
 
-**Model.** This skill is meant to run on Opus. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model opus` (press `s` to apply it to this session only) if the session isn't already on it.
+**Model.** This skill is meant to run on the best available model: Fable, or Opus if Fable isn't available. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model best` (press `s` to apply it to this session only) if the session isn't already on it.
 
 ## 1. Gather context
 

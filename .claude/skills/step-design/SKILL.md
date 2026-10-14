@@ -1,7 +1,7 @@
 ---
 name: step-design
 description: Collaboratively design a Step and write its design.md, a plain-English description of the feature. First step of each Step in the development loop.
-model: opus
+model: best
 argument-hint: "[step, e.g. 03 or tax-collection]"
 disable-model-invocation: true
 ---
@@ -10,7 +10,7 @@ disable-model-invocation: true
 
 Work with the user to design one Step, then write its `design.md`: a plain-English description of the feature. This is the first step of each Step in the development loop (see `CLAUDE.md`).
 
-**Model.** This skill is meant to run on Opus. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model opus` (press `s` to apply it to this session only) if the session isn't already on it.
+**Model.** This skill is meant to run on the best available model: Fable, or Opus if Fable isn't available. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model best` (press `s` to apply it to this session only) if the session isn't already on it.
 
 ## 1. Pick the Step
 

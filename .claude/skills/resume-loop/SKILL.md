@@ -1,7 +1,7 @@
 ---
 name: resume-loop
 description: Work out where the development loop stopped after an interrupted session, explain it, and continue from there.
-model: opus
+model: best
 disable-model-invocation: true
 ---
 
@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 A previous session ended partway through the development loop (see `CLAUDE.md`). Work out where it stopped, using only the files and git, explain that to the user in plain English, and continue from there.
 
-**Model.** This skill is meant to run on Opus. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model opus` (press `s` to apply it to this session only) if the session isn't already on it.
+**Model.** This skill is meant to run on the best available model: Fable, or Opus if Fable isn't available. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model best` (press `s` to apply it to this session only) if the session isn't already on it.
 
 ## 1. Gather the state
 

@@ -70,6 +70,16 @@ Steps in `roadmap.md` are tagged using `#tag` format (lowercase, kebab-case, e.g
 
 Use the LSP tool (rust-analyzer) to find definitions and references before falling back to text search.
 
+## Presenting Decisions
+
+When you bring the user a decision to make, in any skill or part of the loop:
+
+1. Briefly introduce the issue: what needs deciding and why it matters.
+2. Describe each option in one paragraph: what it is, its pros and cons, and what it means for the project.
+3. Give your recommendation and why, if you have one. If you don't, say so.
+
+Put this in your message, not only in a question prompt's short option labels.
+
 ## Status Dashboard
 
 A dashboard on the home server shows the project's progress. It reads `Z:\Project-Tracking\PolicySpace\status.json`, a snapshot of the Stages, Steps, and statuses in `roadmap.md`. `tools/export_status.py` generates the file:
@@ -174,19 +184,20 @@ A bug is code that doesn't do what its Step's `design.md` says. When the user re
 
 ### Models
 
-Each part of the loop runs on a model suited to its work: the strongest models for thinking-heavy work and independent review, Sonnet for building and docs.
+Each part of the loop runs on a model suited to its work: the best model for the skills the user talks with and for the final docs, Opus for independent review and docs drafting, Sonnet for building and status commits.
 
 | Part of the loop | Model | Effort |
 |---|---|---|
-| `brainstorm` | `best` (Fable, or Opus where Fable isn't available) | — |
-| `project-plan`, `step-design`, `step-spec`, `comp-review`, `bugfix`, `resume-loop` | `opus` | — |
+| `brainstorm`, `project-plan`, `step-design`, `step-spec`, `comp-review`, `bugfix`, `resume-loop` | `best` (Fable, or Opus where Fable isn't available) | — |
 | `build` | `sonnet` | high |
 | `build-review` | `opus` | high |
-| `step-docs-draft`, `update-docs`, `update-manual` | `sonnet` | medium |
+| `step-docs-draft` | `opus` | medium |
+| `update-docs`, `update-manual` | `fable` | medium |
 | `update-status` | `sonnet` | low |
 
 - **The skill and agent frontmatter (`model:`, `effort:`) is the source of truth.** To change a model, edit the frontmatter, then update this table.
-- **A skill's model lasts only for the turn it's invoked.** The rest of the session, including Code Review and handling build issues, runs on the session model. Sessions in this project start on Opus (`"model": "opus"` in `.claude/settings.json`), so usually only `brainstorm` needs a switch: `/model best` (press `s` to apply it to this session only). Each skill reminds the user if the session isn't on its model.
+- **Agent frontmatter doesn't accept `best`**, only `sonnet`, `opus`, `haiku`, `fable`, a full model ID, or `inherit`. So `update-docs` and `update-manual` name `fable` directly and don't fall back to Opus. If Fable isn't available, change them to `opus`.
+- **A skill's model lasts only for the turn it's invoked.** The rest of the session, including Code Review and handling build issues, runs on the session model. Sessions in this project start on the best model (`"model": "best"` in `.claude/settings.json`), so usually no switch is needed. If a session is on another model, use `/model best` (press `s` to apply it to this session only). Each skill reminds the user if the session isn't on its model.
 - **When deploying a loop subagent, never pass a `model` override.** It would replace the agent's frontmatter.
 - **Every subagent report starts with a `Model:` line.** If it doesn't match the table, tell the user: something is overriding the frontmatter (an Agent tool `model` parameter, or `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`).
 

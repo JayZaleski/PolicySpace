@@ -1,7 +1,7 @@
 ---
 name: comp-review
 description: Review all the code changes from a completed Stage, look for chances to consolidate and optimize, and write the approved recommendations to the Stage's consolidate.md. Then run the end-of-Stage loop (build, code review, docs, status).
-model: opus
+model: best
 argument-hint: "[stage, e.g. 01 or economy]"
 disable-model-invocation: true
 ---
@@ -12,7 +12,7 @@ Review the code changes across all of a Stage's Steps, look for chances to conso
 
 **Two audiences.** Everything you say to the user (findings, recommendations, summaries, proposed changes) is in plain English: what it means for the code and the project, without code jargon. Bring in a technical term only when it's needed, and explain it when you do. `consolidate.md` is written for the `build` subagent and should be as precise and technical as that requires.
 
-**Model.** This skill is meant to run on Opus. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model opus` (press `s` to apply it to this session only) if the session isn't already on it.
+**Model.** This skill is meant to run on the best available model: Fable, or Opus if Fable isn't available. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model best` (press `s` to apply it to this session only) if the session isn't already on it.
 
 ## 1. Pick the Stage
 

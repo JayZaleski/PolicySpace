@@ -1,7 +1,7 @@
 ---
 name: bugfix
 description: Diagnose and fix a bug in code that's already built, outside the Stage/Step loop. Logs the bug in PROJECT_PLAN/bugs.md, writes its fix.md, then builds, reviews, and commits the fix.
-model: opus
+model: best
 argument-hint: "[bug number, or a short description of a new bug]"
 disable-model-invocation: true
 ---
@@ -12,7 +12,7 @@ Fix a bug in code that's already built: find the cause, write `fix.md` (the plan
 
 **Two audiences.** Everything you say to the user (diagnosis, options, summaries) is in plain English: what it means for the game and the code, without code jargon. Bring in a technical term only when it's needed, and explain it when you do. `fix.md` is written for the `build` subagent and should be as precise and technical as that requires.
 
-**Model.** This skill is meant to run on Opus. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model opus` (press `s` to apply it to this session only) if the session isn't already on it.
+**Model.** This skill is meant to run on the best available model: Fable, or Opus if Fable isn't available. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model best` (press `s` to apply it to this session only) if the session isn't already on it.
 
 ## 1. Check for a clean point
 

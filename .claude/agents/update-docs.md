@@ -2,7 +2,7 @@
 name: update-docs
 description: At the end of a Stage, applies the Stage's docs_changes.md proposals and the applied consolidate.md recommendations to the docs/ folder. Give it the path to the Stage folder. Deploy before update-manual.
 tools: Read, Glob, Grep, Bash, Edit, Write
-model: sonnet
+model: fable
 effort: medium
 ---
 

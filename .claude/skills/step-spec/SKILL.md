@@ -1,7 +1,7 @@
 ---
 name: step-spec
 description: Translate a Step's design.md into spec.md, the technical instructions the build subagent follows. Second step of each Step in the development loop.
-model: opus
+model: best
 argument-hint: "[step, e.g. 03 or tax-collection]"
 disable-model-invocation: true
 ---
@@ -12,7 +12,7 @@ Translate a Step's `design.md` into `spec.md`: technical instructions that the `
 
 **Two audiences.** Everything you say to the user (decisions, summaries, proposed changes) is in plain English: what each option means for the feature and the project, without code jargon. Bring in a technical term only when it's needed, and explain it when you do. `spec.md` itself is written for the `build` subagent and should be as precise and technical as that requires.
 
-**Model.** This skill is meant to run on Opus. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model opus` (press `s` to apply it to this session only) if the session isn't already on it.
+**Model.** This skill is meant to run on the best available model: Fable, or Opus if Fable isn't available. Its frontmatter switches the model only for the turn it's invoked, so in your opening message tell the user, in one line, to run `/model best` (press `s` to apply it to this session only) if the session isn't already on it.
 
 ## 1. Pick the Step
 
