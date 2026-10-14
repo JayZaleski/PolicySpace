@@ -81,6 +81,16 @@ impl MapReader {
         Some(HexId::from_usize(index))
     }
 
+    /// Number of placed hexes (the hex count of the finished map).
+    pub fn len(&self) -> usize {
+        self.coords.len()
+    }
+
+    /// The resolved currency of a placed hex: None before phase 2, or if it didn't resolve.
+    pub fn currency(&self, hex: HexId) -> Option<GoodId> {
+        self.currency_ids.get(hex.index()).copied().flatten()
+    }
+
     /// Phase 2: resolves each placed hex's currency against the goods. An unknown name is
     /// reported at the value (`unknown good '<name>'`) by `Definitions::resolve`.
     pub fn resolve(&mut self, goods: &Definitions<GoodKind>, sink: &mut ErrorSink) {

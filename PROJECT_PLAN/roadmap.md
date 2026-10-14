@@ -54,7 +54,7 @@
 - Description: Designate one good per hex as its currency, in the starting state. Decide whether every hex must have one and what the designated good may be. The designation is state, not a rule, because it can change during the simulation. Add a currency good to the sample setting.
 
 ### Step 02: dummy-market
-- Status: specified
+- Status: done
 - Tags: #market #dummy-data #setting-data #currency
 - Description: A per-hex dummy market that posts fixed prices in the hex's currency and buys and sells any amount at those prices. Decide where the dummy prices live in the setting folder. Add the first way to take goods out of a stockpile, including which perish group goes first. This is the seam Stage 05 replaces with the live market.
 

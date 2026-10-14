@@ -1,0 +1,108 @@
+# Markets: the dummy market on a hex. A market posts fixed prices, in the hex's currency
+# (here `silver`, the currency of every hex), and exchanges goods against a stockpile at
+# those prices. Every [[market]] needs:
+#
+#   q, r      The axial coordinates of a hex that exists in the map.
+#   prices    A table of good name = price, each price a number greater than 0: how many
+#             units of the hex's currency one unit of the good costs.
+#
+# A good without a price is not traded on that hex. A hex may have no market at all, and at
+# most one [[market]] may be written per hex. The hex's own currency can't be given a
+# price: it always costs 1, and it can't be traded against itself.
+#
+# This setting has a market on every hex of the map except (2, -2), the hex in the
+# north-east corner, which has none. The markets are listed in the map's order (row by row,
+# north to south, west to east).
+
+[[market]]
+q = 0
+r = -2
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 1
+r = -2
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+# (2, -2) has no market.
+
+[[market]]
+q = -1
+r = -1
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 0
+r = -1
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 1
+r = -1
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 2
+r = -1
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = -2
+r = 0
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = -1
+r = 0
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 0
+r = 0
+# The center is the only hex that trades resource output (the unimproved goods).
+prices = { unskilled_labor = 1, grain = 2, copper = 5, unimproved_grain = 0.5, unimproved_copper = 1 }
+
+[[market]]
+q = 1
+r = 0
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 2
+r = 0
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = -2
+r = 1
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = -1
+r = 1
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 0
+r = 1
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 1
+r = 1
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = -2
+r = 2
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = -1
+r = 2
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 0
+r = 2
+prices = { unskilled_labor = 1, grain = 2, copper = 5 }

@@ -21,13 +21,21 @@ Valid settings:
   with the goods and hexes they refer to defined in files read after them. Resource
   types: `copper_ore`, `iron_ore`, `farmland`, `unused`. Deposits: 2 `copper_ore` and 1
   `farmland` at (0, 0), then 3 `iron_ore` at (1, 0).
-- `resources_one`: one good, one hex, one resource type and one deposit (for the setting
-  checker's `1 resource` and `1 deposit`).
+- `resources_one`: one good, one hex, one resource type, one deposit and one market with
+  empty prices (for the setting checker's `1 resource`, `1 deposit` and `1 market`).
 - `turns_valid`: for the turn clock tests (`crates/engine/tests/world.rs`). Goods: `daily`
   (perishes after 1), `stew` (perishes after 3), `gold` (never perishes). Resource types:
   `field` (2 `daily`), `meadow` (0.5 `daily`), `pot` (5 `stew`), `mine` (1.5 `gold`).
   Hexes: (0, 0), (1, 0), (2, 0). Deposits: 2 `field`, 1 `meadow` and 1 `pot` at (0, 0),
   then 1 `field` and 1 `mine` at (1, 0); (2, 0) has none.
+  Markets (in `start/markets.toml`): (0, 0) prices `daily` 2 and `stew` 4; (1, 0) prices
+  `daily` 0.5 and `stew` 3; (2, 0) has no market. `gold` is every hex's currency.
+- `markets_valid`: markets across several files and a nested folder, in both the inline
+  `prices = { ... }` form and the `[market.prices]` sub-table form, with one market that has
+  empty prices and one hex with no market. Goods: `coin`, `shell`, `grain`, `fish`. Hexes:
+  (0, 0) `coin`, (1, 0) `shell`, (2, 0) `coin`, (3, 0) `coin`. Prices: (0, 0) `grain` 2 and
+  `fish` 1.5; (1, 0) `grain` 3 and `coin` 0.25 (`coin` is not that hex's currency, so it may
+  be priced); (2, 0) none; (3, 0) has no market.
 
 Folder-structure errors:
 - `missing_manifest`, `missing_rules`, `missing_start`: a required entry is absent.
@@ -54,8 +62,14 @@ File-content errors:
   or out-of-range key, bad counts (0, negative, over 1,000,000, a float), an unknown
   resource, a coordinate with no hex, one deposit with several problems, a duplicate across
   files, and a `[[deposit]]` in `rules/`.
+- `markets_errors`: every kind of `[[market]]` error, including a missing, wrongly typed or
+  out-of-range coordinate, a missing or non-table `prices`, prices that are not numbers or
+  not finite and above 0, an unknown good, a priced currency, a coordinate with no hex, one
+  market with several problems, an unknown key, a duplicate across files, and a `[[market]]`
+  in `rules/`. Its goods are `coin` (every hex's currency) and `grain`.
 - `resources_broken_file`: a broken TOML file next to resources that refer to a good and a
-  hex that don't exist, plus a hex whose currency is an unknown good: only the syntax error
+  hex that don't exist, plus a hex whose currency is an unknown good
+  and a market that prices goods that don't exist: only the syntax error
   is reported.
 - `resources_missing_start`: no `start/` folder, and a resource that refers to a good that
   doesn't exist: only the missing folder is reported.

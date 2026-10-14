@@ -1,0 +1,9 @@
+[[market]]
+q = 0
+r = 0
+prices = { daily = 2, stew = 4 }
+
+[[market]]
+q = 1
+r = 0
+prices = { daily = 0.5, stew = 3 }

@@ -177,24 +177,31 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         let Found::Value(value) = self.find(key, true) else {
             return None;
         };
+        let prefix = format!("key '{key}' in {}", self.label);
+        self.number_value(&prefix, value)
+    }
+
+    /// Parses `value` as a number (an integer or a float, as `f64`). `prefix` starts the
+    /// message of any problem: `key 'output' in resource` or `key 'grain' in prices of market`.
+    fn number_value(&mut self, prefix: &str, value: &Spanned<DeValue<'i>>) -> Option<Located<f64>> {
         let at = self.file.location_of(value.span());
         let parsed = match value.get_ref() {
             DeValue::Integer(int) => i64::from_str_radix(int.as_str(), int.radix())
                 .ok()
                 .map(|n| n as f64),
             DeValue::Float(float) => float.as_str().parse::<f64>().ok(),
-            _ => {
-                self.wrong_type(key, "a number", value);
+            other => {
+                self.sink.at(
+                    &at,
+                    format!("{prefix} must be a number, found {}", other.type_str()),
+                );
                 return None;
             }
         };
         match parsed {
             Some(n) => Some(Located { value: n, at }),
             None => {
-                self.sink.at(
-                    &at,
-                    format!("key '{key}' in {} is out of range", self.label),
-                );
+                self.sink.at(&at, format!("{prefix} is out of range"));
                 None
             }
         }
@@ -257,6 +264,39 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     /// returned as written (including `inf` and `nan`); range checks belong to the caller.
     pub fn required_number(&mut self, key: &str) -> Option<Located<f64>> {
         self.number(key)
+    }
+
+    /// Reads `key` as a table whose values are numbers. Returns every (key, value) pair in the
+    /// table's order, each key with its location. A value that isn't a number or is out of
+    /// range is reported (`key '<k>' in <key> of <label> must be a number, found <type>`,
+    /// `key '<k>' in <key> of <label> is out of range`) and returned as None, so the caller
+    /// still sees the key. A missing key reports the usual missing-key error; a value that
+    /// isn't a table reports `key '<key>' in <label> must be a table, found <type>`. Both
+    /// return None. The nested table's keys are data, not fields: they are not name-checked
+    /// and not tracked as read or unknown.
+    #[allow(clippy::type_complexity)]
+    pub fn required_number_table(
+        &mut self,
+        key: &str,
+    ) -> Option<Vec<(Located<String>, Option<Located<f64>>)>> {
+        let Found::Value(value) = self.find(key, true) else {
+            return None;
+        };
+        let Some(table) = value.get_ref().as_table() else {
+            self.wrong_type(key, "a table", value);
+            return None;
+        };
+        let mut pairs = Vec::new();
+        for (k, v) in table.iter() {
+            let name = Located {
+                value: k.get_ref().to_string(),
+                at: self.file.location_of(k.span()),
+            };
+            let prefix = format!("key '{}' in {key} of {}", name.value, self.label);
+            let number = self.number_value(&prefix, v);
+            pairs.push((name, number));
+        }
+        Some(pairs)
     }
 
     /// A boolean value that must be present.
@@ -423,6 +463,55 @@ i = -inf
                 "rules/t.toml:8:5: key 'h' in thing is out of range",
             ]
         );
+    }
+
+    #[test]
+    fn number_tables_give_every_key_and_report_bad_values() {
+        let errors = run(
+            "p = { a = 1, b = 2.5, c = \"x\", d = 99999999999999999999, e = inf }
+q = 7
+",
+            |r| {
+                let pairs = r.required_number_table("p").unwrap();
+                let keys: Vec<&str> = pairs.iter().map(|(k, _)| k.value.as_str()).collect();
+                assert_eq!(keys, vec!["a", "b", "c", "d", "e"]);
+                assert_eq!(pairs[0].1.as_ref().unwrap().value, 1.0);
+                assert_eq!(pairs[1].1.as_ref().unwrap().value, 2.5);
+                assert!(pairs[2].1.is_none());
+                assert!(pairs[3].1.is_none());
+                assert_eq!(pairs[4].1.as_ref().unwrap().value, f64::INFINITY);
+                assert_eq!((pairs[0].0.at.line, pairs[0].0.at.column), (1, 7));
+                assert!(r.required_number_table("q").is_none());
+                assert!(r.required_number_table("missing").is_none());
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:1:1: missing required key 'missing' in thing",
+                "rules/t.toml:1:27: key 'c' in p of thing must be a number, found string",
+                "rules/t.toml:1:36: key 'd' in p of thing is out of range",
+                "rules/t.toml:2:5: key 'q' in thing must be a table, found integer",
+            ]
+        );
+    }
+
+    #[test]
+    fn number_tables_work_as_sub_tables_and_empty() {
+        let errors = run(
+            "[p]
+x = 3
+
+[q]
+",
+            |r| {
+                let pairs = r.required_number_table("p").unwrap();
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0.value, "x");
+                assert_eq!(r.required_number_table("q").unwrap().len(), 0);
+            },
+        );
+        assert_eq!(errors, Vec::<String>::new());
     }
 
     #[test]

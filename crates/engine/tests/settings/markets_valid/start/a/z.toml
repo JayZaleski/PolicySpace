@@ -1,0 +1,7 @@
+[[market]]
+q = 1
+r = 0
+
+[market.prices]
+grain = 3
+coin = 0.25

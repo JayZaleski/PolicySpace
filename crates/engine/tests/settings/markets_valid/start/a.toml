@@ -1,0 +1,4 @@
+[[market]]
+q = 0
+r = 0
+prices = { grain = 2, fish = 1.5 }

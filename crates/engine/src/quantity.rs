@@ -4,7 +4,8 @@
 //! are continuous. They're stored as `f64` for now, behind this type, so every system uses
 //! one representation that can be swapped later (for example, to fixed decimal for
 //! cross-platform determinism) in one place. A [`Quantity`] is always finite and never
-//! negative. Arithmetic is added when a system needs it; so far, only `saturating_add`.
+//! negative. Arithmetic is added when a system needs it; so far, `saturating_add`,
+//! `checked_sub` and `saturating_mul`.
 
 use std::fmt;
 
@@ -15,6 +16,9 @@ pub struct Quantity(f64);
 impl Quantity {
     /// Zero.
     pub const ZERO: Quantity = Quantity(0.0);
+
+    /// One unit.
+    pub const ONE: Quantity = Quantity(1.0);
 
     /// The quantity `value`, or None if it is negative, NaN, or infinite.
     /// `-0.0` becomes `0.0`.
@@ -37,6 +41,24 @@ impl Quantity {
         // Both values are finite and non-negative, so only overflow to infinity needs
         // the clamp.
         Quantity((self.0 + other.0).min(f64::MAX))
+    }
+
+    /// `self - other`, or None if `other > self`. The result is normalized (never -0.0).
+    pub fn checked_sub(self, other: Quantity) -> Option<Quantity> {
+        if other.0 > self.0 {
+            None
+        } else {
+            // Both values are finite and `other <= self`, so the difference is finite and
+            // non-negative. Adding 0.0 guards against -0.0.
+            Some(Quantity(self.0 - other.0 + 0.0))
+        }
+    }
+
+    /// `self * other`, clamped at `f64::MAX`.
+    pub fn saturating_mul(self, other: Quantity) -> Quantity {
+        // Both values are finite and non-negative, so only overflow to infinity needs the
+        // clamp. (Zero times a finite value is zero, never NaN.)
+        Quantity((self.0 * other.0).min(f64::MAX))
     }
 }
 
@@ -106,5 +128,49 @@ mod tests {
         let sum = max.saturating_add(max);
         assert_eq!(sum.get(), f64::MAX);
         assert!(sum.get().is_finite());
+    }
+
+    #[test]
+    fn one_is_one() {
+        assert_eq!(Quantity::ONE.get(), 1.0);
+    }
+
+    #[test]
+    fn checked_sub_subtracts_normal_values() {
+        let a = Quantity::new(4.5).unwrap();
+        let b = Quantity::new(1.5).unwrap();
+        assert_eq!(a.checked_sub(b).map(Quantity::get), Some(3.0));
+        assert_eq!(a.checked_sub(Quantity::ZERO), Some(a));
+    }
+
+    #[test]
+    fn checked_sub_of_equal_values_is_positive_zero() {
+        let a = Quantity::new(2.5).unwrap();
+        let zero = a.checked_sub(a).unwrap();
+        assert_eq!(zero, Quantity::ZERO);
+        assert!(zero.get().is_sign_positive());
+    }
+
+    #[test]
+    fn checked_sub_of_a_larger_value_is_none() {
+        let a = Quantity::new(1.0).unwrap();
+        let b = Quantity::new(2.0).unwrap();
+        assert_eq!(a.checked_sub(b), None);
+    }
+
+    #[test]
+    fn saturating_mul_multiplies_normal_values() {
+        let a = Quantity::new(1.5).unwrap();
+        let b = Quantity::new(4.0).unwrap();
+        assert_eq!(a.saturating_mul(b).get(), 6.0);
+        assert_eq!(a.saturating_mul(Quantity::ZERO), Quantity::ZERO);
+        assert_eq!(a.saturating_mul(Quantity::ONE), a);
+    }
+
+    #[test]
+    fn saturating_mul_clamps_at_the_largest_finite_value() {
+        let max = Quantity::new(f64::MAX).unwrap();
+        let product = max.saturating_mul(Quantity::new(2.0).unwrap());
+        assert_eq!(product.get(), f64::MAX);
     }
 }

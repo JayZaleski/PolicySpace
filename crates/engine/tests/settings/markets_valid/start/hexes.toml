@@ -1,0 +1,19 @@
+[[hex]]
+q = 0
+r = 0
+currency = "coin"
+
+[[hex]]
+q = 1
+r = 0
+currency = "shell"
+
+[[hex]]
+q = 2
+r = 0
+currency = "coin"
+
+[[hex]]
+q = 3
+r = 0
+currency = "coin"

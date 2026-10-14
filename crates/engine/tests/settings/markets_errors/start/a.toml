@@ -1,0 +1,72 @@
+[[market]]
+q = 0
+r = 0
+prices = { grain = 2 }
+
+[[market]]
+r = 0
+prices = { grain = 2 }
+
+[[market]]
+q = 0
+prices = { grain = 2 }
+
+[[market]]
+q = 1.5
+r = 0
+prices = { grain = 2 }
+
+[[market]]
+q = 2147483648
+r = 0
+prices = { grain = 2 }
+
+[[market]]
+q = 9
+r = 9
+prices = { grain = 2 }
+
+[[market]]
+q = 1
+r = 0
+prices = { grain = "2" }
+
+[[market]]
+q = 2
+r = 0
+prices = { grain = 0 }
+
+[[market]]
+q = 3
+r = 0
+prices = { grain = -1 }
+
+[[market]]
+q = 4
+r = 0
+prices = { grain = inf }
+
+[[market]]
+q = 5
+r = 0
+prices = 7
+
+[[market]]
+q = 6
+r = 0
+prices = { coin = 1 }
+
+[[market]]
+q = 7
+r = 0
+prices = { tin = 3 }
+
+[[market]]
+q = 8
+r = 0
+
+[[market]]
+q = 1
+r = 1
+prices = { grain = 2, tin = 1, coin = 2 }
+colour = "red"

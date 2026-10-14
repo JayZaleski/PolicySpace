@@ -8,8 +8,9 @@
 //!   turn T perishes at the end of turn T+N−1. A durable good's amount is one group that
 //!   never perishes. Amounts of a good that perish at the same time are merged.
 //! - A stockpile lists only goods it holds a positive amount of.
-//! - Only the engine changes stockpiles. Goods enter by emission and leave by perishing;
-//!   taking goods out to use them comes with Stage 02.
+//! - Only the engine changes stockpiles. Goods enter by emission and leave by perishing.
+//!   They also leave by removal, soonest-perishing group first, which the
+//!   [`market`](crate::market) uses to sell goods and pay currency.
 
 use std::collections::BTreeMap;
 
@@ -97,6 +98,61 @@ impl Stockpile {
             .entry(at)
             .or_insert(Quantity::ZERO);
         *group = group.saturating_add(amount);
+    }
+
+    /// Removes `amount` of `good`, taking from the group that perishes soonest first.
+    /// All-or-nothing: if the stockpile holds less than `amount` of `good`, returns
+    /// `Err(held)` (the total it holds) and changes nothing. A zero amount is Ok and changes
+    /// nothing. Groups that reach zero are dropped, and so is a good left with no groups.
+    /// Crate-private.
+    pub(crate) fn remove(&mut self, good: GoodId, amount: Quantity) -> Result<(), Quantity> {
+        if amount == Quantity::ZERO {
+            return Ok(());
+        }
+        let held = self.total(good);
+        if held < amount {
+            return Err(held);
+        }
+        if let Some(groups) = self.goods.get_mut(&good) {
+            let mut remaining = amount;
+            let order: Vec<PerishesAt> = groups.keys().copied().collect();
+            for at in order {
+                if remaining == Quantity::ZERO {
+                    break;
+                }
+                let Some(group) = groups.get(&at).copied() else {
+                    continue;
+                };
+                if remaining >= group {
+                    groups.remove(&at);
+                    remaining = remaining.checked_sub(group).unwrap_or(Quantity::ZERO);
+                } else {
+                    match group.checked_sub(remaining) {
+                        Some(left) if left > Quantity::ZERO => {
+                            groups.insert(at, left);
+                        }
+                        _ => {
+                            groups.remove(&at);
+                        }
+                    }
+                    remaining = Quantity::ZERO;
+                }
+            }
+            // If the groups ran out while `remaining` is a tiny positive value (rounding
+            // of the total), that is acceptable.
+            if groups.is_empty() {
+                self.goods.remove(&good);
+            }
+        }
+        Ok(())
+    }
+
+    /// Removes every unit of `good` and returns the total removed (zero if it held none).
+    /// Crate-private.
+    pub(crate) fn remove_all(&mut self, good: GoodId) -> Quantity {
+        let total = self.total(good);
+        self.goods.remove(&good);
+        total
     }
 
     /// Removes every group that perishes at the end of `turn` or earlier, drops goods left
@@ -260,5 +316,92 @@ mod tests {
         only_perishing.add(good(1), q(2.0), end(0));
         only_perishing.remove_perishing(Turn::new(0));
         assert!(only_perishing.is_empty());
+    }
+
+    fn mixed() -> Stockpile {
+        let mut s = Stockpile::new();
+        s.add(good(0), q(4.0), end(1));
+        s.add(good(0), q(3.0), end(3));
+        s.add(good(0), q(2.0), PerishesAt::Never);
+        s.add(good(1), q(1.0), end(1));
+        s
+    }
+
+    #[test]
+    fn remove_part_of_the_soonest_group_keeps_the_rest() {
+        let mut s = mixed();
+        assert_eq!(s.remove(good(0), q(1.5)), Ok(()));
+        let groups: Vec<_> = s.groups(good(0)).collect();
+        assert_eq!(
+            groups,
+            vec![
+                (end(1), q(2.5)),
+                (end(3), q(3.0)),
+                (PerishesAt::Never, q(2.0))
+            ]
+        );
+        assert_eq!(s.total(good(1)), q(1.0));
+    }
+
+    #[test]
+    fn remove_exactly_a_group_drops_it() {
+        let mut s = mixed();
+        assert_eq!(s.remove(good(0), q(4.0)), Ok(()));
+        let groups: Vec<_> = s.groups(good(0)).collect();
+        assert_eq!(groups, vec![(end(3), q(3.0)), (PerishesAt::Never, q(2.0))]);
+    }
+
+    #[test]
+    fn remove_across_groups_empties_the_first_and_reduces_the_second() {
+        let mut s = mixed();
+        assert_eq!(s.remove(good(0), q(5.0)), Ok(()));
+        let groups: Vec<_> = s.groups(good(0)).collect();
+        assert_eq!(groups, vec![(end(3), q(2.0)), (PerishesAt::Never, q(2.0))]);
+    }
+
+    #[test]
+    fn remove_the_whole_total_drops_the_good() {
+        let mut s = mixed();
+        assert_eq!(s.remove(good(0), q(9.0)), Ok(()));
+        assert_eq!(s.groups(good(0)).count(), 0);
+        assert_eq!(s.total(good(0)), Quantity::ZERO);
+        let listed: Vec<_> = s.iter().collect();
+        assert_eq!(listed, vec![(good(1), q(1.0))]);
+    }
+
+    #[test]
+    fn remove_more_than_held_fails_and_changes_nothing() {
+        let mut s = mixed();
+        let before = s.clone();
+        assert_eq!(s.remove(good(0), q(9.5)), Err(q(9.0)));
+        assert_eq!(s, before);
+        assert_eq!(s.remove(good(7), q(1.0)), Err(Quantity::ZERO));
+        assert_eq!(s, before);
+    }
+
+    #[test]
+    fn remove_zero_is_ok_and_changes_nothing() {
+        let mut s = mixed();
+        let before = s.clone();
+        assert_eq!(s.remove(good(0), Quantity::ZERO), Ok(()));
+        assert_eq!(s.remove(good(7), Quantity::ZERO), Ok(()));
+        assert_eq!(s, before);
+    }
+
+    #[test]
+    fn remove_all_returns_the_total_and_drops_the_good() {
+        let mut s = mixed();
+        assert_eq!(s.remove_all(good(0)), q(9.0));
+        assert_eq!(s.groups(good(0)).count(), 0);
+        let listed: Vec<_> = s.iter().collect();
+        assert_eq!(listed, vec![(good(1), q(1.0))]);
+    }
+
+    #[test]
+    fn remove_all_of_a_good_not_held_returns_zero() {
+        let mut s = mixed();
+        let before = s.clone();
+        assert_eq!(s.remove_all(good(7)), Quantity::ZERO);
+        assert_eq!(s, before);
     }
 }

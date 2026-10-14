@@ -2,9 +2,12 @@
 //!
 //! - A [`World`] is a running world, built from a [`LoadedSetting`]. The rules (goods,
 //!   resource types) never change. The world holds what does: the clock, the hexes, the
-//!   deposits, each hex's currency, and one stockpile of unowned goods per hex. Hexes,
+//!   deposits, each hex's currency, each hex's posted prices, and one stockpile of unowned
+//!   goods per hex. Hexes,
 //!   currencies and deposits don't change yet, but they are world state because later
-//!   Stages change them (deposit ownership in Stage 02).
+//!   Stages change them (deposit ownership in Stage 02). The posted prices don't change
+//!   yet either; [`World::market`] hands out each hex's market view, the seam Stage 05
+//!   replaces.
 //! - A turn has three parts:
 //!   1. start of turn: every deposit emits its type's `output` of its good into its hex's
 //!      stockpile;
@@ -27,6 +30,7 @@ use crate::currency::HexCurrencies;
 use crate::goods::GoodId;
 use crate::id::IdVec;
 use crate::map::{HexId, HexKind, HexMap};
+use crate::market::{HexPrices, Market};
 use crate::quantity::Quantity;
 use crate::resources::Deposits;
 use crate::setting::{LoadedSetting, Manifest, Rules};
@@ -76,6 +80,8 @@ pub struct World {
     turn: Turn,
     /// One per hex, by `HexId`. Nothing changes it yet.
     hex_currencies: HexCurrencies,
+    /// One per hex, by `HexId`. Nothing changes it yet.
+    hex_prices: HexPrices,
     /// One per hex, by `HexId`.
     hex_stockpiles: IdVec<HexKind, Stockpile>,
 }
@@ -97,6 +103,7 @@ impl World {
             deposits: start.deposits,
             turn: Turn::ZERO,
             hex_currencies: start.currencies,
+            hex_prices: start.prices,
             hex_stockpiles,
         };
         let emitted = world.emit();
@@ -158,6 +165,26 @@ impl World {
     /// Panics if `hex` isn't from this world's map.
     pub fn hex_currency(&self, hex: HexId) -> GoodId {
         self.hex_currencies.get(hex)
+    }
+
+    /// Every hex's posted prices.
+    pub fn hex_prices(&self) -> &HexPrices {
+        &self.hex_prices
+    }
+
+    /// The market of `hex`: its prices in the hex's currency and the exchange, at the
+    /// current turn.
+    ///
+    /// # Panics
+    /// Panics if `hex` isn't from this world's map.
+    pub fn market(&self, hex: HexId) -> Market<'_> {
+        Market::new(
+            hex,
+            &self.rules.goods,
+            self.hex_currencies.get(hex),
+            self.hex_prices.list(hex),
+            self.turn,
+        )
     }
 
     /// The stockpile of unowned goods on `hex`.

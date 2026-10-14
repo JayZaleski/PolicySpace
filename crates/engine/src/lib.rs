@@ -11,7 +11,9 @@
 //! in the setting's starting state (see the [`map`] module). Natural resources (resource
 //! types in the rules, deposits on hexes in the starting state) are in the [`resources`]
 //! module, and amounts of goods are [`Quantity`] values (see the [`quantity`] module).
-//! Each hex designates a currency good (see the [`currency`] module).
+//! Each hex designates a currency good (see the [`currency`] module), and may have a
+//! dummy market that posts prices in that currency and exchanges goods against a stockpile
+//! (see the [`market`] module).
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -25,6 +27,8 @@ pub mod id;
 pub use id::{Id, IdError, IdKind, NameRegistry, NamedList};
 pub mod map;
 pub use map::{HexCoord, HexId, HexKind, HexMap};
+pub mod market;
+pub use market::{HexPrices, Market, TradeError};
 pub mod quantity;
 pub use quantity::Quantity;
 pub mod resources;

@@ -45,8 +45,11 @@
 //!   unresolved.
 //! - **Phase 2** (`SettingContent::resolve`) checks the references once every file has
 //!   been read, so a reference can point into any file. Resource types refer to goods by
-//!   name, deposits refer to resource types by name and to hexes by coordinates, and each
-//!   hex's currency refers to a good by name.
+//!   name, deposits refer to resource types by name and to hexes by coordinates, each
+//!   hex's currency refers to a good by name, and each market refers to a hex by
+//!   coordinates and to the goods it prices by name (and no market may price its hex's
+//!   currency). `MapReader::resolve` runs before `MarketsReader::resolve`, since the
+//!   market check needs the resolved currencies.
 //!   A reader's `finish` that depends on phase 2 (such as `ResourcesReader::finish`) is
 //!   only called after a successful load.
 //!
@@ -59,7 +62,9 @@
 //!    therefore checks its own duplicates: the domain types are in [`crate::map`], the
 //!    reader is in `setting/map.rs`, and the finished map is `StartState::map`. Resource
 //!    types (`Rules::resources`) and deposits (`StartState::deposits`) follow the same two
-//!    patterns, in [`crate::resources`] and `setting/resources.rs`.
+//!    patterns, in [`crate::resources`] and `setting/resources.rs`. Markets
+//!    (`StartState::prices`) are a starting-state section identified by a hex's coordinates,
+//!    in [`crate::market`] and `setting/market.rs`.
 //! 2. Add a `SectionType` to `WorldContent::section_types`, naming its header, the one
 //!    folder it belongs in, and a `read` function.
 //! 3. Check references in `WorldContent::resolve`. Resources and deposits are the worked
@@ -75,6 +80,7 @@ mod discover;
 mod error;
 mod goods;
 mod map;
+mod market;
 mod reader;
 mod resources;
 mod source;
@@ -90,10 +96,12 @@ pub use error::{LoadError, LoadErrors};
 use crate::currency::HexCurrencies;
 use crate::goods::Goods;
 use crate::map::HexMap;
+use crate::market::HexPrices;
 use crate::resources::{Deposits, ResourceTypes};
 use error::{ErrorSink, Location};
 use goods::GoodsReader;
 use map::MapReader;
+use market::MarketsReader;
 use reader::EntryReader;
 use resources::{DepositsReader, ResourcesReader};
 use source::{SourceFile, read_toml};
@@ -141,12 +149,16 @@ pub struct StartState {
     pub currencies: HexCurrencies,
     /// Every deposit, in load order.
     pub deposits: Deposits,
+    /// Each hex's posted prices, by hex ID (one per hex in `map`); see [`crate::market`].
+    pub prices: HexPrices,
 }
 
 /// Loads the setting folder at `path`. Either every check passes and a [`LoadedSetting`]
 /// is returned, or every problem found is returned (sorted; see the module docs).
 pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors> {
     let (manifest, content) = load_with::<WorldContent>(path.as_ref())?;
+    // The markets don't need the map reader after phase 2, and `map.finish()` consumes it.
+    let prices = content.markets.finish();
     let (map, currencies) = content.map.finish();
     let deposits = content.deposits.finish(map.len());
     Ok(LoadedSetting {
@@ -159,6 +171,7 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
             map,
             currencies,
             deposits,
+            prices,
         },
     })
 }
@@ -224,6 +237,7 @@ pub(crate) struct WorldContent {
     pub map: MapReader,
     pub resources: ResourcesReader,
     pub deposits: DepositsReader,
+    pub markets: MarketsReader,
 }
 
 impl SettingContent for WorldContent {
@@ -249,16 +263,23 @@ impl SettingContent for WorldContent {
                 folder: Folder::Start,
                 read: |content, reader| content.deposits.read(reader),
             },
+            SectionType {
+                header: "market",
+                folder: Folder::Start,
+                read: |content, reader| content.markets.read(reader),
+            },
         ]
     }
 
     // Goods refer to nothing. Hexes refer to goods (their currency), resource types refer
-    // to goods, and deposits refer to resource types and hexes.
+    // to goods, deposits refer to resource types and hexes, and markets refer to hexes and
+    // goods (and need the hexes' resolved currencies, so the map resolves first).
     fn resolve(&mut self, sink: &mut ErrorSink) {
         self.map.resolve(self.goods.defs(), sink);
         self.resources.resolve(self.goods.defs(), sink);
         self.deposits
             .resolve(self.resources.defs(), &self.map, sink);
+        self.markets.resolve(self.goods.defs(), &self.map, sink);
     }
 }
 
