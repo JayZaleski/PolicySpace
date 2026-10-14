@@ -16,7 +16,7 @@ Read before starting:
 - eframe/egui API: use version 0.36. Check the API against the crate source in the local cargo registry (`~/.cargo/registry/src/*/eframe-0.36.*`, `egui-0.36.*`) or docs.rs, rather than relying on memory: names such as the `App` trait method, scroll and zoom input, and painter shapes have changed between egui versions.
 
 ## Approach
-- **egui/eframe 0.36 (default features, OpenGL "glow" backend) for the window, and rfd 0.17 for the system folder picker.** These are dependencies of `policyspace-dev-ui` only. The engine crate is not modified at all, and gets no new dependencies.
+- **egui/eframe 0.36 (default features, which in 0.36 use the wgpu renderer) for the window, and rfd 0.17 for the system folder picker.** These are dependencies of `policyspace-dev-ui` only. The engine crate is not modified at all, and gets no new dependencies.
 - **One binary crate, split into modules**, so most of the logic can be tested without a window:
   - `cli`: argument parsing and the usage message.
   - `check`: today's checker and `--turns`, moved from `main.rs` with identical output, plus the shared error-lines function.

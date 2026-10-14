@@ -1,14 +1,22 @@
-//! Runs the dev UI binary as a setting checker and checks its output and exit codes.
-//! (With no arguments, `placeholder.rs` covers the unchanged behavior.)
+//! Runs the dev UI binary's `check` form (the setting checker) and checks its output and
+//! exit codes. (`cli.rs` covers `--version` and the usage errors.)
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-fn run(args: &[&Path]) -> Output {
+/// Runs `dev-ui` with the arguments exactly as given.
+fn run_raw(args: &[&Path]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_dev-ui"))
         .args(args)
         .output()
         .expect("failed to run the dev-ui binary")
+}
+
+/// Runs `dev-ui check` with the arguments.
+fn run(args: &[&Path]) -> Output {
+    let mut all = vec![Path::new("check")];
+    all.extend_from_slice(args);
+    run_raw(&all)
 }
 
 fn repo_path(relative: &str) -> PathBuf {
@@ -93,14 +101,16 @@ fn reports_every_error_of_a_broken_setting() {
 
 #[test]
 fn two_arguments_print_usage_and_exit_2() {
-    let output = run(&[Path::new("a"), Path::new("b")]);
+    let output = run_raw(&[Path::new("a"), Path::new("b")]);
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert_eq!(stderr.trim(), USAGE);
 }
 
-const USAGE: &str = "usage: dev-ui [SETTING_FOLDER [--turns N]]";
+const USAGE: &str = "usage: dev-ui [SETTING_FOLDER]
+       dev-ui check SETTING_FOLDER [--turns N]
+       dev-ui --version";
 
 const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 5 goods, 19 hexes, 2 resources, 10 deposits";
 
