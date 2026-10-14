@@ -82,9 +82,9 @@ Put this in your message, not only in a question prompt's short option labels.
 
 ## Status Dashboard
 
-A dashboard on the home server shows the project's progress. It reads `Z:\Project-Tracking\PolicySpace\status.json`, a snapshot of the Stages, Steps, and statuses in `roadmap.md`. `tools/export_status.py` generates the file:
+A dashboard on the home server shows the project's progress. It reads `Z:\Project-Tracking\PolicySpace\status.json`, a snapshot of the Stages in `roadmap.md`. In the snapshot each Stage has three sections of **tasks**: `planning` (brainstorm, project-plan), `work` (the Steps), and `wrap-up` (comprehensive review, documentation). Each task has a progress percentage: the share of its sub-tasks (design, spec, build, code-review, docs-draft, commit, and so on) that are done, derived from the roadmap statuses, the files in the plan folders, the recommendation statuses in `consolidate.md`, and git. The schema is documented in `Z:\Project-Tracking\README.md`. `tools/export_status.py` generates the file:
 
-- A hook in `.claude/settings.json` runs it whenever `roadmap.md` is edited, so every status change reaches the dashboard.
+- A hook in `.claude/settings.json` runs it whenever a file under `PROJECT_PLAN/` (other than `scratchpad.md`) is edited, so every status change and every plan file reaches the dashboard.
 - `update-status` runs it again after committing, to record the new commit.
 - It parses `roadmap.md`, so keep the roadmap in the format above. If the hook reports a format error, fix `roadmap.md`.
 - If the shared drive isn't available, it prints a warning and the work continues. The next export catches up.

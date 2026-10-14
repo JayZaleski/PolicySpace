@@ -1,11 +1,14 @@
-"""Export the project's roadmap status to the shared dashboard folder.
+"""Export the project's progress to the shared dashboard folder.
 
-Parses PROJECT_PLAN/roadmap.md (format defined in CLAUDE.md), validates it, and
-atomically writes <STATUS_ROOT>/<PROJECT>/status.json. Standard library only.
+Parses PROJECT_PLAN/roadmap.md (format defined in CLAUDE.md), validates it, works
+out each task's progress from the plan folders and git, and atomically writes
+<STATUS_ROOT>/<PROJECT>/status.json (schema_version 2: Stages, sections, and tasks;
+see the README in the Project-Tracking folder). Standard library only.
 
 Usage:
     python tools/export_status.py            # export now
-    python tools/export_status.py --hook     # Claude Code PostToolUse hook mode
+    python tools/export_status.py --hook     # Claude Code PostToolUse hook mode: exports when a file
+                                             # under PROJECT_PLAN/ (other than scratchpad.md) was edited
     python tools/export_status.py --check    # check roadmap.md against the plan folders; no export
     python tools/export_status.py --roadmap <path>   # parse a different roadmap (testing)
 
@@ -29,9 +32,10 @@ STATUS_ROOT = r"Z:\Project-Tracking"  # overridden by the PROJECT_TRACKING_DIR e
 PROJECT = "PolicySpace"
 # ------------------------------------------------------------------------------
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ROADMAP = PROJECT_ROOT / "PROJECT_PLAN" / "roadmap.md"
+PLAN_DIR = PROJECT_ROOT / "PROJECT_PLAN"
+ROADMAP = PLAN_DIR / "roadmap.md"
 
 STAGE_STATUSES = ("outline", "planned", "in-progress", "done")
 STEP_STATUSES = ("planned", "designed", "specified", "built", "done")
@@ -51,6 +55,7 @@ STEP_RE = re.compile(r"^###\s+Step\s+(\d+):\s*(.*?)\s*$")
 FIELD_RE = re.compile(r"^-\s+([A-Za-z]+):\s*(.*?)\s*$")
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 TAG_RE = re.compile(r"^#([a-z0-9]+(?:-[a-z0-9]+)*)$")
+RECOMMENDATION_STATUS_RE = re.compile(r"^-\s+\*\*Status:\*\*\s*(approved|rejected|applied)\b")
 
 
 class RoadmapError(Exception):
@@ -183,6 +188,106 @@ def missing_files(folder, where, status, statuses, required):
             if not (folder / name).is_file()]
 
 
+# --- Sections, tasks, and progress (schema_version 2) -------------------------
+#
+# Each Stage is exported as three sections, planning / work / wrap-up, each a list
+# of tasks. A task's progress is the share of its sub-tasks that are done. Steps are
+# the tasks of the work section. Sub-task completion is derived from evidence the
+# development loop already leaves: roadmap statuses, files in the plan folders, the
+# recommendation statuses in consolidate.md, and git (dirty files, checkpoint commits).
+
+
+def task(name, subtasks, **extra):
+    """subtasks: ordered (name, done) pairs. Non-step tasks get a status derived from progress."""
+    done = sum(1 for _, d in subtasks if d)
+    progress = round(100 * done / len(subtasks)) if subtasks else 0
+    derived = "done" if done == len(subtasks) else "in-progress" if done else "planned"
+    return {"name": name, "status": extra.pop("status", derived), **extra,
+            "progress": progress, "subtasks": [{"name": n, "done": bool(d)} for n, d in subtasks]}
+
+
+def step_task(step, step_dir):
+    reached = STEP_STATUSES.index(step["status"])
+    at_least = lambda s: reached >= STEP_STATUSES.index(s)
+    drafts = all((step_dir / f).is_file() for f in STEP_FILES["done"])
+    return task(step["name"], [
+        ("design", at_least("designed")),
+        ("spec", at_least("specified")),
+        ("build", at_least("built")),
+        ("code-review", at_least("built")),  # the build is only observable as the approved Code Review
+        ("docs-draft", at_least("done") or drafts),
+        ("commit", at_least("done")),
+    ], number=step["number"], status=step["status"], tags=step["tags"], description=step["description"])
+
+
+def planning_tasks(stage, is_current, evidence):
+    started = stage["status"] != "outline"
+    plan_commit = re.compile(rf"^plan: stage {stage['number']:02d}\b")
+    return [
+        task("brainstorm", [
+            ("brainstorm", started or (is_current and "PROJECT_PLAN/vision.md" in evidence["dirty"])),
+        ]),
+        task("project-plan", [
+            ("project-plan", started),
+            ("commit", started and any(plan_commit.match(s) for s in evidence["subjects"])),
+        ]),
+    ]
+
+
+def wrap_up_tasks(stage, stage_dir, evidence):
+    finished = stage["status"] == "done"
+    consolidate = stage_dir / "consolidate.md"
+    reviewed = finished or consolidate.is_file()
+    consolidated = finished or (consolidate.is_file() and not consolidate_has_approved(consolidate))
+    dirty_docs = any(p.startswith("docs/") for p in evidence["dirty"])
+    dirty_manual = any(p in ("manual.ipynb", "manual.html") for p in evidence["dirty"])
+    return [
+        task("comprehensive-review", [
+            ("review", reviewed),
+            ("consolidation-build", consolidated),  # flips with code-review: approval sets recommendations to applied
+            ("code-review", consolidated),
+        ]),
+        task("documentation", [
+            ("update-docs", finished or (consolidated and dirty_docs)),
+            ("update-manual", finished or (consolidated and dirty_manual)),
+            ("commit", finished),
+        ]),
+    ]
+
+
+def consolidate_has_approved(path):
+    """True if consolidate.md still has a recommendation whose Status is approved (not yet built)."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return any(m[1] == "approved" for line in text.splitlines() if (m := RECOMMENDATION_STATUS_RE.match(line)))
+
+
+def build_sections(stages, plan_dir, evidence):
+    """Turns the parsed Stages into the schema-2 list: each Stage with its sections and tasks."""
+    current = next((s["number"] for s in stages if s["status"] != "done"), None)
+    result = []
+    for stage in stages:
+        stage_dir = plan_dir / f"stage-{stage['number']:02d}-{stage['name']}"
+        work = [step_task(step, stage_dir / f"step-{step['number']:02d}-{step['name']}") for step in stage["steps"]]
+        result.append({
+            "number": stage["number"],
+            "name": stage["name"],
+            "status": stage["status"],
+            "goal": stage["goal"],
+            "sections": [
+                {"name": "planning", "tasks": planning_tasks(stage, stage["number"] == current, evidence)},
+                {"name": "work", "tasks": work},
+                {"name": "wrap-up", "tasks": wrap_up_tasks(stage, stage_dir, evidence)},
+            ],
+        })
+    return result
+
+
+# --- git ------------------------------------------------------------------------
+
+
 def git(*args):
     try:
         out = subprocess.run(["git", "-C", str(PROJECT_ROOT), *args],
@@ -193,15 +298,24 @@ def git(*args):
 
 
 def git_info():
+    """Returns (last_commit, uncommitted_changes, evidence). Without git the evidence is empty."""
+    evidence = {"dirty": set(), "subjects": []}
     if (git("rev-parse", "--is-inside-work-tree") or "").strip() != "true":
-        return None, None
+        return None, None, evidence
     log = git("log", "-1", "--format=%h%x00%s%x00%cI")
     last = None
     if log and log.strip():
         h, subject, date = log.strip().split("\x00")
         last = {"hash": h, "subject": subject, "date": date}
     status = git("status", "--porcelain")
-    return last, (bool(status.strip()) if status is not None else None)
+    if status is not None:
+        # Porcelain lines are "XY path" or "XY old -> new"; paths are repo-relative with '/'.
+        evidence["dirty"] = {line[3:].split(" -> ")[-1].strip('"') for line in status.splitlines() if len(line) > 3}
+    evidence["subjects"] = (git("log", "--format=%s") or "").splitlines()
+    return last, (bool(status.strip()) if status is not None else None), evidence
+
+
+# --- output ---------------------------------------------------------------------
 
 
 def write_atomic(path, data):
@@ -260,14 +374,14 @@ def export(roadmap_path):
         print(f"export_status: WARNING: {root} is not available; dashboard not updated.", file=sys.stderr)
         return 0
 
-    last_commit, uncommitted = git_info()
+    last_commit, uncommitted, evidence = git_info()
     snapshot = {
         "schema_version": SCHEMA_VERSION,
         "project": PROJECT,
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "last_commit": last_commit,
         "uncommitted_changes": uncommitted,
-        "stages": stages,
+        "stages": build_sections(stages, roadmap_path.parent, evidence),
     }
     target = root / PROJECT / "status.json"
     try:
@@ -280,23 +394,26 @@ def export(roadmap_path):
     return 0
 
 
-def hook_targets_roadmap():
+def hook_targets_plan():
+    """True if the hook payload's edited file is under PROJECT_PLAN/ and isn't scratchpad.md."""
     try:
         payload = json.load(sys.stdin)
         file_path = payload["tool_input"]["file_path"]
     except (ValueError, KeyError, TypeError):
         return False
     norm = lambda p: os.path.normcase(os.path.abspath(p))
-    return norm(file_path) == norm(ROADMAP)
+    edited, plan = norm(file_path), norm(PLAN_DIR)
+    return edited.startswith(plan + os.sep) and os.path.basename(edited) != "scratchpad.md"
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--hook", action="store_true", help="read a PostToolUse hook payload from stdin")
+    parser.add_argument("--hook", action="store_true",
+                        help="read a PostToolUse hook payload from stdin; export only if a plan file was edited")
     parser.add_argument("--check", action="store_true", help="check roadmap.md against the plan folders; no export")
-    parser.add_argument("--roadmap",type=Path, default=ROADMAP, help="roadmap file to parse (for testing)")
+    parser.add_argument("--roadmap", type=Path, default=ROADMAP, help="roadmap file to parse (for testing)")
     args = parser.parse_args()
-    if args.hook and not hook_targets_roadmap():
+    if args.hook and not hook_targets_plan():
         return 0
     return check(args.roadmap) if args.check else export(args.roadmap)
 
