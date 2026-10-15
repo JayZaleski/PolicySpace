@@ -21,7 +21,7 @@ The first milestone is a **closed market**: a self-contained economy on each hex
 
 ## Building principles
 
-- **Dummy data now, live data later.** When a system needs a system that isn't built yet, its actors respond to static dummy data. When the later system arrives, the dummy data is replaced with live simulation data. For example, POPs and industries trade with a dummy market that posts fixed prices until the real market exists. Each Stage leaves clean seams where its stubs will be replaced.
+- **Dummy data now, live data later.** When a system needs a system that isn't built yet, its actors respond to static dummy data. When the later system arrives, the dummy data is replaced with live simulation data. For example, POPs and industries trade with a dummy market that posts fixed prices until the real market exists. The dummy market is the live market with two things missing: its prices never adjust, and it buys and sells any amount. Each Stage leaves clean seams where its stubs will be replaced.
 - **Systems stay simpler than they sound** until a later system needs more. POPs sell unskilled labor to a dummy market long before anyone else demands it.
 
 ## Core concepts
@@ -69,6 +69,18 @@ A business is the layer between POPs and the things they ultimately own. POPs ow
 
 Utility functions (POPs) and production functions (industries) name goods directly. Their parameters are defined in the setting folder.
 
+### Markets
+
+Each hex has one market, and every exchange of goods on the hex goes through it. The market works by **submission and aggregation**, not by search:
+
+- **Actors submit parameters, not answers.** Each actor hands the market its demand and supply in one of a small set of forms the market knows how to add up. POPs submit their Stone-Geary parameters and their endowment. Industries submit their production parameters and capacity. Businesses, whose decisions are discretionary, submit the result of those decisions as a curve: a fixed quantity, a reservation price, or a markup. The market never asks an actor "how much would you want at this price?", so the cost of a turn grows with the number of actors only through one pass over them, and the market's own work grows with the number of goods.
+- **The market aggregates exactly.** Stone-Geary demand is linear in income, so every POP of one type on a hex collapses into a single demand function with their sizes summed, and the aggregate demand and supply across types has a closed form. Where industries make supply nonlinear in prices, the market works on the aggregate curves, never on individual actors.
+- **Prices are fixed within a turn and adjust between turns.** At the start of trading the market posts one price per good in the hex's currency. Actors trade at those prices. After trading, the market uses the aggregate curves to compute where each price would have cleared and moves next turn's price part of the way toward it, at an adjustment speed set in the setting. It never iterates to equilibrium within a turn.
+- **Disequilibrium is real and persists.** When bids and offers at the posted price don't match, a rationing rule decides who trades and how much (proportionally, by default). Unsold durable goods are inventory, unsold labor perishes as unemployment, and unfilled bids are shortages. All three are visible quantities in the simulation. Gluts, shortages, and price cycles are emergent, and with constant fundamentals prices converge over turns to the equilibrium.
+- **Settlement order matters.** An actor that is rationed when selling has less income than it planned. Sales settle before purchases, and currency left unspent, because a good was short or by rounding, carries over as income next turn.
+- **Policy lives in the market.** Taxes and subsidies, once States exist, are wedges between the price buyers pay and the price sellers receive, applied to the aggregate curves. The market applies the wedge, solves, and reports the revenue. Policy changes the market's inputs, not the actors' code.
+- **Market power comes later.** The first live market is price-taking. Its natural extension is to let sellers post their own prices instead of taking the market's, which gives businesses the lever to withhold supply or mark up.
+
 ## Stages
 
 The roadmap currently runs to the Saving and Investment Stage. Later directions are listed below without order or commitment.
@@ -83,7 +95,7 @@ Setting files define persistent parameters and starting state. The world has hex
 
 ### Stage 2: Populate the World
 
-POPs with Stone-Geary utility functions that include leisure, unskilled labor, consumption, and growth or decline. POPs trade with a dummy market that posts fixed prices in the hex's designated currency good: they sell labor into it and buy goods from it, and their supply and demand follow from their utility functions. They spend their whole income every turn and start with no cash; saving comes later. Stone-Geary demand is closed form, so no approximations are needed; simplified heuristics (budget shares, share of labor sold) are an option later if the full rules turn out to be slow.
+POPs with Stone-Geary utility functions that include leisure, unskilled labor, consumption, and growth or decline. POPs trade with a dummy market that posts fixed prices in the hex's designated currency good: they sell labor into it and buy goods from it, and their supply and demand follow from their utility functions. A POP's trade is structured as the live market expects: the POP's parameters and endowment are its submission, prices are posted, then the POP trades at those prices. They start with no cash and spend their whole income every turn; currency left over by rounding carries over as next turn's income, and saving comes later. Stone-Geary demand is closed form, so no approximations are needed; simplified heuristics (budget shares, share of labor sold) are an option later if the full rules turn out to be slow.
 
 POPs own their own goods, but there is no ownership of deposits or industries in this Stage. Deposits keep emitting into unowned stockpiles.
 
@@ -97,7 +109,7 @@ Ownership arrives. Businesses own deposits and industries, and POPs own business
 
 ### Stage 5: Market
 
-Demand, supply, market power, and settlement rules in a single closed economy with no external trade. The dummy market is replaced by live market outcomes, bringing POPs, industries, and businesses together.
+The live market described under [Markets](#markets), in a single closed economy with no external trade. It brings POPs, industries, and businesses together: the dummy market's infinite counterparty is removed, bids and offers are settled against each other with rationing, and prices adjust between turns toward clearing using the aggregate curves. Inventory, unemployment, and shortages appear. The test of correctness is that, with constant fundamentals, prices converge over turns to the known equilibrium. Market power is not part of this Stage.
 
 ### Stage 6: Saving and Investment
 
@@ -108,10 +120,11 @@ POPs own shares of businesses and receive dividends. POPs do financial planning 
 Directions the project will take later, in no particular order:
 
 - A central bank and a synthetic currency, so fiat money regimes can be simulated alongside commodity money.
-- States as actors: budgets, taxes, spending, and the first policy levers.
+- States as actors: budgets, taxes, spending, and the first policy levers. Taxes and subsidies are modelled in the markets, as wedges on the aggregate curves.
 - Politics: how POPs form interests and pressure the State.
 - Terrain, movement, and trade between places; open markets between economies. Hexes become much less dense when space matters.
 - Technology trees and starting States in the setting folder.
 - A player UI, and saving and loading.
 - LLM and SystemOne AI models controlling businesses first, then other non-player actors.
 - Resource exhaustion.
+- Market power: sellers posting their own prices instead of taking the market's.

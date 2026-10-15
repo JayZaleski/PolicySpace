@@ -76,7 +76,7 @@
 ### Step 06: pop-trade
 - Status: planned
 - Tags: #pops #market #turn-loop
-- Description: The first behavior in the "actors act" part of the turn: each POP computes its demand against the dummy market's prices, sells the endowment it doesn't keep as leisure, buys goods with the proceeds, and consumes them. The turn report gains POP totals.
+- Description: The first behavior in the "actors act" part of the turn, shaped as the live market expects. Each POP hands the hex's market a submission: its Stone-Geary parameters and its endowment. The market posts its prices (fixed, from the dummy data). Demand is computed from the submission against those prices; the POP sells the endowment it doesn't keep as leisure, then buys goods with the proceeds, so sales settle before purchases. The POP then consumes what it demanded. Currency left over by rounding stays in the stockpile and is income next turn. The turn report gains POP totals. Design question: whether the market or the POP computes demand from the submission (leaning market-side, so Stage 05 replaces market internals only).
 
 ### Step 07: pop-growth
 - Status: planned
@@ -86,11 +86,11 @@
 ### Step 08: dev-ui-pops
 - Status: planned
 - Tags: #dev-ui #pops #currency #market
-- Description: Inspect a hex's currency, its posted prices, and its POPs in the dev UI: each POP's type, size, inventory, last turn's endowment sold, goods bought and consumed, utility, and growth. Show the POP totals in the turn log.
+- Description: Inspect a hex's currency, its posted prices, and its POPs in the dev UI: each POP's type, size, inventory, last turn's submission and trade outcome (endowment sold, goods bought and consumed, currency carried over), utility, and growth. Show the POP totals in the turn log.
 
 ## Stage 03: industries
 - Status: outline
-- Goal: Add industries that combine goods, including labor and unimproved resource output, into other goods according to production functions, with technology and depreciation. Industries buy inputs from and sell output to the dummy market. They have no owners, budgets, or dividends yet.
+- Goal: Add industries that combine goods, including labor and unimproved resource output, into other goods according to production functions, with technology and depreciation. Industries buy inputs from and sell output to the dummy market through the same submission seam as POPs, submitting their production parameters and capacity. They have no owners, budgets, or dividends yet.
 
 ## Stage 04: businesses
 - Status: outline
@@ -98,7 +98,7 @@
 
 ## Stage 05: market
 - Status: outline
-- Goal: Demand, supply, market power, and settlement rules in a single closed economy with no external trade. The dummy market is replaced by live market outcomes, bringing POPs, industries, and businesses together.
+- Goal: The live market of the vision's Markets section, in a single closed economy with no external trade. The dummy market's infinite counterparty is removed: bids and offers are settled against each other with proportional rationing, sales before purchases, and prices adjust between turns toward clearing using the aggregate curves at a speed set in the setting. Inventory, unemployment, and shortages become visible quantities. The test of correctness is that, with constant fundamentals, prices converge over turns to the known equilibrium. Market power is not part of this Stage.
 
 ## Stage 06: saving-and-investment
 - Status: outline
