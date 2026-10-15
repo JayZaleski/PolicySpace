@@ -6,8 +6,8 @@ use std::path::Path;
 
 use common::{failures_of, load, sample_setting, test_setting};
 use policyspace_engine::{
-    GoodId, HexCoord, HexId, IdError, LoadedSetting, PerishesAt, PopId, Quantity, Turn, TurnReport,
-    World,
+    GoodId, GrowthParams, HexCoord, HexId, IdError, LoadedSetting, PerishesAt, PopId, Quantity,
+    Turn, TurnReport, World,
 };
 
 /// One POP type as (index, name, endowment as (good name, amount), utility as (good name,
@@ -66,6 +66,22 @@ fn assert_shares_sum_to_one(setting: &LoadedSetting) {
     }
 }
 
+/// Asserts a type's growth parameters, with a tolerance.
+fn assert_growth(
+    growth: &GrowthParams,
+    coefficients: &[f64],
+    decline: f64,
+    max_growth: f64,
+    name: &str,
+) {
+    assert_eq!(growth.coefficients().len(), coefficients.len(), "{name}");
+    for (a, e) in growth.coefficients().iter().zip(coefficients) {
+        assert!(close(*a, *e), "{name}: {a} vs {e}");
+    }
+    assert!(close(growth.decline(), decline), "{name}");
+    assert!(close(growth.max_growth(), max_growth), "{name}");
+}
+
 fn row(
     index: usize,
     name: &str,
@@ -107,6 +123,9 @@ fn the_sample_setting_has_two_pop_types() {
     );
     assert_shares_sum_to_one(&setting);
     assert_eq!(setting.rules.pop_types.id("peasant").unwrap().index(), 0);
+    for (_, name, t) in setting.rules.pop_types.iter() {
+        assert_growth(t.growth(), &[0.06, -0.03], 0.1, 0.05, name);
+    }
 }
 
 #[test]
@@ -134,6 +153,12 @@ fn pop_types_across_files_and_both_forms_get_ids_in_load_order() {
     assert_types(&types_of(&setting), &expected);
     assert_shares_sum_to_one(&setting);
 
+    let types = &setting.rules.pop_types;
+    let growth_of = |name: &str| types.get(types.id(name).unwrap()).growth();
+    assert_growth(growth_of("farmer"), &[0.06, -0.03], 0.1, 0.05, "farmer");
+    assert_growth(growth_of("fisher"), &[0.03], 0.0, 1.0, "fisher");
+    assert_growth(growth_of("idle"), &[0.02, 0.01, -0.005], 0.5, 0.2, "idle");
+
     let pops = &setting.rules.pop_types;
     let goods = &setting.rules.goods;
     let labor = goods.id("labor").unwrap();
@@ -157,59 +182,104 @@ fn pop_types_across_files_and_both_forms_get_ids_in_load_order() {
 fn every_pop_type_error_is_reported_at_its_place() {
     let help = "(names must start with a lowercase letter and contain only lowercase letters, digits, and underscores)";
     let expected = vec![
-        s("rules/a.toml:6:1: missing required key 'name' in pop_type"),
-        s("rules/a.toml:10:1: missing required key 'endowment' in pop_type"),
-        s("rules/a.toml:14:1: missing required key 'utility' in pop_type"),
-        format!("rules/a.toml:19:8: invalid name 'Bad Name' {help}"),
-        s("rules/a.toml:24:8: duplicate pop type name 'ok' (first defined at rules/a.toml:2:8)"),
-        s("rules/a.toml:30:13: key 'endowment' in pop_type must be a table, found integer"),
-        s("rules/a.toml:36:11: key 'utility' in pop_type must be a table, found string"),
+        s("rules/a.toml:7:1: missing required key 'name' in pop_type"),
+        s("rules/a.toml:12:1: missing required key 'endowment' in pop_type"),
+        s("rules/a.toml:17:1: missing required key 'utility' in pop_type"),
+        format!("rules/a.toml:23:8: invalid name 'Bad Name' {help}"),
+        s("rules/a.toml:29:8: duplicate pop type name 'ok' (first defined at rules/a.toml:2:8)"),
+        s("rules/a.toml:36:13: key 'endowment' in pop_type must be a table, found integer"),
+        s("rules/a.toml:43:11: key 'utility' in pop_type must be a table, found string"),
         s(
-            "rules/a.toml:40:23: key 'grain' in endowment of pop_type must be a number, found string",
+            "rules/a.toml:48:23: key 'grain' in endowment of pop_type must be a number, found string",
         ),
         s(
-            "rules/a.toml:40:35: key 'coin' in endowment of pop_type must be a finite number greater than 0",
+            "rules/a.toml:48:35: key 'coin' in endowment of pop_type must be a finite number greater than 0",
         ),
         s(
-            "rules/a.toml:45:23: key 'grain' in endowment of pop_type must be a finite number greater than 0",
+            "rules/a.toml:54:23: key 'grain' in endowment of pop_type must be a finite number greater than 0",
         ),
         s(
-            "rules/a.toml:45:34: key 'coin' in endowment of pop_type must be a finite number greater than 0",
+            "rules/a.toml:54:34: key 'coin' in endowment of pop_type must be a finite number greater than 0",
         ),
-        s("rules/a.toml:51:21: key 'grain' in utility of pop_type must be a table, found integer"),
+        s("rules/a.toml:61:21: key 'grain' in utility of pop_type must be a table, found integer"),
         s(
-            "rules/a.toml:56:37: key 'subsistence' in utility.grain of pop_type must be a finite number of at least 0",
-        ),
-        s(
-            "rules/a.toml:56:77: key 'subsistence' in utility.coin of pop_type must be a number, found string",
+            "rules/a.toml:67:37: key 'subsistence' in utility.grain of pop_type must be a finite number of at least 0",
         ),
         s(
-            "rules/a.toml:61:31: key 'share' in utility.grain of pop_type must be a finite number of at least 0",
+            "rules/a.toml:67:77: key 'subsistence' in utility.coin of pop_type must be a number, found string",
         ),
         s(
-            "rules/a.toml:66:36: key 'coin' in utility of pop_type must have a positive subsistence or share",
+            "rules/a.toml:73:31: key 'share' in utility.grain of pop_type must be a finite number of at least 0",
         ),
         s(
-            "rules/a.toml:71:36: key 'coin' in utility of pop_type must have a positive subsistence or share",
+            "rules/a.toml:79:36: key 'coin' in utility of pop_type must have a positive subsistence or share",
         ),
-        s("rules/a.toml:73:1: utility of pop_type needs at least one good with a positive share"),
-        s("rules/a.toml:78:1: utility of pop_type needs at least one good with a positive share"),
-        s("rules/a.toml:85:15: unknown good 'tin'"),
-        s("rules/a.toml:86:13: unknown good 'tin'"),
-        s("rules/a.toml:91:34: unknown key 'weight' in utility.grain of pop_type"),
-        s("rules/a.toml:92:1: unknown key 'colour' in pop_type"),
-        format!("rules/a.toml:95:8: invalid name 'Several' {help}"),
-        s("rules/a.toml:96:15: unknown good 'tin'"),
-        s("rules/a.toml:97:13: unknown good 'tin'"),
         s(
-            "rules/a.toml:97:29: key 'share' in utility.tin of pop_type must be a finite number of at least 0",
+            "rules/a.toml:85:36: key 'coin' in utility of pop_type must have a positive subsistence or share",
         ),
-        s("rules/a.toml:97:33: unknown key 'weight' in utility.tin of pop_type"),
+        s("rules/a.toml:88:1: utility of pop_type needs at least one good with a positive share"),
+        s("rules/a.toml:94:1: utility of pop_type needs at least one good with a positive share"),
+        s("rules/a.toml:102:15: unknown good 'tin'"),
+        s("rules/a.toml:103:13: unknown good 'tin'"),
+        s("rules/a.toml:109:34: unknown key 'weight' in utility.grain of pop_type"),
+        s("rules/a.toml:110:1: unknown key 'colour' in pop_type"),
+        format!("rules/a.toml:114:8: invalid name 'Several' {help}"),
+        s("rules/a.toml:115:15: unknown good 'tin'"),
+        s("rules/a.toml:116:13: unknown good 'tin'"),
         s(
-            "rules/a.toml:97:47: key 'coin' in utility of pop_type must have a positive subsistence or share",
+            "rules/a.toml:116:29: key 'share' in utility.tin of pop_type must be a finite number of at least 0",
         ),
-        s("rules/a.toml:98:1: unknown key 'colour' in pop_type"),
+        s("rules/a.toml:116:33: unknown key 'weight' in utility.tin of pop_type"),
+        s(
+            "rules/a.toml:116:47: key 'coin' in utility of pop_type must have a positive subsistence or share",
+        ),
+        s("rules/a.toml:117:1: unknown key 'colour' in pop_type"),
         s("rules/b.toml:2:8: duplicate pop type name 'ok' (first defined at rules/a.toml:2:8)"),
+        s("rules/c.toml:1:1: missing required key 'growth' in pop_type"),
+        s("rules/c.toml:10:10: key 'growth' in pop_type must be a table, found integer"),
+        s("rules/c.toml:16:1: missing required key 'growth' in growth of pop_type"),
+        s("rules/c.toml:16:1: missing required key 'decline' in growth of pop_type"),
+        s("rules/c.toml:16:1: missing required key 'max_growth' in growth of pop_type"),
+        s("rules/c.toml:22:21: key 'growth' in growth of pop_type must be an array, found float"),
+        s(
+            "rules/c.toml:28:21: key 'growth' in growth of pop_type must have at least one coefficient",
+        ),
+        s(
+            "rules/c.toml:34:28: element 2 of key 'growth' in growth of pop_type must be a number, found string",
+        ),
+        s(
+            "rules/c.toml:34:33: element 3 of key 'growth' in growth of pop_type must be a finite number",
+        ),
+        s(
+            "rules/c.toml:40:39: key 'decline' in growth of pop_type must be a finite number of at least 0 and less than 1",
+        ),
+        s(
+            "rules/c.toml:46:39: key 'decline' in growth of pop_type must be a finite number of at least 0 and less than 1",
+        ),
+        s(
+            "rules/c.toml:52:39: key 'decline' in growth of pop_type must be a finite number of at least 0 and less than 1",
+        ),
+        s("rules/c.toml:58:39: key 'decline' in growth of pop_type must be a number, found string"),
+        s(
+            "rules/c.toml:64:57: key 'max_growth' in growth of pop_type must be a finite number of at least 0",
+        ),
+        s(
+            "rules/c.toml:70:57: key 'max_growth' in growth of pop_type must be a finite number of at least 0",
+        ),
+        s("rules/c.toml:76:63: unknown key 'cap' in growth of pop_type"),
+        s("rules/c.toml:83:11: missing required key 'growth' in growth of pop_type"),
+        s("rules/c.toml:83:11: missing required key 'max_growth' in growth of pop_type"),
+        s("rules/c.toml:87:8: duplicate pop type name 'ok' (first defined at rules/a.toml:2:8)"),
+        s(
+            "rules/c.toml:90:21: key 'growth' in growth of pop_type must have at least one coefficient",
+        ),
+        s(
+            "rules/c.toml:90:35: key 'decline' in growth of pop_type must be a finite number of at least 0 and less than 1",
+        ),
+        s(
+            "rules/c.toml:90:51: key 'max_growth' in growth of pop_type must be a finite number of at least 0",
+        ),
+        s("rules/c.toml:90:55: unknown key 'cap' in growth of pop_type"),
         s("start/p.toml:1:3: section 'pop_type' belongs in rules/, not start/"),
     ];
     assert_eq!(failures_of("pops_errors"), expected);
@@ -393,13 +463,14 @@ fn a_fresh_sample_world_endows_every_pop() {
     assert_eq!(world.pops().len(), 16);
     let labor = good(&world, "unskilled_labor");
     let silver = good(&world, "silver");
-    for (id, pop) in world.pops().iter() {
+    for (id, _) in world.pops().iter() {
         // The endowment is traded and consumed in turn 0's round: the demand records what
         // the POP held, and the stockpile keeps no labor and at most a sliver of silver.
-        let held = world.pop_outcome(id).demand().get(labor).unwrap().held;
+        let outcome = world.pop_outcome(id);
+        let held = outcome.demand().get(labor).unwrap().held;
         assert_eq!(
             held,
-            Quantity::new(10.0 * pop.size.get()).unwrap(),
+            Quantity::new(10.0 * outcome.starting_size().get()).unwrap(),
             "POP {}",
             id.index()
         );
@@ -429,8 +500,8 @@ fn a_fresh_sample_world_endows_every_pop() {
 }
 
 #[test]
-fn stepping_the_sample_re_endows_and_the_labor_is_used_up() {
-    let (mut world, _) = world_of(&sample_setting());
+fn stepping_the_sample_re_endows_by_the_grown_sizes() {
+    let (mut world, mut previous) = world_of(&sample_setting());
     let (mut other, _) = world_of(&sample_setting());
     for _ in 1..=3u64 {
         let report = world.step().unwrap();
@@ -457,9 +528,13 @@ fn stepping_the_sample_re_endows_and_the_labor_is_used_up() {
                 pair("unimproved_grain", 24.0)
             ]
         );
-        assert_eq!(
-            named(&world, &report.endowed),
-            vec![pair("unskilled_labor", 4100.0)]
+        let endowed = named(&world, &report.endowed);
+        assert_eq!(endowed.len(), 1);
+        assert_eq!(endowed[0].0, "unskilled_labor");
+        assert!(
+            close(endowed[0].1, 10.0 * previous.population.get()),
+            "{endowed:?} vs population {}",
+            previous.population
         );
         let center = pop_id(7, &world);
         assert!(pop_groups(&world, center, "unskilled_labor").is_empty());
@@ -471,6 +546,7 @@ fn stepping_the_sample_re_endows_and_the_labor_is_used_up() {
         for (id, _) in world.pops().iter() {
             assert_eq!(world.pop_stockpile(id), other.pop_stockpile(id));
         }
+        previous = report;
     }
 }
 
@@ -521,6 +597,7 @@ fn pops_across_files_with_two_types_on_a_hex_are_placed_in_load_order() {
 #[test]
 fn the_pops_placed_world_endows_durable_and_perishable_goods() {
     let (mut world, report) = world_of(&test_setting("pops_placed"));
+    let sizes_at_start: Vec<Quantity> = world.pops().iter().map(|(_, p)| p.size).collect();
     let (p0, p1, p2, p3) = (
         pop_id(0, &world),
         pop_id(1, &world),
@@ -565,6 +642,7 @@ fn the_pops_placed_world_endows_durable_and_perishable_goods() {
     );
     assert!(report.sold.is_empty() && report.bought.is_empty());
     assert_eq!(named(&world, &report.consumed), vec![pair("labor", 35.0)]);
+    assert_eq!(report.population.get(), 12.5);
     for t in 1..=3u64 {
         let report = world.step().unwrap();
         check(&world, t);
@@ -580,7 +658,10 @@ fn the_pops_placed_world_endows_durable_and_perishable_goods() {
         );
         assert!(report.sold.is_empty() && report.bought.is_empty());
         assert_eq!(named(&world, &report.consumed), vec![pair("labor", 35.0)]);
+        assert_eq!(report.population.get(), 12.5, "turn {t}");
     }
+    let sizes_now: Vec<Quantity> = world.pops().iter().map(|(_, p)| p.size).collect();
+    assert_eq!(sizes_now, sizes_at_start);
 }
 
 #[test]
@@ -618,6 +699,7 @@ fn a_world_with_no_pops_has_none_and_endows_nothing() {
         let (mut world, report) = world_of(&test_setting(name));
         assert!(world.pops().is_empty(), "{name}");
         assert!(report.endowed.is_empty(), "{name}");
+        assert_eq!(report.population, Quantity::ZERO, "{name}");
         assert!(
             report.sold.is_empty() && report.bought.is_empty() && report.consumed.is_empty(),
             "{name}"
@@ -625,6 +707,7 @@ fn a_world_with_no_pops_has_none_and_endows_nothing() {
         for _ in 0..3 {
             let report = world.step().unwrap();
             assert!(report.endowed.is_empty(), "{name}");
+            assert_eq!(report.population, Quantity::ZERO, "{name}");
             assert!(
                 report.sold.is_empty() && report.bought.is_empty() && report.consumed.is_empty(),
                 "{name}"

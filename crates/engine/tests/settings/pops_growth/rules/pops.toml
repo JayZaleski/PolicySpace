@@ -1,0 +1,41 @@
+[[pop_type]]
+name = "peasant"
+endowment = { labor = 10 }
+utility = { labor = { subsistence = 2, share = 0.2 }, grain = { subsistence = 2, share = 0.8 } }
+growth = { growth = [0.06, -0.03], decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "boomer"
+endowment = { labor = 10 }
+utility = { labor = { subsistence = 1, share = 1 } }
+growth = { growth = [1], decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "rich"
+endowment = { labor = 10 }
+utility = { labor = { subsistence = 2.5, share = 1 } }
+growth = { growth = [0.06, -0.03], decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "richer"
+endowment = { labor = 10 }
+utility = { labor = { subsistence = 1, share = 1 } }
+growth = { growth = [0.06, -0.03], decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "carefree"
+endowment = { labor = 10 }
+utility = { labor = { share = 1 } }
+growth = { growth = [0.06], decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "wanting"
+endowment = { labor = 10 }
+utility = { labor = { share = 1 }, copper = { subsistence = 1 } }
+growth = { growth = [0.06], decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "static"
+endowment = { labor = 10 }
+utility = { labor = { subsistence = 2, share = 0.2 }, grain = { subsistence = 2, share = 0.8 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }

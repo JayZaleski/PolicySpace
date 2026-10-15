@@ -8,12 +8,16 @@
 //! is never traded: proceeds add it, purchases spend it, and what is left is its demanded
 //! quantity up to rounding. Hexes are handled by the World in hex ID order; within a hex
 //! POPs go in POP ID order and goods in good ID order. Leftover currency stays in the
-//! stockpile. A refused trade is an engine bug. Stage 05 replaces the inside of the round
-//! (adjusted prices, rationing); the submission, the order, consumption and the outcome
-//! stay. Knows nothing about the World or files.
+//! stockpile. A refused trade is an engine bug. The record also carries the POP's
+//! subsistence index and growth rate, computed by the [`growth`](crate::growth) module from
+//! the demand and the type, and the size the turn started with; the World applies the rate
+//! after every hex has traded. Stage 05 replaces the inside of the round (adjusted prices,
+//! rationing); the submission, the order, consumption and the outcome stay. Knows nothing
+//! about the World or files.
 
 use crate::demand::{Demand, demand};
 use crate::goods::GoodId;
+use crate::growth::{growth_rate, subsistence_index};
 use crate::market::{Market, TradeError};
 use crate::pops::PopType;
 use crate::quantity::Quantity;
@@ -41,6 +45,12 @@ pub struct PopOutcome {
     consumed: Vec<(GoodId, Quantity)>,
     /// The hex's currency left in the stockpile after consumption.
     carried_over: Quantity,
+    /// The POP's subsistence index this turn (see the `growth` module).
+    subsistence_index: f64,
+    /// The growth rate the World applies to the size after the round.
+    growth_rate: f64,
+    /// The size the turn started with (the size the demand and the trade were for).
+    starting_size: Quantity,
 }
 
 /// The amount recorded for `good` in a list sorted by good; zero if none.
@@ -89,6 +99,21 @@ impl PopOutcome {
     /// The hex's currency left in the POP's stockpile after consumption.
     pub fn carried_over(&self) -> Quantity {
         self.carried_over
+    }
+
+    /// The subsistence index: 0 at subsistence, positive above, down to −1 below.
+    pub fn subsistence_index(&self) -> f64 {
+        self.subsistence_index
+    }
+
+    /// The growth rate applied to the size after this turn's round.
+    pub fn growth_rate(&self) -> f64 {
+        self.growth_rate
+    }
+
+    /// The size the turn started with; the POP's current size is the size after growth.
+    pub fn starting_size(&self) -> Quantity {
+        self.starting_size
     }
 }
 
@@ -142,12 +167,17 @@ pub(crate) fn hex_round(
     for (((s, demand), sold), bought) in submissions.iter_mut().zip(demands).zip(sold).zip(bought) {
         let consumed = consume(s.pop_type, &demand, &mut s.stockpile);
         let carried_over = s.stockpile.total(market.currency());
+        let subsistence_index = subsistence_index(&demand);
+        let growth_rate = growth_rate(s.pop_type.growth(), subsistence_index);
         outcomes.push(PopOutcome {
             demand,
             sold,
             bought,
             consumed,
             carried_over,
+            subsistence_index,
+            growth_rate,
+            starting_size: s.size,
         });
     }
     Ok(outcomes)
@@ -242,10 +272,15 @@ mod tests {
 
     use super::*;
     use crate::map::{HexCoord, HexId};
+    use crate::pops::GrowthParams;
     use crate::setting::load_setting;
     use crate::stockpile::PerishesAt;
     use crate::turn::Turn;
     use crate::world::World;
+
+    fn no_growth() -> GrowthParams {
+        GrowthParams::new(vec![0.0], 0.0, 0.0)
+    }
 
     fn q(value: f64) -> Quantity {
         Quantity::new(value).unwrap()
@@ -411,7 +446,11 @@ mod tests {
 
     /// A type that wants only grain, spending everything on it.
     fn grain_only(world: &World) -> PopType {
-        PopType::new(vec![], vec![(good(world, "grain"), Quantity::ZERO, 1.0)])
+        PopType::new(
+            vec![],
+            vec![(good(world, "grain"), Quantity::ZERO, 1.0)],
+            no_growth(),
+        )
     }
 
     #[test]
@@ -505,6 +544,7 @@ mod tests {
         let pop_type = PopType::new(
             vec![],
             vec![(labor, Quantity::ZERO, 0.5), (silver, q(1.0), 0.5)],
+            no_growth(),
         );
         let mut subs = vec![Submission {
             pop_type: &pop_type,

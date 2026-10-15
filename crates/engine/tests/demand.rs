@@ -159,8 +159,9 @@ fn the_recorded_demand_matches_the_pure_function() {
     let center = hex(&world, 0, 0);
     let peasant_id = world.rules().pop_types.id("peasant").unwrap();
     let pop_id = world.pops().of_type_on_hex(center, peasant_id).unwrap();
-    let pop = world.pops().get(pop_id);
-    assert_eq!(pop.size, q(60.0));
+    // The POP has grown since the round, so the demand was for its starting size.
+    let size = world.pop_outcome(pop_id).starting_size();
+    assert_eq!(size, q(60.0));
     let pop_type = world.rules().pop_types.get(peasant_id);
     let market = world.market(center);
 
@@ -176,7 +177,7 @@ fn the_recorded_demand_matches_the_pure_function() {
     );
     assert!(close(recorded.income().get(), 600.0));
     assert_balances(&world, recorded, CENTER);
-    let pure = demand(pop_type, pop.size, [(labor, q(600.0))], &market);
+    let pure = demand(pop_type, size, [(labor, q(600.0))], &market);
     assert_eq!(recorded, &pure);
     assert_eq!(world.turn().get(), 0);
 }

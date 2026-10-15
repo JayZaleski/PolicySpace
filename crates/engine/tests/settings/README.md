@@ -41,9 +41,12 @@ Valid settings:
   and a hex (whose currency is `coin`) in files read after them. Goods: `coin`, `labor`,
   `grain`, `fish`. POP types: `farmer` (endows `labor`), `fisher` (endows `fish` and
   `labor` written out of ID order; a pure-necessity `fish`, and the currency `coin` in its
-  utility), `idle` (empty endowment).
+  utility), `idle` (empty endowment). Every type has real growth parameters, in both forms:
+  `farmer` `[0.06, -0.03]`, decline 0.1, max_growth 0.05 (inline); `fisher` `[0.03]`,
+  decline 0, max_growth 1 (the `[pop_type.growth]` table); `idle` `[0.02, 0.01, -0.005]`,
+  decline 0.5, max_growth 0.2 (inline).
 - `pops_one`: one good, one POP type, one hex and one POP (for the setting checker's
-  `1 pop type`, `1 hex` and `1 pop`).
+  `1 pop type`, `1 hex` and `1 pop`). Its type has zero growth parameters.
 - `pops_placed`: POPs across several files and a nested folder (`start/a.toml`, then
   `start/b/c.toml`), with a deposit, for the turn behavior. Goods: `labor` (perishes after 1
   turn, unmovable), `grain` (perishes after 1 turn), `gold` (never perishes). Hexes (0, 0),
@@ -53,6 +56,8 @@ Valid settings:
   `worker` at (1, 0) size 0.5 (fractional); 3 `idle` at (1, 0) size 7; (2, 0) has none. The
   hoarder's utility is `grain`, so its `gold` is parked and accumulates and its `labor` is
   not consumed; the workers consume their `labor` (their utility). No hex has a market.
+  Every type has zero growth parameters (`growth = [0]`, `decline = 0`, `max_growth = 0`),
+  so no size changes and the population is 12.5 every turn.
 - `pops_trade`: for the POP trade round (`crates/engine/tests/trade.rs` and the unit tests
   in `crates/engine/src/trade.rs`). Goods (IDs 0-4): `labor` (perishes after 1), `grain`
   (perishes after 3), `copper`, `silver`, `gem` (durable). Hexes (0, 0) to (4, 0), every one
@@ -63,7 +68,25 @@ Valid settings:
   1; as peasant), `miser` (labor 10; labor with share 0, copper), `idle` (empty endowment;
   grain). POPs: 0 `peasant` at (0, 0) size 2; 1 `artisan` at (0, 0) size 1; 2 `peasant` at
   (1, 0) size 1; 3 `idle` at (1, 0) size 3; 4 `peasant` at (2, 0) size 1; 5 `saver`, 6
-  `miser`, 7 `collector` at (3, 0) size 1; (4, 0) has a market and no POPs.
+  `miser`, 7 `collector` at (3, 0) size 1; (4, 0) has a market and no POPs. Every type has
+  zero growth parameters, so no size changes and the population is 11 every turn.
+- `pops_growth`: for POP growth (`crates/engine/tests/growth.rs`). Goods (IDs 0-3): `labor`
+  (perishes after 1), `grain` (perishes after 3), `copper`, `silver` (durable). Hexes (0, 0),
+  (1, 0), (2, 0), every one with currency `silver`. Markets: (0, 0) `labor` 1, `grain` 2;
+  (1, 0) `labor` 1, `grain` 4; (2, 0) `labor` 1, `grain` 10; no hex prices `copper`. With
+  G = `{ growth = [0.06, -0.03], decline = 0.1, max_growth = 0.05 }`, POP types (every one
+  endows 10 `labor`): `peasant` (labor subsistence 2 share 0.2, grain subsistence 2 share
+  0.8; G), `boomer` (labor subsistence 1; `[1]`, decline 0.1, max_growth 0.05), `rich`
+  (labor subsistence 2.5; G), `richer` (labor subsistence 1; G), `carefree` (labor share 1,
+  no subsistence; `[0.06]`, 0.1, 0.05), `wanting` (labor share 1, copper subsistence 1;
+  `[0.06]`, 0.1, 0.05), `static` (as `peasant`; `[0]`, 0, 0). POPs (IDs 0-9): 0 `peasant` at
+  (0, 0) size 20; 1 `boomer`, 2 `rich`, 3 `richer`, 4 `carefree`, 5 `wanting`, 6 `static`,
+  all at (0, 0) size 10; 7 `peasant` at (1, 0) size 10; 8 `peasant` at (2, 0) size 11; 9
+  `static` at (2, 0) size 10. At turn 0 the (index, rate, size after growth) are: 0 (2/3,
+  0.02666, 20.5333); 1 (9, capped 0.05, 10.5); 2 (3, -0.09, 9.1); 3 (9, floored -0.1, 9); 4
+  (0, 0, 10: subsistence costs nothing); 5 (-1, -0.1, 9: copper can't be obtained); 6 (2/3, 0,
+  10); 7 (0, 0, 10: income exactly covers subsistence); 8 (-6/11, -0.6/11, 10.4: below
+  subsistence); 9 (-6/11, 0, 10). The population is 108.5333 at turn 0.
 
 Folder-structure errors:
 - `missing_manifest`, `missing_rules`, `missing_start`: a required entry is absent.
@@ -101,7 +124,13 @@ File-content errors:
   a negative or non-finite `subsistence` or `share`, a utility good with nothing positive, a
   utility with no positive share, unknown goods, unknown keys in the entry and in a
   sub-table, one entry with several problems, a duplicate across files, and a `[[pop_type]]`
-  in `start/`. Its goods are `coin` and `grain`.
+  in `start/`. Every entry in `rules/a.toml`, `rules/b.toml` and `start/p.toml` has a valid
+  `growth` line as its last line, and `rules/c.toml` holds every `growth` error: a missing
+  or non-table `growth`, missing keys inside it (inline and in the `[pop_type.growth]` form),
+  a `growth` list that is a number, empty, or holds a string or `inf`, a `decline` that is
+  negative, 1, infinite or a string, a `max_growth` that is negative or infinite, an unknown
+  key in the sub-table, and one entry (a duplicate of `ok`) with four growth problems. Its
+  goods are `coin` and `grain`.
 - `pops_placed_errors`: every kind of `[[pop]]` error, including a missing `type`, `q`, `r`
   or `size`, a wrongly typed `type`, `q` or `size`, an out-of-range `q`, a coordinate with
   no hex, a size that is zero, negative or infinite, an unknown POP type, an unknown key, one

@@ -2,3 +2,4 @@
 name = "eater"
 endowment = { grain = 1 }
 utility = { grain = { share = 1 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }

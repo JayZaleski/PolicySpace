@@ -2,3 +2,4 @@
 name = "worker"
 endowment = { labor = 1 }
 utility = { labor = { share = 1 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }

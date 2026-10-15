@@ -3,16 +3,17 @@
 #   type  The name of a POP type (see rules/pops.toml).
 #   q, r  The axial coordinates of a hex that exists in the map, as for deposits.
 #   size  N, the number of individuals in the POP: a number greater than 0, and decimals
-#         are allowed. A POP is an aggregate: its endowment (and later its demand) scales
-#         with N, and its size will grow by a rate.
+#         are allowed. A POP is an aggregate: its endowment and its demand scale with N,
+#         and its size grows or shrinks by a rate each turn (see rules/pops.toml).
 #
 # A hex holds at most one POP of each type: two entries with the same type and coordinates
 # are an error. A hex may hold POPs of several types, or none. Every POP starts with
 # nothing; its first endowment arrives at the start of turn 0.
 #
 # The POPs are listed in the map's order (row by row, north to south, west to east). Four
-# hexes have no POP: (2, -1), (-2, 0), (1, 1) and (-2, 2). The sizes total 410, so POPs are
-# endowed 4100 unskilled_labor every turn.
+# hexes have no POP: (2, -1), (-2, 0), (1, 1) and (-2, 2). The sizes total 410 at turn 0,
+# so POPs are endowed 4100 unskilled_labor at turn 0; from then on the sizes grow or shrink
+# (see rules/pops.toml).
 
 [[pop]]
 type = "peasant"

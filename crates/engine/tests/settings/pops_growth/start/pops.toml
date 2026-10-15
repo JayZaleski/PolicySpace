@@ -1,0 +1,59 @@
+[[pop]]
+type = "peasant"
+q = 0
+r = 0
+size = 20
+
+[[pop]]
+type = "boomer"
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+type = "rich"
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+type = "richer"
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+type = "carefree"
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+type = "wanting"
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+type = "static"
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+type = "peasant"
+q = 1
+r = 0
+size = 10
+
+[[pop]]
+type = "peasant"
+q = 2
+r = 0
+size = 11
+
+[[pop]]
+type = "static"
+q = 2
+r = 0
+size = 10

@@ -91,8 +91,9 @@ fn a_fresh_sample_world_has_traded_turn_0() {
     let artisan = types.id("artisan").unwrap();
     let mut peasants = 0;
     for (id, pop) in world.pops().iter() {
-        let n = pop.size.get();
         let o = world.pop_outcome(id);
+        // The POP has grown since the round; the round was for its starting size.
+        let n = o.starting_size().get();
         let i = id.index();
         if pop.hex == no_market {
             continue;
@@ -132,8 +133,8 @@ fn a_fresh_sample_world_has_traded_turn_0() {
 fn the_no_market_peasant_consumes_its_labor_and_goes_without_grain() {
     let (world, _) = world_of(&sample_setting());
     let pop = pop_id(2, &world);
-    assert_eq!(world.pops().get(pop).size.get(), 12.0);
     let o = world.pop_outcome(pop);
+    assert_eq!(o.starting_size().get(), 12.0);
     assert!(o.sold().is_empty());
     assert!(o.bought().is_empty());
     assert_list(&world, o.consumed(), &[("unskilled_labor", 120.0)]);
@@ -158,11 +159,32 @@ fn the_sample_report_totals_pops_in_good_id_order() {
     assert_list(&world, &first.sold, &sold);
     assert_list(&world, &first.bought, &bought);
     assert_list(&world, &first.consumed, &consumed);
+
+    // Turn 1 follows the sizes after turn 0's growth: s is the sum of the market-hex
+    // peasants' sizes, a the artisan's, n the no-market peasant's.
+    let size_of = |index: usize| world.pops().get(pop_id(index, &world)).size.get();
+    let (a, n) = (size_of(8), size_of(2));
+    let s: f64 = (0..16).filter(|i| *i != 2 && *i != 8).map(size_of).sum();
     let second = world.step().unwrap();
-    assert_eq!(second.sold.len(), first.sold.len());
-    assert_list(&world, &second.sold, &sold);
-    assert_list(&world, &second.bought, &bought);
-    assert_list(&world, &second.consumed, &consumed);
+    assert_list(
+        &world,
+        &second.sold,
+        &[("unskilled_labor", 7.2 * s + 8.5 * a)],
+    );
+    assert_list(
+        &world,
+        &second.bought,
+        &[("copper", 0.5 * a), ("grain", 3.6 * s + 3.0 * a)],
+    );
+    assert_list(
+        &world,
+        &second.consumed,
+        &[
+            ("unskilled_labor", 2.8 * s + 1.5 * a + 10.0 * n),
+            ("copper", 0.5 * a),
+            ("grain", 3.6 * s + 3.0 * a),
+        ],
+    );
     let perished = list(&world, &second.perished);
     for (name, amount) in &perished {
         assert!(
@@ -177,7 +199,7 @@ fn the_sample_report_totals_pops_in_good_id_order() {
 }
 
 #[test]
-fn stepping_repeats_the_outcomes_and_two_worlds_agree() {
+fn stepping_repeats_the_outcomes_per_individual_and_two_worlds_agree() {
     let (mut world, _) = world_of(&sample_setting());
     let (mut other, _) = world_of(&sample_setting());
     let turn_0: Vec<PopOutcome> = world
@@ -190,7 +212,9 @@ fn stepping_repeats_the_outcomes_and_two_worlds_agree() {
         for (id, _) in world.pops().iter() {
             assert_eq!(world.pop_outcome(id), other.pop_outcome(id));
             assert_eq!(world.pop_stockpile(id), other.pop_stockpile(id));
+            // Per individual: divide by the size each round was for.
             let (now, then) = (world.pop_outcome(id), &turn_0[id.index()]);
+            let (now_n, then_n) = (now.starting_size().get(), then.starting_size().get());
             for (a, b) in [
                 (now.sold(), then.sold()),
                 (now.bought(), then.bought()),
@@ -199,12 +223,12 @@ fn stepping_repeats_the_outcomes_and_two_worlds_agree() {
                 assert_eq!(a.len(), b.len());
                 for ((ag, aq), (bg, bq)) in a.iter().zip(b) {
                     assert_eq!(ag, bg);
-                    assert!(close(aq.get(), bq.get()));
+                    assert!(close(aq.get() / now_n, bq.get() / then_n));
                 }
             }
             assert!(close(
-                now.demand().income().get(),
-                then.demand().income().get()
+                now.demand().income().get() / now_n,
+                then.demand().income().get() / then_n
             ));
         }
     }
@@ -443,6 +467,7 @@ fn worlds_without_pops_report_nothing_traded() {
             reports.push(world.step().unwrap());
         }
         for report in reports {
+            assert_eq!(report.population, Quantity::ZERO, "{name}");
             assert!(report.sold.is_empty(), "{name}");
             assert!(report.bought.is_empty(), "{name}");
             assert!(report.consumed.is_empty(), "{name}");

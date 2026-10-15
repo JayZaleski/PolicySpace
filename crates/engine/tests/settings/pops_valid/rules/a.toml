@@ -2,3 +2,4 @@
 name = "farmer"
 endowment = { labor = 10 }
 utility = { grain = { subsistence = 2, share = 3 }, labor = { subsistence = 1, share = 1 } }
+growth = { growth = [0.06, -0.03], decline = 0.1, max_growth = 0.05 }

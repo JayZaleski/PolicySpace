@@ -4,6 +4,8 @@
 //! unknown keys) and keeps going, so one load can report all of them. Later Steps define
 //! their section types with it.
 
+use std::borrow::Cow;
+
 use toml::Spanned;
 use toml::de::{DeTable, DeValue};
 
@@ -102,11 +104,24 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     }
 
     fn find(&mut self, key: &str, required: bool) -> Found<'a, 'i> {
+        match self.find_entry(key, required) {
+            Some((_, value)) => Found::Value(value),
+            None => Found::Absent,
+        }
+    }
+
+    /// Like `find`, but also returns the key as the table holds it (so its span is known).
+    #[allow(clippy::type_complexity)]
+    fn find_entry(
+        &mut self,
+        key: &str,
+        required: bool,
+    ) -> Option<(&'a Spanned<Cow<'i, str>>, &'a Spanned<DeValue<'i>>)> {
         self.read.push(key.to_string());
         let table: &'a DeTable<'i> = self.table;
         for (k, v) in table.iter() {
             if k.get_ref().as_ref() == key {
-                return Found::Value(v);
+                return Some((k, v));
             }
         }
         if required {
@@ -116,7 +131,7 @@ impl<'a, 'i> EntryReader<'a, 'i> {
                 MissingAt::File => self.sink.in_file(&self.entry.path, message),
             }
         }
-        Found::Absent
+        None
     }
 
     fn wrong_type(&mut self, key: &str, expected: &str, value: &Spanned<DeValue<'i>>) {
@@ -375,6 +390,63 @@ impl<'a, 'i> EntryReader<'a, 'i> {
             read: Vec::new(),
             sink: &mut *self.sink,
         }
+    }
+
+    /// Reads `key` as a table and returns a reader for it, labelled `<key> of <label>` (for
+    /// example `growth of pop_type`), so its messages read `key 'decline' in growth of
+    /// pop_type must be a number, found string` and `unknown key 'cap' in growth of
+    /// pop_type`. Missing required keys inside it are reported at `key`'s own location (the
+    /// key in an inline entry, or its name in a `[section.key]` header). A missing `key`
+    /// reports the usual missing-key error; a value that isn't a table reports `key '<key>'
+    /// in <label> must be a table, found <type>`. Both return None. Call `finish` on the
+    /// returned reader to report its unknown keys.
+    pub fn required_sub_table(&mut self, key: &str) -> Option<EntryReader<'_, 'i>> {
+        let (k, value) = self.find_entry(key, true)?;
+        let Some(table) = value.get_ref().as_table() else {
+            self.wrong_type(key, "a table", value);
+            return None;
+        };
+        Some(EntryReader {
+            file: self.file,
+            table,
+            entry: self.file.location_of(k.span()),
+            missing_at: MissingAt::Entry,
+            label: format!("{key} of {}", self.label),
+            read: Vec::new(),
+            sink: &mut *self.sink,
+        })
+    }
+
+    /// Reads `key` as an array of numbers (integers or floats, as `f64`). Returns the array's
+    /// location and every element in order: `Some(value)` for a number (as written, including
+    /// `inf` and `nan`; range checks belong to the caller), `None` for an element that isn't
+    /// one, which is reported at the element's position as `element <n> of key '<key>' in
+    /// <label> must be a number, found <type>` or `element <n> of key '<key>' in <label> is
+    /// out of range`, with `n` counted from 1. An empty array returns an empty list. A
+    /// missing `key` reports the usual missing-key error; a value that isn't an array
+    /// reports `key '<key>' in <label> must be an array, found <type>`. Both return None.
+    #[allow(clippy::type_complexity)]
+    pub fn required_number_array(
+        &mut self,
+        key: &str,
+    ) -> Option<Located<Vec<Option<Located<f64>>>>> {
+        let Found::Value(value) = self.find(key, true) else {
+            return None;
+        };
+        let Some(array) = value.get_ref().as_array() else {
+            self.wrong_type(key, "an array", value);
+            return None;
+        };
+        let at = self.file.location_of(value.span());
+        let mut elements = Vec::new();
+        for (i, element) in array.iter().enumerate() {
+            let prefix = format!("element {} of key '{key}' in {}", i + 1, self.label);
+            elements.push(self.number_value(&prefix, element));
+        }
+        Some(Located {
+            value: elements,
+            at,
+        })
     }
 
     /// A boolean value that must be present.
@@ -744,6 +816,78 @@ z = 1
             vec![
                 "setting.toml: missing required key 'name' in manifest",
                 "setting.toml:1:1: unknown key 'x' in manifest",
+            ]
+        );
+    }
+
+    #[test]
+    fn sub_tables_read_with_their_own_label_and_location() {
+        let errors = run("g = { a = 1, z = 2 }\nq = 7\n", |r| {
+            {
+                let mut sub = r.required_sub_table("g").unwrap();
+                assert_eq!(sub.label(), "g of thing");
+                assert_eq!(sub.required_number("a").unwrap().value, 1.0);
+                assert!(sub.required_number("b").is_none());
+                sub.finish();
+            }
+            assert!(r.required_sub_table("q").is_none());
+            assert!(r.required_sub_table("missing").is_none());
+        });
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:1:1: missing required key 'b' in g of thing",
+                "rules/t.toml:1:1: missing required key 'missing' in thing",
+                "rules/t.toml:1:14: unknown key 'z' in g of thing",
+                "rules/t.toml:2:5: key 'q' in thing must be a table, found integer",
+            ]
+        );
+    }
+
+    #[test]
+    fn sub_tables_work_in_header_form() {
+        let errors = run("[g]\na = 1\n", |r| {
+            let mut sub = r.required_sub_table("g").unwrap();
+            assert_eq!(sub.required_number("a").unwrap().value, 1.0);
+            assert!(sub.required_number("b").is_none());
+            sub.finish();
+        });
+        assert_eq!(
+            errors,
+            vec!["rules/t.toml:1:2: missing required key 'b' in g of thing"]
+        );
+    }
+
+    #[test]
+    fn number_arrays_give_every_element_and_report_bad_ones() {
+        let errors = run(
+            "a = [1, 2.5, \"x\", 99999999999999999999, inf]\nb = []\nc = 7\n",
+            |r| {
+                let a = r.required_number_array("a").unwrap();
+                assert_eq!((a.at.line, a.at.column), (1, 5));
+                let values: Vec<Option<f64>> = a
+                    .value
+                    .iter()
+                    .map(|e| e.as_ref().map(|e| e.value))
+                    .collect();
+                assert_eq!(
+                    values,
+                    vec![Some(1.0), Some(2.5), None, None, Some(f64::INFINITY)]
+                );
+                let b = r.required_number_array("b").unwrap();
+                assert!(b.value.is_empty());
+                assert_eq!((b.at.line, b.at.column), (2, 5));
+                assert!(r.required_number_array("c").is_none());
+                assert!(r.required_number_array("missing").is_none());
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:1:1: missing required key 'missing' in thing",
+                "rules/t.toml:1:14: element 3 of key 'a' in thing must be a number, found string",
+                "rules/t.toml:1:19: element 4 of key 'a' in thing is out of range",
+                "rules/t.toml:3:5: key 'c' in thing must be an array, found integer",
             ]
         );
     }

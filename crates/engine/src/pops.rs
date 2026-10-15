@@ -9,9 +9,12 @@
 //!   Shares are stored normalized (they sum to 1 over the type's utility goods); the
 //!   weights as written in the setting aren't kept. A good with share 0 but a positive
 //!   subsistence is a pure necessity. The [`demand`](crate::demand) module computes demand from the utility.
+//!   The type also carries the growth parameters that say how its POPs' size responds to
+//!   their subsistence index (see [`GrowthParams`] and the [`growth`](crate::growth) module).
 //! - A **POP** (`[[pop]]` in `start/`) is N identical individuals of one POP type on one
 //!   hex. N (its size) is continuous: a POP is an aggregate, so its endowment scales with N
-//!   and its size will later grow by a rate. A hex holds at most one POP of each type, and
+//!   and its size grows or shrinks each turn by a rate from its type's growth parameters
+//!   (see the [`growth`](crate::growth) module). A hex holds at most one POP of each type, and
 //!   may hold POPs of several types or none. POPs have no names; they are identified in
 //!   setting files by hex and type, and [`PopId`]s are valid only within the [`Pops`] that
 //!   produced them. Each POP's stockpile is world state (see the [`world`](crate::world)
@@ -57,18 +60,82 @@ pub struct UtilityGood {
     pub share: f64,
 }
 
-/// One POP type: the per-individual endowment and utility parameters.
+/// How a POP type's size responds to its subsistence index u (see the
+/// [`growth`](crate::growth) module): a polynomial above subsistence, a linear decline
+/// below, both clamped.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GrowthParams {
+    /// c₁, c₂, …: above subsistence the rate is c₁u + c₂u² + …. Never empty; every
+    /// coefficient finite.
+    coefficients: Vec<f64>,
+    /// Below subsistence the rate is `decline × u`, so a POP with nothing (u = −1) shrinks
+    /// by exactly this. Finite, in [0, 1).
+    decline: f64,
+    /// The cap on the rate. Finite, at least 0.
+    max_growth: f64,
+}
+
+impl GrowthParams {
+    /// Crate-private: only the loader (and tests) build parameters.
+    ///
+    /// # Panics
+    /// Panics if `coefficients` is empty or holds a non-finite number
+    /// (`"a POP type's growth coefficients must be a non-empty list of finite numbers"`),
+    /// if `decline` is not finite or not in [0, 1) (`"a POP type's decline must be a finite
+    /// number of at least 0 and less than 1"`), or if `max_growth` is not finite or is
+    /// negative (`"a POP type's max_growth must be a finite number of at least 0"`).
+    pub(crate) fn new(coefficients: Vec<f64>, decline: f64, max_growth: f64) -> Self {
+        assert!(
+            !coefficients.is_empty() && coefficients.iter().all(|c| c.is_finite()),
+            "a POP type's growth coefficients must be a non-empty list of finite numbers"
+        );
+        assert!(
+            decline.is_finite() && (0.0..1.0).contains(&decline),
+            "a POP type's decline must be a finite number of at least 0 and less than 1"
+        );
+        assert!(
+            max_growth.is_finite() && max_growth >= 0.0,
+            "a POP type's max_growth must be a finite number of at least 0"
+        );
+        GrowthParams {
+            coefficients,
+            decline,
+            max_growth,
+        }
+    }
+
+    /// The polynomial coefficients c₁, c₂, …: above subsistence the rate is
+    /// c₁u + c₂u² + …. Never empty.
+    pub fn coefficients(&self) -> &[f64] {
+        &self.coefficients
+    }
+
+    /// The decline: below subsistence the rate is `decline × u`. In [0, 1).
+    pub fn decline(&self) -> f64 {
+        self.decline
+    }
+
+    /// The cap on the rate. At least 0.
+    pub fn max_growth(&self) -> f64 {
+        self.max_growth
+    }
+}
+
+/// One POP type: the per-individual endowment and utility parameters, and the growth
+/// parameters.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PopType {
     /// Sorted by good, no good twice.
     endowment: Vec<Endowment>,
     /// Sorted by good, no good twice.
     utility: Vec<UtilityGood>,
+    /// How the size responds to the subsistence index.
+    growth: GrowthParams,
 }
 
 impl PopType {
-    /// Builds a type from (good, amount) endowment pairs and (good, subsistence, weight)
-    /// utility triples in any order. Sorts both by good ID and normalizes the weights to
+    /// Builds a type from (good, amount) endowment pairs, (good, subsistence, weight)
+    /// utility triples in any order, and its growth parameters. Sorts both by good ID and normalizes the weights to
     /// shares that sum to 1. Crate-private: only the loader builds POP types.
     ///
     /// # Panics
@@ -77,6 +144,7 @@ impl PopType {
     pub(crate) fn new(
         mut endowment: Vec<(GoodId, Quantity)>,
         mut utility: Vec<(GoodId, Quantity, f64)>,
+        growth: GrowthParams,
     ) -> Self {
         endowment.sort_by_key(|x| x.0);
         utility.sort_by_key(|x| x.0);
@@ -112,6 +180,7 @@ impl PopType {
                     share: (weight / largest) / total,
                 })
                 .collect(),
+            growth,
         }
     }
 
@@ -123,6 +192,11 @@ impl PopType {
     /// The utility goods, in good ID order. Never empty; at least one share is positive.
     pub fn utility(&self) -> &[UtilityGood] {
         &self.utility
+    }
+
+    /// The growth parameters.
+    pub fn growth(&self) -> &GrowthParams {
+        &self.growth
     }
 
     /// How much of `good` one individual receives per turn; zero if it isn't endowed.
@@ -163,7 +237,9 @@ pub struct Pop {
     pub hex: HexId,
     /// Its POP type.
     pub pop_type: PopTypeId,
-    /// N, the number of individuals. Continuous; always finite and greater than 0.
+    /// N, the number of individuals. Continuous and finite; greater than 0 in the setting,
+    /// and growth multiplies it by a factor above 0 each turn, so it stays positive (only
+    /// floating-point underflow after thousands of turns of decline could reach 0).
     pub size: Quantity,
 }
 
@@ -256,6 +332,14 @@ impl Pops {
             .copied()
             .find(|id| self.pops.get(*id).pop_type == pop_type)
     }
+
+    /// Sets the size of `id`. Crate-private: only the World's growth step changes sizes.
+    ///
+    /// # Panics
+    /// Panics if `id` isn't from this list.
+    pub(crate) fn set_size(&mut self, id: PopId, size: Quantity) {
+        self.pops.get_mut(id).size = size;
+    }
 }
 
 #[cfg(test)]
@@ -275,11 +359,16 @@ mod tests {
         (a - b).abs() < 1e-9
     }
 
+    fn no_growth() -> GrowthParams {
+        GrowthParams::new(vec![0.0], 0.0, 0.0)
+    }
+
     #[test]
     fn shares_are_normalized_and_sorted_by_good() {
         let t = PopType::new(
             vec![(good(4), q(1.0)), (good(1), q(2.0))],
             vec![(good(3), q(0.0), 3.0), (good(2), q(5.0), 1.0)],
+            no_growth(),
         );
         let utility = t.utility();
         assert_eq!(utility.len(), 2);
@@ -300,6 +389,7 @@ mod tests {
         let t = PopType::new(
             vec![],
             vec![(good(0), q(0.0), 1e308), (good(1), q(0.0), 1e308)],
+            no_growth(),
         );
         assert!(close(t.utility()[0].share, 0.5));
         assert!(close(t.utility()[1].share, 0.5));
@@ -307,13 +397,17 @@ mod tests {
 
     #[test]
     fn a_single_positive_weight_gives_share_one() {
-        let t = PopType::new(vec![], vec![(good(0), q(0.0), 7.5)]);
+        let t = PopType::new(vec![], vec![(good(0), q(0.0), 7.5)], no_growth());
         assert!(close(t.utility()[0].share, 1.0));
     }
 
     #[test]
     fn a_zero_weight_good_stays_with_share_zero() {
-        let t = PopType::new(vec![], vec![(good(0), q(1.0), 0.0), (good(1), q(0.0), 2.0)]);
+        let t = PopType::new(
+            vec![],
+            vec![(good(0), q(1.0), 0.0), (good(1), q(0.0), 2.0)],
+            no_growth(),
+        );
         assert_eq!(t.utility().len(), 2);
         assert_eq!(t.utility()[0].share, 0.0);
         assert!(close(t.utility()[1].share, 1.0));
@@ -321,7 +415,7 @@ mod tests {
 
     #[test]
     fn an_empty_endowment_is_fine() {
-        let t = PopType::new(vec![], vec![(good(0), q(0.0), 1.0)]);
+        let t = PopType::new(vec![], vec![(good(0), q(0.0), 1.0)], no_growth());
         assert!(t.endowment().is_empty());
         assert_eq!(t.endowment_of(good(0)), Quantity::ZERO);
     }
@@ -331,6 +425,7 @@ mod tests {
         let t = PopType::new(
             vec![(good(5), q(8.0)), (good(2), q(3.0))],
             vec![(good(0), q(0.0), 1.0)],
+            no_growth(),
         );
         assert_eq!(t.endowment_of(good(5)), q(8.0));
         assert_eq!(t.endowment_of(good(2)), q(3.0));
@@ -339,7 +434,11 @@ mod tests {
 
     #[test]
     fn utility_of_finds_a_good_or_gives_none() {
-        let t = PopType::new(vec![], vec![(good(5), q(1.0), 1.0), (good(2), q(0.0), 1.0)]);
+        let t = PopType::new(
+            vec![],
+            vec![(good(5), q(1.0), 1.0), (good(2), q(0.0), 1.0)],
+            no_growth(),
+        );
         assert_eq!(t.utility_of(good(5)).unwrap().subsistence, q(1.0));
         assert!(close(t.utility_of(good(2)).unwrap().share, 0.5));
         assert!(t.utility_of(good(3)).is_none());
@@ -351,19 +450,83 @@ mod tests {
         PopType::new(
             vec![(good(1), q(1.0)), (good(1), q(2.0))],
             vec![(good(0), q(0.0), 1.0)],
+            no_growth(),
         );
     }
 
     #[test]
     #[should_panic(expected = "a good appears twice in a POP type's utility")]
     fn a_duplicate_utility_good_panics() {
-        PopType::new(vec![], vec![(good(1), q(0.0), 1.0), (good(1), q(0.0), 2.0)]);
+        PopType::new(
+            vec![],
+            vec![(good(1), q(0.0), 1.0), (good(1), q(0.0), 2.0)],
+            no_growth(),
+        );
     }
 
     #[test]
     #[should_panic(expected = "a POP type needs a utility good with a positive share")]
     fn no_positive_weight_panics() {
-        PopType::new(vec![], vec![(good(1), q(2.0), 0.0)]);
+        PopType::new(vec![], vec![(good(1), q(2.0), 0.0)], no_growth());
+    }
+
+    // --- GrowthParams ---
+
+    #[test]
+    fn growth_params_are_stored() {
+        let g = GrowthParams::new(vec![0.06, -0.03], 0.1, 0.05);
+        assert_eq!(g.coefficients(), &[0.06, -0.03]);
+        assert_eq!(g.decline(), 0.1);
+        assert_eq!(g.max_growth(), 0.05);
+        let t = PopType::new(vec![], vec![(good(0), q(0.0), 1.0)], g.clone());
+        assert_eq!(t.growth(), &g);
+        assert_eq!(t.growth().coefficients(), &[0.06, -0.03]);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "a POP type's growth coefficients must be a non-empty list of finite numbers"
+    )]
+    fn empty_coefficients_panic() {
+        GrowthParams::new(vec![], 0.1, 0.05);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "a POP type's growth coefficients must be a non-empty list of finite numbers"
+    )]
+    fn a_nan_coefficient_panics() {
+        GrowthParams::new(vec![0.1, f64::NAN], 0.1, 0.05);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "a POP type's decline must be a finite number of at least 0 and less than 1"
+    )]
+    fn a_decline_of_one_panics() {
+        GrowthParams::new(vec![0.1], 1.0, 0.05);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "a POP type's decline must be a finite number of at least 0 and less than 1"
+    )]
+    fn a_negative_decline_panics() {
+        GrowthParams::new(vec![0.1], -0.1, 0.05);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "a POP type's decline must be a finite number of at least 0 and less than 1"
+    )]
+    fn an_infinite_decline_panics() {
+        GrowthParams::new(vec![0.1], f64::INFINITY, 0.05);
+    }
+
+    #[test]
+    #[should_panic(expected = "a POP type's max_growth must be a finite number of at least 0")]
+    fn a_negative_max_growth_panics() {
+        GrowthParams::new(vec![0.1], 0.1, -1.0);
     }
 
     // --- Pops ---
@@ -458,6 +621,17 @@ mod tests {
             Some(3)
         );
         assert!(pops.of_type_on_hex(h[1], t[0]).is_none());
+    }
+
+    #[test]
+    fn set_size_changes_one_pop() {
+        let mut pops = sample_pops();
+        let ids: Vec<PopId> = pops.iter().map(|(id, _)| id).collect();
+        pops.set_size(ids[2], q(7.0));
+        assert_eq!(pops.get(ids[2]).size, q(7.0));
+        assert_eq!(pops.get(ids[0]).size, q(1.0));
+        assert_eq!(pops.get(ids[1]).size, q(2.0));
+        assert_eq!(pops.get(ids[3]).size, q(4.0));
     }
 
     #[test]

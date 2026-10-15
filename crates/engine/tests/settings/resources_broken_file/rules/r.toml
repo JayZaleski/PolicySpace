@@ -7,3 +7,4 @@ output = 1
 name = "ghost"
 endowment = { tin = 1 }
 utility = { nothing = { share = 1 } }
+growth = { growth = [0.03], decline = 0.1, max_growth = 0.05 }

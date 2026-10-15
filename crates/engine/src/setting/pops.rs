@@ -5,6 +5,9 @@
 //! for phase 2, even one whose name was bad, so its unknown goods are still reported; only
 //! entries with an ID reach `finish`.
 //!
+//! `growth` is read with its own nested reader, so its keys are fields (name-checked for
+//! unknown keys), unlike the data keys of `endowment` and `utility`.
+//!
 //! POPs have no names: they are identified by POP type and hex, so their reader checks its
 //! own duplicates (like deposits). A POP refers to its type by name and to its hex by
 //! coordinates, and both are resolved in phase 2.
@@ -13,7 +16,7 @@ use std::collections::HashMap;
 
 use crate::goods::{GoodId, GoodKind};
 use crate::map::HexCoord;
-use crate::pops::{Pop, PopType, PopTypeId, PopTypeKind, PopTypes, Pops};
+use crate::pops::{GrowthParams, Pop, PopType, PopTypeId, PopTypeKind, PopTypes, Pops};
 use crate::quantity::Quantity;
 
 use super::defs::Definitions;
@@ -32,6 +35,8 @@ struct PopTypeEntry {
     endowment: Vec<(Located<String>, Option<Quantity>)>,
     /// Every utility key, in table order; None where the sub-table or a value was invalid.
     utility: Vec<UtilityEntry>,
+    /// None if the `growth` sub-table or anything in it was invalid (already reported).
+    growth: Option<GrowthParams>,
     /// Filled in phase 2, parallel to `endowment`.
     endowment_ids: Vec<Option<GoodId>>,
     /// Filled in phase 2, parallel to `utility`.
@@ -72,6 +77,75 @@ fn amount(sub: &mut EntryReader<'_, '_>, key: &str) -> Amount {
         );
         sub.errors().at(&value.at, message);
         Amount::Invalid
+    }
+}
+
+/// Reads the `growth` sub-table of one `[[pop_type]]`: every key is read before anything
+/// is decided, so one bad sub-table reports all of its problems.
+fn read_growth(reader: &mut EntryReader<'_, '_>) -> Option<GrowthParams> {
+    let mut sub = reader.required_sub_table("growth")?;
+    let label = sub.label().to_string();
+
+    // 1. The coefficients.
+    let mut coefficients = Vec::new();
+    let mut coefficients_valid = false;
+    if let Some(list) = sub.required_number_array("growth") {
+        if list.value.is_empty() {
+            let message = format!("key 'growth' in {label} must have at least one coefficient");
+            sub.errors().at(&list.at, message);
+        } else {
+            coefficients_valid = true;
+            for (i, element) in list.value.into_iter().enumerate() {
+                match element {
+                    Some(v) if v.value.is_finite() => coefficients.push(v.value),
+                    Some(v) => {
+                        let message = format!(
+                            "element {} of key 'growth' in {label} must be a finite number",
+                            i + 1
+                        );
+                        sub.errors().at(&v.at, message);
+                        coefficients_valid = false;
+                    }
+                    None => coefficients_valid = false,
+                }
+            }
+        }
+    }
+
+    // 2. The decline.
+    let mut decline = None;
+    if let Some(v) = sub.required_number("decline") {
+        if v.value.is_finite() && (0.0..1.0).contains(&v.value) {
+            decline = Some(v.value);
+        } else {
+            let message = format!(
+                "key 'decline' in {label} must be a finite number of at least 0 and less than 1"
+            );
+            sub.errors().at(&v.at, message);
+        }
+    }
+
+    // 3. The cap.
+    let mut max_growth = None;
+    if let Some(v) = sub.required_number("max_growth") {
+        if v.value.is_finite() && v.value >= 0.0 {
+            max_growth = Some(v.value);
+        } else {
+            let message =
+                format!("key 'max_growth' in {label} must be a finite number of at least 0");
+            sub.errors().at(&v.at, message);
+        }
+    }
+
+    // 4. Unknown keys.
+    sub.finish();
+
+    // 5. All three valid.
+    match (coefficients_valid, decline, max_growth) {
+        (true, Some(decline), Some(max_growth)) => {
+            Some(GrowthParams::new(coefficients, decline, max_growth))
+        }
+        _ => None,
     }
 }
 
@@ -165,11 +239,14 @@ impl PopTypesReader {
             reader.errors().at(&at, message);
         }
 
+        let growth = read_growth(reader);
+
         let id = name.and_then(|n| self.defs.define(&n, reader.errors()));
         self.entries.push(PopTypeEntry {
             id,
             endowment,
             utility,
+            growth,
             endowment_ids: Vec::new(),
             utility_ids: Vec::new(),
         });
@@ -221,7 +298,10 @@ impl PopTypesReader {
                     (good.expect(UNRESOLVED), subsistence, weight)
                 })
                 .collect();
-            types.push(PopType::new(endowment, utility));
+            let growth = entry
+                .growth
+                .expect("internal error: a POP type's growth was invalid in a successful load");
+            types.push(PopType::new(endowment, utility, growth));
         }
         PopTypes::from_parts(self.defs.into_registry(), types)
     }

@@ -1,0 +1,90 @@
+[[pop_type]]
+name = "no_growth"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+
+[[pop_type]]
+name = "growth_not_table"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = 5
+
+[[pop_type]]
+name = "growth_missing_keys"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = {}
+
+[[pop_type]]
+name = "growth_list_not_array"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = 0.03, decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "growth_list_empty"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [], decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "growth_list_bad_elements"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [0.06, "x", inf], decline = 0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "decline_negative"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [0.03], decline = -0.1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "decline_one"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [0.03], decline = 1, max_growth = 0.05 }
+
+[[pop_type]]
+name = "decline_infinite"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [0.03], decline = inf, max_growth = 0.05 }
+
+[[pop_type]]
+name = "decline_not_number"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [0.03], decline = "x", max_growth = 0.05 }
+
+[[pop_type]]
+name = "max_growth_negative"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [0.03], decline = 0.1, max_growth = -1 }
+
+[[pop_type]]
+name = "max_growth_infinite"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [0.03], decline = 0.1, max_growth = inf }
+
+[[pop_type]]
+name = "growth_unknown_key"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [0.03], decline = 0.1, max_growth = 0.05, cap = 1 }
+
+[[pop_type]]
+name = "growth_sub_table_form"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+
+[pop_type.growth]
+decline = 0.1
+
+[[pop_type]]
+name = "ok"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }
+growth = { growth = [], decline = 2, max_growth = -1, cap = 1 }

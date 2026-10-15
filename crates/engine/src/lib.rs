@@ -20,7 +20,9 @@
 //! demand from its type's utility, its holdings and a hex's prices, as a pure function. The
 //! [`trade`] module runs each hex's trade round every turn: every POP submits its parameters
 //! and holdings, the market computes demand and settles sales then purchases, and the POP
-//! consumes; each POP's outcome is recorded.
+//! consumes; each POP's outcome is recorded. The [`growth`] module turns a POP's demand into
+//! a subsistence index and a growth rate from its type's parameters, and the world applies
+//! the rate to the POP's size after every hex has traded.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -32,6 +34,8 @@ pub mod demand;
 pub use demand::{Demand, DemandedGood, PriceList, demand};
 pub mod goods;
 pub use goods::{Good, GoodId, GoodKind, Goods, Perishes};
+pub mod growth;
+pub use growth::{grown_size, growth_rate, subsistence_index};
 pub mod id;
 pub use id::{Id, IdError, IdKind, NameRegistry, NamedList};
 pub mod map;
@@ -40,7 +44,8 @@ pub mod market;
 pub use market::{HexPrices, Market, TradeError};
 pub mod pops;
 pub use pops::{
-    Endowment, Pop, PopId, PopKind, PopType, PopTypeId, PopTypeKind, PopTypes, Pops, UtilityGood,
+    Endowment, GrowthParams, Pop, PopId, PopKind, PopType, PopTypeId, PopTypeKind, PopTypes, Pops,
+    UtilityGood,
 };
 pub mod quantity;
 pub use quantity::Quantity;

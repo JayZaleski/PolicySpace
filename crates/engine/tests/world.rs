@@ -6,7 +6,7 @@ mod common;
 use std::path::Path;
 
 use common::{load, sample_setting, test_setting};
-use policyspace_engine::{GoodId, HexCoord, HexId, PerishesAt, Turn, TurnReport, World};
+use policyspace_engine::{GoodId, HexCoord, HexId, PerishesAt, Quantity, Turn, TurnReport, World};
 
 fn world_of(path: &Path) -> (World, TurnReport) {
     World::new(load(path))
@@ -100,7 +100,7 @@ fn sample_setting_at_turn_0() {
 
 #[test]
 fn sample_setting_steps() {
-    let (mut world, _) = world_of(&sample_setting());
+    let (mut world, mut previous) = world_of(&sample_setting());
     for t in 1..=3u64 {
         let report = world.step().unwrap();
         assert_eq!(report.turn, Turn::new(t));
@@ -109,7 +109,11 @@ fn sample_setting_steps() {
             pair("unimproved_copper", 10.0),
             pair("unimproved_grain", 24.0),
         ];
-        let labor = pair("unskilled_labor", 4100.0);
+        // The POPs are endowed by their grown sizes: 10 labor each individual.
+        let endowed = named(&world, &report.endowed);
+        assert_eq!(endowed.len(), 1);
+        assert_eq!(endowed[0].0, "unskilled_labor");
+        assert!((endowed[0].1 - 10.0 * previous.population.get()).abs() < 1e-9);
         // The POPs' labor is traded and consumed in the round, so only the hex stockpiles
         // (and slivers of rounding) perish.
         let perished = named(&world, &report.perished);
@@ -120,7 +124,6 @@ fn sample_setting_steps() {
             .collect();
         assert_eq!(big, both);
         assert_eq!(named(&world, &report.emitted), both);
-        assert_eq!(named(&world, &report.endowed), vec![labor]);
         assert_eq!(
             totals(&world, 0, 0),
             vec![
@@ -136,6 +139,7 @@ fn sample_setting_steps() {
             groups(&world, 0, 0, "unimproved_grain"),
             vec![(end(t), 12.0)]
         );
+        previous = report;
     }
 }
 
@@ -180,6 +184,7 @@ fn reports_match_the_expected_numbers() {
     assert!(report.perished.is_empty());
     assert!(report.endowed.is_empty());
     assert!(report.sold.is_empty() && report.bought.is_empty() && report.consumed.is_empty());
+    assert_eq!(report.population, Quantity::ZERO);
     assert_eq!(named(&world, &report.emitted), emitted);
     for t in 1..=4u64 {
         let report = world.step().unwrap();
@@ -195,6 +200,7 @@ fn reports_match_the_expected_numbers() {
             report.sold.is_empty() && report.bought.is_empty() && report.consumed.is_empty(),
             "turn {t}"
         );
+        assert_eq!(report.population, Quantity::ZERO, "turn {t}");
     }
     assert!(world.pops().is_empty());
 }
@@ -262,6 +268,7 @@ fn worlds_without_deposits_stay_empty() {
                 && report.consumed.is_empty(),
             "{name}"
         );
+        assert_eq!(report.population, Quantity::ZERO, "{name}");
         for _ in 0..3 {
             let report = world.step().unwrap();
             assert!(
@@ -273,6 +280,7 @@ fn worlds_without_deposits_stay_empty() {
                     && report.consumed.is_empty(),
                 "{name}"
             );
+            assert_eq!(report.population, Quantity::ZERO, "{name}");
         }
         assert!(world.pops().is_empty(), "{name}");
         assert_eq!(world.map().len(), if name == "hexes_one" { 1 } else { 0 });

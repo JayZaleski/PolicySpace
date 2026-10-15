@@ -2,28 +2,34 @@
 name = "peasant"
 endowment = { labor = 10 }
 utility = { labor = { subsistence = 2, share = 0.2 }, grain = { subsistence = 2, share = 0.8 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }
 
 [[pop_type]]
 name = "artisan"
 endowment = { labor = 10 }
 utility = { labor = { subsistence = 1, share = 1 }, grain = { subsistence = 2, share = 4 }, copper = { share = 5 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }
 
 [[pop_type]]
 name = "saver"
 endowment = { labor = 10, silver = 5 }
 utility = { labor = { subsistence = 2, share = 0.2 }, grain = { subsistence = 2, share = 0.8 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }
 
 [[pop_type]]
 name = "collector"
 endowment = { labor = 10, gem = 1 }
 utility = { labor = { subsistence = 2, share = 0.2 }, grain = { subsistence = 2, share = 0.8 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }
 
 [[pop_type]]
 name = "miser"
 endowment = { labor = 10 }
 utility = { labor = { subsistence = 2, share = 0 }, copper = { share = 1 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }
 
 [[pop_type]]
 name = "idle"
 endowment = {}
 utility = { grain = { share = 1 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }

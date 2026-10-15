@@ -13,3 +13,8 @@ share = 0.5
 
 [pop_type.utility.grain]
 share = 1.5
+
+[pop_type.growth]
+growth = [0.03]
+decline = 0
+max_growth = 1

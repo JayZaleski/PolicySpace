@@ -1,5 +1,5 @@
 # POP types: the kinds of individual in a POP. Every POP type comes from a [[pop_type]]
-# section here. A POP type needs three keys:
+# section here. A POP type needs four keys:
 #
 #   name       The type's name (lowercase snake_case).
 #   endowment  The goods one individual receives at the start of every turn: a table of
@@ -11,6 +11,18 @@
 #                share        Its weight when spending whatever is left beyond subsistence.
 #              A good needs a positive subsistence or a positive share, and at least one
 #              good needs a positive share.
+#   growth     How the POP's size N changes each turn, a sub-table with three keys:
+#                growth      A list of one or more polynomial coefficients c1, c2, ...
+#                            Above subsistence the rate is c1*u + c2*u^2 + ..., where u is
+#                            the POP's subsistence index: the number of extra subsistence
+#                            bundles its income could buy (0 at exactly subsistence).
+#                decline     A number from 0 up to but not including 1: the rate at u = -1
+#                            (a POP with nothing). Below subsistence the rate is
+#                            decline * u, a linear decline.
+#                max_growth  A number of at least 0: the cap on growth.
+#              The rate is clamped to [-decline, max_growth], and N becomes N * (1 + rate),
+#              so a POP shrinks geometrically but never disappears. growth = [0] and
+#              decline = 0 freeze a type's size.
 #
 # Shares are weights: the engine normalizes them to sum to 1 over the type's utility goods,
 # so shares of 1, 4 and 5 mean 10%, 40% and 50%. A good with share 0 and a positive
@@ -37,6 +49,13 @@ share = 0.2
 subsistence = 2
 share = 0.8
 
+# Growth peaks at u = 1 (3% a turn), crosses zero at u = 2, and is capped at 5%. A POP
+# with nothing shrinks 10% a turn. A peasant at these prices (u = 2/3) grows about 2.7%.
+[pop_type.growth]
+growth = [0.06, -0.03]
+decline = 0.1
+max_growth = 0.05
+
 # Artisans keep less leisure and weight copper heavily. The shares are weights: 1, 4 and 5
 # become 0.1, 0.4 and 0.5.
 [[pop_type]]
@@ -53,3 +72,10 @@ share = 4
 
 [pop_type.utility.copper]
 share = 5
+
+# Growth peaks at u = 1 (3% a turn), crosses zero at u = 2, and is capped at 5%. A POP
+# with nothing shrinks 10% a turn. An artisan at these prices (u = 1) grows 3%.
+[pop_type.growth]
+growth = [0.06, -0.03]
+decline = 0.1
+max_growth = 0.05

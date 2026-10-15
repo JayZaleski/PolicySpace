@@ -21,7 +21,8 @@
 //!
 //! The budget balances up to floating-point rounding: the demanded tradable goods are worth
 //! the income. The function does no rounding. The trade round (the [`trade`](crate::trade)
-//! module) calls it for every POP each turn. It knows nothing about the world or files;
+//! module) calls it for every POP each turn, and the [`growth`](crate::growth) module builds
+//! the subsistence index from a [`Demand`]. It knows nothing about the world or files;
 //! prices come in through the [`PriceList`] trait and holdings as any list of goods and
 //! amounts.
 
@@ -242,6 +243,7 @@ pub fn demand(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pops::GrowthParams;
 
     const LABOR: u32 = 0;
     const GRAIN: u32 = 1;
@@ -250,6 +252,10 @@ mod tests {
 
     fn good(index: u32) -> GoodId {
         GoodId::from_index(index)
+    }
+
+    fn no_growth() -> GrowthParams {
+        GrowthParams::new(vec![0.0], 0.0, 0.0)
     }
 
     fn q(value: f64) -> Quantity {
@@ -297,6 +303,7 @@ mod tests {
         PopType::new(
             vec![(good(LABOR), q(10.0))],
             vec![(good(LABOR), q(2.0), 0.2), (good(GRAIN), q(2.0), 0.8)],
+            no_growth(),
         )
     }
 
@@ -307,6 +314,7 @@ mod tests {
                 .iter()
                 .map(|&(g, s, w)| (good(g), q(s), w))
                 .collect(),
+            no_growth(),
         )
     }
 
