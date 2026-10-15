@@ -64,7 +64,7 @@
 - Description: Define POP types in the rules: the endowment each individual receives per turn (any goods, intended to be only unskilled labor; other goods exist for testing), and the Stone-Geary parameters (subsistence and share per named good, shares normalized by the engine). Leisure is an endowed good appearing in the utility function, so it needs no special case. Validate the parameters and check their references to goods. Add POP types to the sample setting.
 
 ### Step 04: pops
-- Status: planned
+- Status: specified
 - Tags: #pops #setting-data #turn-loop
 - Description: Place POPs in the starting state: hex, POP type, and size N. Each POP owns its own stockpile of goods. At the start of each turn every POP's endowment is emitted into its stockpile. POPs start with no cash. Add POPs to the sample setting.
 
