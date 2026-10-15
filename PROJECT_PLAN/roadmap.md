@@ -79,7 +79,7 @@
 - Description: The first behavior in the "actors act" part of the turn, shaped as the live market expects. Each POP hands the hex's market a submission: its Stone-Geary parameters and its endowment. The market posts its prices (fixed, from the dummy data). Demand is computed from the submission against those prices; the POP sells the endowment it doesn't keep as leisure, then buys goods with the proceeds, so sales settle before purchases. The POP then consumes what it demanded. Currency left over by rounding stays in the stockpile and is income next turn. The turn report gains POP totals. Design question: whether the market or the POP computes demand from the submission (leaning market-side, so Stage 05 replaces market internals only).
 
 ### Step 07: pop-growth
-- Status: planned
+- Status: specified
 - Tags: #pops #turn-loop #setting-data
 - Description: Each POP's size N grows or shrinks by a rate that is a function of its utility: zero at subsistence, positive above, negative below. The function's parameters live in the setting. Per-individual parameters don't change; next turn's endowment follows the new N.
 
