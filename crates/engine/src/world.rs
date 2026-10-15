@@ -4,7 +4,8 @@
 //!   resource types, POP types) never change. The world holds what does: the clock, the
 //!   hexes, the deposits, the POPs, each hex's currency, each hex's posted prices, one
 //!   stockpile of unowned goods per hex, and one stockpile per POP (empty when the world
-//!   is created; a POP's first endowment arrives at the start of turn 0). Hexes,
+//!   is created; a POP's first endowment arrives at the start of turn 0), and each POP's
+//!   latest trade outcome (what it demanded, sold, bought and consumed). Hexes,
 //!   currencies, deposits and POPs don't change yet, but they are world state because later
 //!   Steps change them (deposit ownership in Stage 02, POP size in Step 07). The posted
 //!   prices don't change yet either; [`World::market`] hands out each hex's market view,
@@ -13,14 +14,20 @@
 //!   1. start of turn: every deposit emits its type's `output` of its good into its hex's
 //!      stockpile, then every POP receives its type's endowment times its size into its
 //!      own stockpile;
-//!   2. actors act: nothing yet, and later Stages add industries and markets here;
+//!   2. actors act: the trade round and consumption. On every hex each POP submits its
+//!      parameters and holdings, the market computes demand and settles sales before
+//!      purchases, and each POP consumes (see the [`trade`](crate::trade) module). Later
+//!      Stages add industries and the live market here;
 //!   3. end of turn: whatever perishes at the end of this turn is removed, from the hex
 //!      stockpiles and then the POP stockpiles.
-//! - [`World::new`] puts the world at turn 0 and runs turn 0's start. [`World::step`] ends
-//!   the current turn, advances the clock, and starts the next one. Between calls the world
-//!   is always at part 2, where this turn's output and endowment are in the stockpiles and
-//!   nothing has perished yet this turn.
-//! - Deposits emit in deposit ID order, POPs are endowed in POP ID order, and stockpiles
+//! - [`World::new`] puts the world at turn 0 and runs turn 0's start and turn 0's trade
+//!   round. [`World::step`] ends the current turn, advances the clock, and starts the next
+//!   one, trade round included. The world keeps each POP's outcome of the current turn's
+//!   round ([`World::pop_outcome`]). Between calls the world is always after part 2, where
+//!   this turn's trade is done and nothing has perished yet this turn.
+//! - Deposits emit in deposit ID order, POPs are endowed in POP ID order, trade runs on
+//!   hexes in hex ID order, POPs in ID order within a hex and goods in ID order within a
+//!   POP, with every sale before every purchase and then consumption, and stockpiles
 //!   iterate in a fixed order, so the same setting stepped the same number of times always
 //!   gives the same world and reports.
 //! - Stage 02 will send an owned deposit's output to its owner instead of the hex
@@ -40,6 +47,7 @@ use crate::quantity::Quantity;
 use crate::resources::Deposits;
 use crate::setting::{LoadedSetting, Manifest, Rules};
 use crate::stockpile::{PerishesAt, Stockpile};
+use crate::trade::{PopOutcome, RefusedTrade, Submission, hex_round};
 use crate::turn::Turn;
 
 /// What happened in one step (or in creating the world).
@@ -56,6 +64,13 @@ pub struct TurnReport {
     /// Total received by POPs as endowment per good at the start of `turn`, in good ID
     /// order, only amounts > 0.
     pub endowed: Vec<(GoodId, Quantity)>,
+    /// Total sold by POPs per good in the trade round of `turn`, on every hex, in good ID
+    /// order, only amounts > 0.
+    pub sold: Vec<(GoodId, Quantity)>,
+    /// Total bought by POPs per good in the trade round of `turn`, likewise.
+    pub bought: Vec<(GoodId, Quantity)>,
+    /// Total consumed by POPs per good after the trade round of `turn`, likewise.
+    pub consumed: Vec<(GoodId, Quantity)>,
 }
 
 /// Why a step was refused.
@@ -97,10 +112,14 @@ pub struct World {
     pops: Pops,
     /// One per POP, by `PopId`. Empty when the world is created.
     pop_stockpiles: IdVec<PopKind, Stockpile>,
+    /// One per POP, by `PopId`: the outcome of the current turn's trade round. Rebuilt
+    /// every turn.
+    pop_outcomes: IdVec<PopKind, PopOutcome>,
 }
 
 impl World {
-    /// Builds a world from `setting` at turn 0 and runs turn 0's emission.
+    /// Builds a world from `setting` at turn 0 and runs turn 0's start and turn 0's trade
+    /// round.
     /// Returns the world and turn 0's report.
     pub fn new(setting: LoadedSetting) -> (World, TurnReport) {
         let LoadedSetting {
@@ -121,14 +140,19 @@ impl World {
             hex_stockpiles,
             pops: start.pops,
             pop_stockpiles,
+            pop_outcomes: IdVec::from_vec(Vec::new()),
         };
         let emitted = world.emit();
         let endowed = world.endow();
+        let (sold, bought, consumed) = world.trade();
         let report = TurnReport {
             turn: world.turn,
             perished: Vec::new(),
             emitted,
             endowed,
+            sold,
+            bought,
+            consumed,
         };
         (world, report)
     }
@@ -141,11 +165,15 @@ impl World {
         self.turn = next;
         let emitted = self.emit();
         let endowed = self.endow();
+        let (sold, bought, consumed) = self.trade();
         Ok(TurnReport {
             turn: self.turn,
             perished,
             emitted,
             endowed,
+            sold,
+            bought,
+            consumed,
         })
     }
 
@@ -228,6 +256,15 @@ impl World {
         self.pop_stockpiles.get(pop)
     }
 
+    /// The outcome of the current turn's trade round for `pop`: its demand, what it sold,
+    /// bought and consumed, and the currency it carried over.
+    ///
+    /// # Panics
+    /// Panics if `pop` isn't from this world's POPs.
+    pub fn pop_outcome(&self, pop: PopId) -> &PopOutcome {
+        self.pop_outcomes.get(pop)
+    }
+
     /// Start of turn: every deposit, in ID order, adds its type's output to its hex's
     /// stockpile. Returns the total emitted per good, in good ID order.
     fn emit(&mut self) -> Vec<(GoodId, Quantity)> {
@@ -260,6 +297,73 @@ impl World {
             }
         }
         totals_by_good(endowed)
+    }
+
+    /// Part 2 of the turn, after `endow`: runs the trade round and consumption on every
+    /// hex in hex ID order, records every POP's outcome, and returns the totals
+    /// (sold, bought, consumed) per good, each in good ID order.
+    #[allow(clippy::type_complexity)]
+    fn trade(
+        &mut self,
+    ) -> (
+        Vec<(GoodId, Quantity)>,
+        Vec<(GoodId, Quantity)>,
+        Vec<(GoodId, Quantity)>,
+    ) {
+        let mut outcomes: Vec<Option<PopOutcome>> = (0..self.pops.len()).map(|_| None).collect();
+        let mut sold = Vec::new();
+        let mut bought = Vec::new();
+        let mut consumed = Vec::new();
+        for (hex, _) in self.map.iter() {
+            let ids = self.pops.on_hex(hex);
+            if ids.is_empty() {
+                continue;
+            }
+            let market = Market::new(
+                hex,
+                &self.rules.goods,
+                self.hex_currencies.get(hex),
+                self.hex_prices.list(hex),
+                self.turn,
+            );
+            let mut submissions: Vec<Submission<'_>> = ids
+                .iter()
+                .map(|id| {
+                    let pop = self.pops.get(*id);
+                    Submission {
+                        pop_type: self.rules.pop_types.get(pop.pop_type),
+                        size: pop.size,
+                        stockpile: std::mem::take(self.pop_stockpiles.get_mut(*id)),
+                    }
+                })
+                .collect();
+            let results = match hex_round(&market, &mut submissions) {
+                Ok(results) => results,
+                Err(RefusedTrade { submission, error }) => panic!(
+                    "engine bug: the market on hex #{} refused a trade for POP #{}: {error}",
+                    hex.index(),
+                    ids[submission].index()
+                ),
+            };
+            for ((id, submission), outcome) in ids.iter().zip(submissions).zip(results) {
+                *self.pop_stockpiles.get_mut(*id) = submission.stockpile;
+                sold.extend_from_slice(outcome.sold());
+                bought.extend_from_slice(outcome.bought());
+                consumed.extend_from_slice(outcome.consumed());
+                outcomes[id.index()] = Some(outcome);
+            }
+        }
+        self.pop_outcomes = IdVec::from_vec(
+            outcomes
+                .into_iter()
+                .map(|o| o.expect("every POP is on exactly one hex"))
+                .collect(),
+        );
+        (
+            totals_by_good(sold),
+            totals_by_good(bought),
+            totals_by_good(consumed),
+        )
     }
 
     /// End of turn: removes whatever perishes at the end of the current turn from every
@@ -326,10 +430,12 @@ mod tests {
             world.turn = Turn::MAX;
             let before: IdVec<HexKind, Stockpile> = world.hex_stockpiles.clone();
             let pops_before: IdVec<PopKind, Stockpile> = world.pop_stockpiles.clone();
+            let outcomes_before: IdVec<PopKind, PopOutcome> = world.pop_outcomes.clone();
             assert_eq!(world.step(), Err(StepError::ClockAtMaximum));
             assert_eq!(world.turn(), Turn::MAX);
             assert_eq!(world.hex_stockpiles, before);
             assert_eq!(world.pop_stockpiles, pops_before);
+            assert_eq!(world.pop_outcomes, outcomes_before);
         }
     }
 }

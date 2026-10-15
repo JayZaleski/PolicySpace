@@ -20,9 +20,10 @@
 //!   cost) of its subsistence amount, and everything else tradable gets zero.
 //!
 //! The budget balances up to floating-point rounding: the demanded tradable goods are worth
-//! the income. The function does no rounding. Nothing calls it during the turn yet (the POP
-//! trade step does). It knows nothing about the world or files; prices come in through the
-//! [`PriceList`] trait and holdings as any list of goods and amounts.
+//! the income. The function does no rounding. The trade round (the [`trade`](crate::trade)
+//! module) calls it for every POP each turn. It knows nothing about the world or files;
+//! prices come in through the [`PriceList`] trait and holdings as any list of goods and
+//! amounts.
 
 use std::collections::BTreeMap;
 

@@ -66,7 +66,7 @@ No setting file changes, and the sample setting is unchanged. `check --turns` an
 - A fresh sample world has already run turn 0's trade round: a typical-hex peasant POP's stockpile holds no labor and no grain, and at most a rounding sliver of silver; its recorded outcome shows 7.2 labor sold, 3.6 grain bought, and 2.8 labor and 3.6 grain consumed per individual, times its size.
 - The center artisan POP's outcome shows 8.5 labor sold and 3 grain and 0.5 copper bought and consumed per individual, times its size.
 - The north-east peasant POP (no market) sells and buys nothing, consumes its whole labor endowment, and its recorded demand reports grain below subsistence.
-- Stepping the sample world repeats the same outcomes every turn, and two worlds from the same setting stepped the same number of times are identical, outcomes and reports included.
+- Stepping the sample world repeats the same outcomes every turn up to floating-point rounding (the silver sliver carried over is income next turn), and two worlds from the same setting stepped the same number of times are identical, outcomes and reports included.
 - Every POP's purchases are capped at its currency: in a test where the budget's floating-point rounding would leave the last purchase a sliver short, the purchase is reduced rather than refused, and the leftover currency is in the stockpile and counts as income next turn.
 - Currency carried over counts as income: a test POP that starts a turn with currency in its stockpile has a demand with that currency included in its income and buys accordingly.
 - On a test hex with two POPs, every sale on the hex is settled before any purchase, and the result is the same as the per-POP order would give with the dummy market.

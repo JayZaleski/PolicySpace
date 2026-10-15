@@ -50,7 +50,20 @@ Valid settings:
   (1, 0), (2, 0), each with currency `gold`; a `field` (output 2 `grain`) at (2, 0). POP
   types: `worker` (endows 10 `labor`), `hoarder` (endows 4 `labor` and 1.5 `gold`), `idle`
   (empty endowment). POPs: 0 `worker` at (0, 0) size 3; 1 `hoarder` at (0, 0) size 2; 2
-  `worker` at (1, 0) size 0.5 (fractional); 3 `idle` at (1, 0) size 7; (2, 0) has none.
+  `worker` at (1, 0) size 0.5 (fractional); 3 `idle` at (1, 0) size 7; (2, 0) has none. The
+  hoarder's utility is `grain`, so its `gold` is parked and accumulates and its `labor` is
+  not consumed; the workers consume their `labor` (their utility). No hex has a market.
+- `pops_trade`: for the POP trade round (`crates/engine/tests/trade.rs` and the unit tests
+  in `crates/engine/src/trade.rs`). Goods (IDs 0-4): `labor` (perishes after 1), `grain`
+  (perishes after 3), `copper`, `silver`, `gem` (durable). Hexes (0, 0) to (4, 0), every one
+  with currency `silver`. Markets: (0, 0) `labor` 1, `grain` 2, `copper` 5; (1, 0) `labor` 1,
+  `grain` 10; (2, 0) none; (3, 0) `labor` 1, `grain` 2; (4, 0) `labor` 1, `grain` 2,
+  `copper` 5. POP types: `peasant` (labor 10; labor and grain), `artisan` (labor 10; labor,
+  grain, copper), `saver` (labor 10 and silver 5; as peasant), `collector` (labor 10 and gem
+  1; as peasant), `miser` (labor 10; labor with share 0, copper), `idle` (empty endowment;
+  grain). POPs: 0 `peasant` at (0, 0) size 2; 1 `artisan` at (0, 0) size 1; 2 `peasant` at
+  (1, 0) size 1; 3 `idle` at (1, 0) size 3; 4 `peasant` at (2, 0) size 1; 5 `saver`, 6
+  `miser`, 7 `collector` at (3, 0) size 1; (4, 0) has a market and no POPs.
 
 Folder-structure errors:
 - `missing_manifest`, `missing_rules`, `missing_start`: a required entry is absent.

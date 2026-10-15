@@ -310,7 +310,7 @@ mod tests {
         assert_eq!(
             session.log(),
             [
-                "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor"
+                "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain"
             ]
         );
         assert_eq!(session.step_error(), None);
@@ -327,7 +327,7 @@ mod tests {
         assert_eq!(
             session.log().last().map(String::as_str),
             Some(
-                "Turn 1: perished 4100 unskilled_labor, 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor"
+                "Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain"
             )
         );
         assert_eq!(session.step(STEP_MANY), 10);

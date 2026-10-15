@@ -1,0 +1,47 @@
+[[pop]]
+type = "peasant"
+q = 0
+r = 0
+size = 2
+
+[[pop]]
+type = "artisan"
+q = 0
+r = 0
+size = 1
+
+[[pop]]
+type = "peasant"
+q = 1
+r = 0
+size = 1
+
+[[pop]]
+type = "idle"
+q = 1
+r = 0
+size = 3
+
+[[pop]]
+type = "peasant"
+q = 2
+r = 0
+size = 1
+
+[[pop]]
+type = "saver"
+q = 3
+r = 0
+size = 1
+
+[[pop]]
+type = "miser"
+q = 3
+r = 0
+size = 1
+
+[[pop]]
+type = "collector"
+q = 3
+r = 0
+size = 1

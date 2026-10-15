@@ -3,8 +3,9 @@
 //! bought appear from nothing, and currency likewise. A good with no posted price isn't
 //! traded on that hex; the hex's currency has price 1 and can't be traded against itself.
 //! A `Market` is a [`PriceList`], so the [`demand`](crate::demand) module can compute a POP's
-//! demand against it. This is the seam Stage 05 replaces with the live market. Prices are starting state and
-//! nothing changes them yet. Knows nothing about files.
+//! demand against it. The trade round in the [`trade`](crate::trade) module uses the
+//! exchange. This is the seam Stage 05 replaces with the live market. Prices are starting
+//! state and nothing changes them yet. Knows nothing about files.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -274,6 +275,23 @@ impl<'a> Market<'a> {
         Ok((sold, received))
     }
 
+    /// Sells everything of `good` above `keep` from `stockpile` (soonest-perishing first), so
+    /// that `keep` remains, and adds the proceeds in currency. Returns (amount sold, currency
+    /// received); (0, 0) if the stockpile holds `keep` or less. Same refusals as
+    /// [`Market::sell`] except `NotEnoughGoods`.
+    pub fn sell_down_to(
+        &self,
+        stockpile: &mut Stockpile,
+        good: GoodId,
+        keep: Quantity,
+    ) -> Result<(Quantity, Quantity), TradeError> {
+        let price = self.trade_price(good)?;
+        let sold = stockpile.retain(good, keep);
+        let received = sold.saturating_mul(price);
+        stockpile.add(self.currency, received, self.perishes_at(self.currency));
+        Ok((sold, received))
+    }
+
     /// Buys `amount` of `good` into `stockpile`: removes `amount * price` of the currency
     /// and adds the good, perishing as a good added this turn does. Returns the currency
     /// paid.
@@ -303,6 +321,38 @@ impl<'a> Market<'a> {
         }
         stockpile.add(good, amount, self.perishes_at(good));
         Ok(needed)
+    }
+
+    /// Spends exactly `spend` of the currency from `stockpile` on `good`, adding
+    /// `spend / price` of it, perishing as a good added this turn does. Returns the amount
+    /// bought (zero for a zero spend). Refuses `NotEnoughCurrency` if the stockpile holds
+    /// less than `spend`; same other refusals as [`Market::buy`].
+    pub fn buy_for(
+        &self,
+        stockpile: &mut Stockpile,
+        good: GoodId,
+        spend: Quantity,
+    ) -> Result<Quantity, TradeError> {
+        let price = self.trade_price(good)?;
+        let held = stockpile.total(self.currency);
+        if held < spend {
+            return Err(TradeError::NotEnoughCurrency {
+                currency: self.currency,
+                held,
+                needed: spend,
+            });
+        }
+        if let Err(held) = stockpile.remove(self.currency, spend) {
+            // Can't happen after the check above; refuse rather than panic.
+            return Err(TradeError::NotEnoughCurrency {
+                currency: self.currency,
+                held,
+                needed: spend,
+            });
+        }
+        let amount = spend.checked_div(price).unwrap_or(Quantity::ZERO);
+        stockpile.add(good, amount, self.perishes_at(good));
+        Ok(amount)
     }
 }
 

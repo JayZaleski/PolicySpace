@@ -74,7 +74,7 @@
 - Description: The closed-form Stone-Geary demand: given prices and the endowment, the quantity of each good a POP wants, including the endowed goods it keeps as leisure. Includes the below-subsistence rule: a POP whose full income can't cover its subsistence bundle spends everything, buying toward subsistence. A pure function with its own tests, not yet wired into the turn.
 
 ### Step 06: pop-trade
-- Status: specified
+- Status: done
 - Tags: #pops #market #turn-loop
 - Description: The first behavior in the "actors act" part of the turn, shaped as the live market expects. Each POP hands the hex's market a submission: its Stone-Geary parameters and its endowment. The market posts its prices (fixed, from the dummy data). Demand is computed from the submission against those prices; the POP sells the endowment it doesn't keep as leisure, then buys goods with the proceeds, so sales settle before purchases. The POP then consumes what it demanded. Currency left over by rounding stays in the stockpile and is income next turn. The turn report gains POP totals. Design question: whether the market or the POP computes demand from the submission (leaning market-side, so Stage 05 replaces market internals only).
 

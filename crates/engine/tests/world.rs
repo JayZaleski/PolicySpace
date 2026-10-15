@@ -110,9 +110,15 @@ fn sample_setting_steps() {
             pair("unimproved_grain", 24.0),
         ];
         let labor = pair("unskilled_labor", 4100.0);
-        let mut perished = vec![labor.clone()];
-        perished.extend(both.clone());
-        assert_eq!(named(&world, &report.perished), perished);
+        // The POPs' labor is traded and consumed in the round, so only the hex stockpiles
+        // (and slivers of rounding) perish.
+        let perished = named(&world, &report.perished);
+        let big: Vec<_> = perished
+            .iter()
+            .filter(|(_, a)| *a >= 1e-9)
+            .cloned()
+            .collect();
+        assert_eq!(big, both);
         assert_eq!(named(&world, &report.emitted), both);
         assert_eq!(named(&world, &report.endowed), vec![labor]);
         assert_eq!(
@@ -173,6 +179,7 @@ fn reports_match_the_expected_numbers() {
     let emitted = vec![pair("daily", 6.5), pair("stew", 5.0), pair("gold", 1.5)];
     assert!(report.perished.is_empty());
     assert!(report.endowed.is_empty());
+    assert!(report.sold.is_empty() && report.bought.is_empty() && report.consumed.is_empty());
     assert_eq!(named(&world, &report.emitted), emitted);
     for t in 1..=4u64 {
         let report = world.step().unwrap();
@@ -184,6 +191,10 @@ fn reports_match_the_expected_numbers() {
         assert_eq!(named(&world, &report.perished), perished, "turn {t}");
         assert_eq!(named(&world, &report.emitted), emitted, "turn {t}");
         assert!(report.endowed.is_empty(), "turn {t}");
+        assert!(
+            report.sold.is_empty() && report.bought.is_empty() && report.consumed.is_empty(),
+            "turn {t}"
+        );
     }
     assert!(world.pops().is_empty());
 }
@@ -243,7 +254,12 @@ fn worlds_without_deposits_stay_empty() {
     for name in ["valid_minimal", "hexes_one"] {
         let (mut world, report) = world_of(&test_setting(name));
         assert!(
-            report.perished.is_empty() && report.emitted.is_empty() && report.endowed.is_empty(),
+            report.perished.is_empty()
+                && report.emitted.is_empty()
+                && report.endowed.is_empty()
+                && report.sold.is_empty()
+                && report.bought.is_empty()
+                && report.consumed.is_empty(),
             "{name}"
         );
         for _ in 0..3 {
@@ -251,7 +267,10 @@ fn worlds_without_deposits_stay_empty() {
             assert!(
                 report.perished.is_empty()
                     && report.emitted.is_empty()
-                    && report.endowed.is_empty(),
+                    && report.endowed.is_empty()
+                    && report.sold.is_empty()
+                    && report.bought.is_empty()
+                    && report.consumed.is_empty(),
                 "{name}"
             );
         }

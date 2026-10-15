@@ -10,7 +10,8 @@
 //! - A stockpile lists only goods it holds a positive amount of.
 //! - Only the engine changes stockpiles. Goods enter by emission and leave by perishing.
 //!   They also leave by removal, soonest-perishing group first, which the
-//!   [`market`](crate::market) uses to sell goods and pay currency.
+//!   [`market`](crate::market) uses to sell goods and pay currency, by sale down to a kept
+//!   amount, and by consumption (see the [`trade`](crate::trade) module).
 
 use std::collections::BTreeMap;
 
@@ -145,6 +146,48 @@ impl Stockpile {
             }
         }
         Ok(())
+    }
+
+    /// Removes everything of `good` above `keep`, taking from the group that perishes
+    /// soonest first, and returns the amount removed (zero, changing nothing, if it holds
+    /// `keep` or less). When the kept amount lies in a single group, exactly `keep`
+    /// remains. Crate-private.
+    pub(crate) fn retain(&mut self, good: GoodId, keep: Quantity) -> Quantity {
+        if self.total(good) <= keep {
+            return Quantity::ZERO;
+        }
+        let Some(groups) = self.goods.get_mut(&good) else {
+            return Quantity::ZERO;
+        };
+        let mut removed = Quantity::ZERO;
+        let mut kept = Quantity::ZERO;
+        let mut boundary_found = false;
+        let order: Vec<PerishesAt> = groups.keys().rev().copied().collect();
+        for at in order {
+            let Some(group) = groups.get(&at).copied() else {
+                continue;
+            };
+            if boundary_found {
+                groups.remove(&at);
+                removed = removed.saturating_add(group);
+            } else if kept.saturating_add(group) <= keep {
+                kept = kept.saturating_add(group);
+            } else {
+                boundary_found = true;
+                let new_amount = keep.checked_sub(kept).unwrap_or(Quantity::ZERO);
+                if new_amount > Quantity::ZERO {
+                    groups.insert(at, new_amount);
+                } else {
+                    groups.remove(&at);
+                }
+                removed =
+                    removed.saturating_add(group.checked_sub(new_amount).unwrap_or(Quantity::ZERO));
+            }
+        }
+        if groups.is_empty() {
+            self.goods.remove(&good);
+        }
+        removed
     }
 
     /// Removes every unit of `good` and returns the total removed (zero if it held none).
@@ -403,5 +446,55 @@ mod tests {
         let before = s.clone();
         assert_eq!(s.remove_all(good(7)), Quantity::ZERO);
         assert_eq!(s, before);
+    }
+
+    #[test]
+    fn retain_removes_everything_above_keep_from_the_soonest_group_first() {
+        let mut s = Stockpile::new();
+        s.add(good(0), q(4.0), end(1));
+        s.add(good(0), q(6.0), end(2));
+        assert_eq!(s.retain(good(0), q(7.0)), q(3.0));
+        let groups: Vec<_> = s.groups(good(0)).collect();
+        assert_eq!(groups, vec![(end(1), q(1.0)), (end(2), q(6.0))]);
+    }
+
+    #[test]
+    fn retain_leaves_exactly_keep_in_a_single_group() {
+        let mut s = Stockpile::new();
+        s.add(good(0), q(10.0), end(1));
+        let removed = s.retain(good(0), q(2.8));
+        let groups: Vec<_> = s.groups(good(0)).collect();
+        assert_eq!(groups, vec![(end(1), q(2.8))]);
+        assert_eq!(removed, q(10.0).checked_sub(q(2.8)).unwrap());
+    }
+
+    #[test]
+    fn retain_with_zero_keep_removes_the_good() {
+        let mut s = mixed();
+        assert_eq!(s.retain(good(0), Quantity::ZERO), q(9.0));
+        assert_eq!(s.groups(good(0)).count(), 0);
+        let listed: Vec<_> = s.iter().collect();
+        assert_eq!(listed, vec![(good(1), q(1.0))]);
+    }
+
+    #[test]
+    fn retain_at_or_below_keep_changes_nothing() {
+        let mut s = mixed();
+        let before = s.clone();
+        assert_eq!(s.retain(good(0), q(9.0)), Quantity::ZERO);
+        assert_eq!(s, before);
+        assert_eq!(s.retain(good(0), q(12.0)), Quantity::ZERO);
+        assert_eq!(s.retain(good(7), q(1.0)), Quantity::ZERO);
+        assert_eq!(s, before);
+    }
+
+    #[test]
+    fn retain_drops_whole_groups_when_keep_falls_on_a_boundary() {
+        let mut s = Stockpile::new();
+        s.add(good(0), q(4.0), end(1));
+        s.add(good(0), q(6.0), end(2));
+        assert_eq!(s.retain(good(0), q(6.0)), q(4.0));
+        let groups: Vec<_> = s.groups(good(0)).collect();
+        assert_eq!(groups, vec![(end(2), q(6.0))]);
     }
 }

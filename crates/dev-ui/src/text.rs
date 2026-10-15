@@ -41,14 +41,18 @@ fn list(world: &World, entries: &[(GoodId, Quantity)]) -> String {
 }
 
 /// The line printed for a turn, by `check` and in the window's turn log: what perished, what
-/// deposits emitted, and what POPs were endowed with, each a list or `nothing`.
+/// deposits emitted, what POPs were endowed with, and what POPs sold, bought and consumed,
+/// each a list or `nothing`.
 pub fn turn_line(world: &World, report: &TurnReport) -> String {
     format!(
-        "Turn {}: perished {}; emitted {}; endowed {}",
+        "Turn {}: perished {}; emitted {}; endowed {}; sold {}; bought {}; consumed {}",
         report.turn,
         list(world, &report.perished),
         list(world, &report.emitted),
-        list(world, &report.endowed)
+        list(world, &report.endowed),
+        list(world, &report.sold),
+        list(world, &report.bought),
+        list(world, &report.consumed)
     )
 }
 

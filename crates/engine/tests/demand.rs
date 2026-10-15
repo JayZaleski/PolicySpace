@@ -154,7 +154,7 @@ fn a_pop_on_a_hex_with_no_market_keeps_what_it_holds() {
 }
 
 #[test]
-fn a_pops_stockpile_is_a_valid_holdings_list() {
+fn the_recorded_demand_matches_the_pure_function() {
     let world = sample_world();
     let center = hex(&world, 0, 0);
     let peasant_id = world.rules().pop_types.id("peasant").unwrap();
@@ -164,17 +164,20 @@ fn a_pops_stockpile_is_a_valid_holdings_list() {
     let pop_type = world.rules().pop_types.get(peasant_id);
     let market = world.market(center);
 
-    let before = world.pop_stockpile(pop_id).clone();
-    let d = demand(
-        pop_type,
-        pop.size,
-        world.pop_stockpile(pop_id).iter(),
-        &market,
+    // The stockpile is empty after turn 0's trade round, so the demand to compare is the
+    // one the round recorded.
+    let labor = good(&world, "unskilled_labor");
+    let recorded = world.pop_outcome(pop_id).demand();
+    assert_eq!(recorded.get(labor).unwrap().held, q(600.0));
+    assert_quantities(
+        &world,
+        recorded,
+        &[("unskilled_labor", 168.0), ("grain", 216.0)],
     );
-    assert_quantities(&world, &d, &[("unskilled_labor", 168.0), ("grain", 216.0)]);
-    assert!(close(d.income().get(), 600.0));
-    assert_balances(&world, &d, CENTER);
-    assert_eq!(world.pop_stockpile(pop_id), &before);
+    assert!(close(recorded.income().get(), 600.0));
+    assert_balances(&world, recorded, CENTER);
+    let pure = demand(pop_type, pop.size, [(labor, q(600.0))], &market);
+    assert_eq!(recorded, &pure);
     assert_eq!(world.turn().get(), 0);
 }
 

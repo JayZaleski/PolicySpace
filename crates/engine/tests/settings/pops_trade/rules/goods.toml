@@ -1,0 +1,16 @@
+[[good]]
+name = "labor"
+perishes_after = 1
+
+[[good]]
+name = "grain"
+perishes_after = 3
+
+[[good]]
+name = "copper"
+
+[[good]]
+name = "silver"
+
+[[good]]
+name = "gem"

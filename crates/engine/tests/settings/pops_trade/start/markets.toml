@@ -1,0 +1,19 @@
+[[market]]
+q = 0
+r = 0
+prices = { labor = 1, grain = 2, copper = 5 }
+
+[[market]]
+q = 1
+r = 0
+prices = { labor = 1, grain = 10 }
+
+[[market]]
+q = 3
+r = 0
+prices = { labor = 1, grain = 2 }
+
+[[market]]
+q = 4
+r = 0
+prices = { labor = 1, grain = 2, copper = 5 }

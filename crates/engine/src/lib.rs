@@ -17,8 +17,10 @@
 //! utility parameters) are rules in the [`pops`] module. POPs (groups of individuals of a POP
 //! type, placed on hexes) live in the same module; each POP receives its type's endowment
 //! into its own stockpile every turn. The [`demand`] module computes a POP's Stone-Geary
-//! demand from its type's utility, its holdings and a hex's prices, as a pure function nothing
-//! calls during the turn yet.
+//! demand from its type's utility, its holdings and a hex's prices, as a pure function. The
+//! [`trade`] module runs each hex's trade round every turn: every POP submits its parameters
+//! and holdings, the market computes demand and settles sales then purchases, and the POP
+//! consumes; each POP's outcome is recorded.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -54,6 +56,8 @@ pub use setting::{
 };
 pub mod stockpile;
 pub use stockpile::{PerishesAt, Stockpile};
+pub mod trade;
+pub use trade::PopOutcome;
 pub mod turn;
 pub use turn::Turn;
 pub mod world;

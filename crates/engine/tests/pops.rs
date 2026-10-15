@@ -391,20 +391,21 @@ fn a_fresh_sample_world_endows_every_pop() {
     let (world, report) = world_of(&sample_setting());
     assert_eq!(world.turn(), Turn::ZERO);
     assert_eq!(world.pops().len(), 16);
+    let labor = good(&world, "unskilled_labor");
+    let silver = good(&world, "silver");
     for (id, pop) in world.pops().iter() {
-        let labor = 10.0 * pop.size.get();
+        // The endowment is traded and consumed in turn 0's round: the demand records what
+        // the POP held, and the stockpile keeps no labor and at most a sliver of silver.
+        let held = world.pop_outcome(id).demand().get(labor).unwrap().held;
         assert_eq!(
-            pop_totals(&world, id),
-            vec![pair("unskilled_labor", labor)],
+            held,
+            Quantity::new(10.0 * pop.size.get()).unwrap(),
             "POP {}",
             id.index()
         );
-        assert_eq!(
-            pop_groups(&world, id, "unskilled_labor"),
-            vec![(end(0), labor)],
-            "POP {}",
-            id.index()
-        );
+        let stockpile = world.pop_stockpile(id);
+        assert_eq!(stockpile.total(labor), Quantity::ZERO, "POP {}", id.index());
+        assert!(stockpile.total(silver).get() < 1e-9, "POP {}", id.index());
     }
     assert_eq!(
         hex_totals(&world, 0, 0),
@@ -428,20 +429,27 @@ fn a_fresh_sample_world_endows_every_pop() {
 }
 
 #[test]
-fn stepping_the_sample_re_endows_and_perishes_the_labor() {
+fn stepping_the_sample_re_endows_and_the_labor_is_used_up() {
     let (mut world, _) = world_of(&sample_setting());
     let (mut other, _) = world_of(&sample_setting());
-    for t in 1..=3u64 {
+    for _ in 1..=3u64 {
         let report = world.step().unwrap();
         assert_eq!(report, other.step().unwrap());
-        assert_eq!(
-            named(&world, &report.perished),
-            vec![
-                pair("unskilled_labor", 4100.0),
-                pair("unimproved_copper", 10.0),
-                pair("unimproved_grain", 24.0)
-            ]
+        let perished = named(&world, &report.perished);
+        assert!(
+            perished.iter().all(|(name, amount)| *amount < 1e-9
+                || name == "unimproved_copper"
+                || name == "unimproved_grain"),
+            "{perished:?}"
         );
+        let amount_of = |name: &str| {
+            perished
+                .iter()
+                .find(|(n, _)| n == name)
+                .map_or(0.0, |(_, a)| *a)
+        };
+        assert_eq!(amount_of("unimproved_copper"), 10.0);
+        assert_eq!(amount_of("unimproved_grain"), 24.0);
         assert_eq!(
             named(&world, &report.emitted),
             vec![
@@ -454,13 +462,11 @@ fn stepping_the_sample_re_endows_and_perishes_the_labor() {
             vec![pair("unskilled_labor", 4100.0)]
         );
         let center = pop_id(7, &world);
-        assert_eq!(
-            pop_totals(&world, center),
-            vec![pair("unskilled_labor", 600.0)]
-        );
-        assert_eq!(
-            pop_groups(&world, center, "unskilled_labor"),
-            vec![(end(t), 600.0)]
+        assert!(pop_groups(&world, center, "unskilled_labor").is_empty());
+        assert!(
+            pop_totals(&world, center)
+                .iter()
+                .all(|(name, amount)| name == "silver" && *amount < 1e-9)
         );
         for (id, _) in world.pops().iter() {
             assert_eq!(world.pop_stockpile(id), other.pop_stockpile(id));
@@ -522,11 +528,9 @@ fn the_pops_placed_world_endows_durable_and_perishable_goods() {
         pop_id(3, &world),
     );
     let check = |world: &World, t: u64| {
-        assert_eq!(
-            pop_groups(world, p0, "labor"),
-            vec![(end(t), 30.0)],
-            "turn {t}"
-        );
+        // The workers' labor is consumed in the trade round; the hoarder's is not in its
+        // utility and stays.
+        assert!(pop_groups(world, p0, "labor").is_empty(), "turn {t}");
         assert!(pop_groups(world, p0, "gold").is_empty(), "turn {t}");
         assert_eq!(
             pop_groups(world, p1, "labor"),
@@ -538,11 +542,7 @@ fn the_pops_placed_world_endows_durable_and_perishable_goods() {
             vec![(PerishesAt::Never, 3.0 * (t + 1) as f64)],
             "turn {t}"
         );
-        assert_eq!(
-            pop_groups(world, p2, "labor"),
-            vec![(end(t), 5.0)],
-            "turn {t}"
-        );
+        assert!(pop_groups(world, p2, "labor").is_empty(), "turn {t}");
         assert!(world.pop_stockpile(p3).is_empty(), "turn {t}");
         assert_eq!(
             world
@@ -563,12 +563,14 @@ fn the_pops_placed_world_endows_durable_and_perishable_goods() {
         named(&world, &report.endowed),
         vec![pair("labor", 43.0), pair("gold", 3.0)]
     );
+    assert!(report.sold.is_empty() && report.bought.is_empty());
+    assert_eq!(named(&world, &report.consumed), vec![pair("labor", 35.0)]);
     for t in 1..=3u64 {
         let report = world.step().unwrap();
         check(&world, t);
         assert_eq!(
             named(&world, &report.perished),
-            vec![pair("labor", 43.0), pair("grain", 2.0)],
+            vec![pair("labor", 8.0), pair("grain", 2.0)],
             "turn {t}"
         );
         assert_eq!(named(&world, &report.emitted), vec![pair("grain", 2.0)]);
@@ -576,6 +578,8 @@ fn the_pops_placed_world_endows_durable_and_perishable_goods() {
             named(&world, &report.endowed),
             vec![pair("labor", 43.0), pair("gold", 3.0)]
         );
+        assert!(report.sold.is_empty() && report.bought.is_empty());
+        assert_eq!(named(&world, &report.consumed), vec![pair("labor", 35.0)]);
     }
 }
 
@@ -614,8 +618,17 @@ fn a_world_with_no_pops_has_none_and_endows_nothing() {
         let (mut world, report) = world_of(&test_setting(name));
         assert!(world.pops().is_empty(), "{name}");
         assert!(report.endowed.is_empty(), "{name}");
+        assert!(
+            report.sold.is_empty() && report.bought.is_empty() && report.consumed.is_empty(),
+            "{name}"
+        );
         for _ in 0..3 {
-            assert!(world.step().unwrap().endowed.is_empty(), "{name}");
+            let report = world.step().unwrap();
+            assert!(report.endowed.is_empty(), "{name}");
+            assert!(
+                report.sold.is_empty() && report.bought.is_empty() && report.consumed.is_empty(),
+                "{name}"
+            );
         }
         assert!(world.pops().is_empty(), "{name}");
     }

@@ -332,6 +332,121 @@ fn zero_amounts_trade_nothing() {
 }
 
 #[test]
+fn sell_down_to_leaves_the_kept_amount_and_pays_the_proceeds() {
+    let world = turns_world();
+    let daily = good(&world, "daily");
+    let gold = good(&world, "gold");
+    let market = world.market(hex(&world, 0, 0));
+    // At turn 0 hex (0, 0) holds `daily` 4.5 in one group (end(0)) and no gold.
+    let mut pile = stock(&world, 0);
+    assert_eq!(groups(&pile, daily), vec![(end(0), 4.5)]);
+
+    assert_eq!(
+        market.sell_down_to(&mut pile, daily, q(2.5)),
+        Ok((q(2.0), q(4.0)))
+    );
+    assert_eq!(pile.total(daily), q(2.5));
+    assert_eq!(groups(&pile, daily), vec![(end(0), 2.5)]);
+    assert_eq!(groups(&pile, gold), vec![(PerishesAt::Never, 4.0)]);
+}
+
+#[test]
+fn sell_down_to_at_or_below_keep_sells_nothing() {
+    let world = turns_world();
+    let daily = good(&world, "daily");
+    let market = world.market(hex(&world, 0, 0));
+    for keep in [4.5, 10.0] {
+        let mut pile = stock(&world, 0);
+        let before = pile.clone();
+        assert_eq!(
+            market.sell_down_to(&mut pile, daily, q(keep)),
+            Ok((Quantity::ZERO, Quantity::ZERO))
+        );
+        assert_eq!(pile, before);
+    }
+}
+
+#[test]
+fn sell_down_to_zero_sells_everything() {
+    let world = turns_world();
+    let daily = good(&world, "daily");
+    let market = world.market(hex(&world, 0, 0));
+    let mut down = stock(&world, 0);
+    let mut all = stock(&world, 0);
+    assert_eq!(
+        market.sell_down_to(&mut down, daily, Quantity::ZERO),
+        market.sell_all(&mut all, daily)
+    );
+    assert_eq!(down, all);
+    assert_eq!(down.total(daily), Quantity::ZERO);
+}
+
+#[test]
+fn sell_down_to_refuses_untraded_goods_and_the_currency() {
+    let world = turns_world();
+    let daily = good(&world, "daily");
+    let gold = good(&world, "gold");
+    let mut pile = stock(&world, 1);
+    let before = pile.clone();
+    let none = world.market(hex(&world, 2, 0));
+    assert_eq!(
+        none.sell_down_to(&mut pile, daily, q(1.0)),
+        Err(policyspace_engine::TradeError::NotTraded { good: daily })
+    );
+    assert_eq!(pile, before);
+    let market = world.market(hex(&world, 0, 0));
+    assert_eq!(
+        market.sell_down_to(&mut pile, gold, q(1.0)),
+        Err(policyspace_engine::TradeError::IsCurrency { good: gold })
+    );
+    assert_eq!(pile, before);
+}
+
+#[test]
+fn buy_for_spends_exactly_and_adds_the_good() {
+    let world = turns_world();
+    let stew = good(&world, "stew");
+    let gold = good(&world, "gold");
+    let market = world.market(hex(&world, 0, 0));
+    // Selling all of hex (0, 0)'s 5 stew at 4 gives exactly 20 gold.
+    let mut pile = stock(&world, 0);
+    assert_eq!(market.sell_all(&mut pile, stew), Ok((q(5.0), q(20.0))));
+    assert_eq!(pile.total(gold), q(20.0));
+
+    assert_eq!(market.buy_for(&mut pile, stew, q(6.0)), Ok(q(1.5)));
+    assert_eq!(pile.total(gold), q(14.0));
+    // `stew` bought in turn 0 lasts to the end of turn 2.
+    assert_eq!(groups(&pile, stew), vec![(end(2), 1.5)]);
+}
+
+#[test]
+fn buy_for_refuses_when_short_and_zero_spend_buys_nothing() {
+    let mut world = turns_world();
+    world.step().unwrap();
+    let stew = good(&world, "stew");
+    let gold = good(&world, "gold");
+    let market = world.market(hex(&world, 0, 0));
+    // After one step hex (1, 0) holds 3 gold.
+    let mut pile = stock(&world, 1);
+    assert_eq!(pile.total(gold), q(3.0));
+    let before = pile.clone();
+    assert_eq!(
+        market.buy_for(&mut pile, stew, q(6.0)),
+        Err(policyspace_engine::TradeError::NotEnoughCurrency {
+            currency: gold,
+            held: q(3.0),
+            needed: q(6.0)
+        })
+    );
+    assert_eq!(pile, before);
+    assert_eq!(
+        market.buy_for(&mut pile, stew, Quantity::ZERO),
+        Ok(Quantity::ZERO)
+    );
+    assert_eq!(pile, before);
+}
+
+#[test]
 fn stepping_does_not_change_prices() {
     let (mut world, _) = world_of(&sample_setting());
     let lists = |world: &World| -> Vec<Vec<(GoodId, f64)>> {
