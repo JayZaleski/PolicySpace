@@ -1,9 +1,11 @@
 //! The developer UI window: panels, the map canvas, and the eframe app that ties them to a
-//! [`Session`]. The window also has the world panel (turn log, goods, resource types) and the
-//! hex panel (the selected hex's deposits and stockpile), and steps turns. The drawing is
-//! checked by hand (see the Step 07 and Step 08 specs); the map math it uses is tested in
-//! `geometry`, and the panel text in `text`.
+//! [`Session`]. The window also has the world panel (turn log, goods, resource types, POP
+//! types) and the hex panel (the selected hex's deposits, stockpile, market and POPs), and
+//! steps turns. The drawing is checked by hand (see the Step 07 and Step 08 specs); the map
+//! math it uses is tested in `geometry`, and the panel text in `text`.
 
+use std::fmt::Debug;
+use std::hash::Hash;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -18,7 +20,10 @@ use crate::geometry::{
     DOT_RADIUS_PX, HexShape, Point, View, Viewport, hex_at, hex_center, hex_corners, is_visible,
 };
 use crate::session::{Loaded, STEP_MANY, Session};
-use crate::text::{count, deposit_lines, good_rows, resource_rows, stockpile_lines};
+use crate::text::{
+    StockLine, count, deposit_lines, good_rows, market_lines, pop_section, pop_type_rows,
+    resource_rows, stockpile_lines,
+};
 
 /// How much one unit of scroll-wheel input zooms: the factor is `exp(scroll · this)`.
 const SCROLL_ZOOM_PER_UNIT: f64 = 0.0015;
@@ -28,6 +33,9 @@ const HOVER_DOT_RADIUS_PX: f32 = 3.0;
 const MAX_LABEL_SIZE: f64 = 14.0;
 /// The width side panels start with (points).
 const SIDE_PANEL_WIDTH: f32 = 320.0;
+/// The width the hex panel starts with (points): wide enough for a POP's seven-column goods
+/// table at the sample's numbers.
+const HEX_PANEL_WIDTH: f32 = 460.0;
 /// The narrowest a side panel can be made (points).
 const SIDE_PANEL_MIN_WIDTH: f32 = 200.0;
 /// The tallest the turn log's scroll area gets (points).
@@ -158,14 +166,15 @@ impl DevApp {
             });
         Panel::right("hex")
             .resizable(true)
-            .default_size(SIDE_PANEL_WIDTH)
+            .default_size(HEX_PANEL_WIDTH)
             .min_size(SIDE_PANEL_MIN_WIDTH)
             .show(ui, |ui| {
-                ScrollArea::vertical().show(ui, |ui| self.hex_panel_contents(ui, world));
+                ScrollArea::both().show(ui, |ui| self.hex_panel_contents(ui, world));
             });
     }
 
-    /// The world panel's sections: the turn log, the goods and the resource types.
+    /// The world panel's sections: the turn log, the goods, the resource types and the POP
+    /// types.
     fn world_panel_contents(&self, ui: &mut Ui, world: &World) {
         CollapsingHeader::new("Turn log")
             .default_open(true)
@@ -191,10 +200,10 @@ impl DevApp {
             .default_open(true)
             .show(ui, |ui| {
                 Grid::new("goods")
-                    .num_columns(4)
+                    .num_columns(5)
                     .striped(true)
                     .show(ui, |ui| {
-                        for heading in ["Name", "Lasts", "Movable", "Held"] {
+                        for heading in ["Name", "Lasts", "Movable", "In hexes", "In POPs"] {
                             ui.strong(heading);
                         }
                         ui.end_row();
@@ -202,7 +211,8 @@ impl DevApp {
                             ui.label(row.name);
                             ui.label(row.lasts);
                             ui.label(row.movable);
-                            ui.label(row.held);
+                            ui.label(row.in_hexes);
+                            ui.label(row.in_pops);
                             ui.end_row();
                         }
                     });
@@ -227,9 +237,47 @@ impl DevApp {
                         }
                     });
             });
+        CollapsingHeader::new("POP types")
+            .default_open(true)
+            .show(ui, |ui| {
+                Grid::new("pop types")
+                    .num_columns(6)
+                    .striped(true)
+                    .show(ui, |ui| {
+                        for heading in [
+                            "Name",
+                            "Endowment",
+                            "Utility",
+                            "Growth",
+                            "POPs",
+                            "Total size",
+                        ] {
+                            ui.strong(heading);
+                        }
+                        ui.end_row();
+                        for row in pop_type_rows(world) {
+                            ui.label(row.name);
+                            ui.vertical(|ui| {
+                                for line in row.endowment {
+                                    ui.label(line);
+                                }
+                            });
+                            ui.vertical(|ui| {
+                                for line in row.utility {
+                                    ui.label(line.line).on_hover_text(line.share);
+                                }
+                            });
+                            ui.label(row.growth);
+                            ui.label(row.pops.to_string());
+                            ui.label(row.total_size);
+                            ui.end_row();
+                        }
+                    });
+            });
     }
 
-    /// The hex panel's contents: the selected hex's deposits and stockpile, or a hint.
+    /// The hex panel's contents: the selected hex's deposits, stockpile, market and POPs, or
+    /// a hint.
     fn hex_panel_contents(&self, ui: &mut Ui, world: &World) {
         if world.map().is_empty() {
             ui.label("This setting has no hexes.");
@@ -251,17 +299,71 @@ impl DevApp {
         }
         ui.add_space(4.0);
         ui.strong("Stockpile");
-        let stockpile = stockpile_lines(world, hex);
-        if stockpile.is_empty() {
-            ui.label("Empty.");
+        stockpile_listing(ui, "hex", stockpile_lines(world, hex));
+        ui.add_space(4.0);
+        ui.strong("Market");
+        for line in market_lines(world, hex) {
+            ui.label(line);
         }
-        for stock in stockpile {
-            ui.label(stock.good);
-            ui.indent("parts", |ui| {
-                for part in stock.parts {
-                    ui.label(part);
-                }
-            });
+        ui.add_space(4.0);
+        ui.strong("POPs");
+        let pops = world.pops().on_hex(hex);
+        if pops.is_empty() {
+            ui.label("No POPs.");
+        }
+        for &pop in pops {
+            let section = pop_section(world, pop);
+            // The ID is explicit: the heading holds the size, which changes every step, and a
+            // collapsed section must stay collapsed.
+            CollapsingHeader::new(section.heading)
+                .id_salt(("pop", pop.index()))
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.label(section.growth).on_hover_text(section.growth_hover);
+                    ui.label(section.demand);
+                    Grid::new(("pop goods", pop.index()))
+                        .num_columns(7)
+                        .striped(true)
+                        .show(ui, |ui| {
+                            for heading in [
+                                "Good",
+                                "Held",
+                                "Demanded",
+                                "Subsistence",
+                                "Sold",
+                                "Bought",
+                                "Consumed",
+                            ] {
+                                ui.strong(heading);
+                            }
+                            ui.end_row();
+                            for row in section.goods {
+                                let cells = [
+                                    row.good,
+                                    row.held,
+                                    row.demanded,
+                                    row.subsistence,
+                                    row.sold,
+                                    row.bought,
+                                    row.consumed,
+                                ];
+                                if row.below_subsistence {
+                                    let color = ui.visuals().error_fg_color;
+                                    for cell in cells {
+                                        ui.colored_label(color, cell);
+                                    }
+                                } else {
+                                    for cell in cells {
+                                        ui.label(cell);
+                                    }
+                                }
+                                ui.end_row();
+                            }
+                        });
+                    ui.label(section.carried_over);
+                    ui.strong("Stockpile");
+                    stockpile_listing(ui, ("pop", pop.index()), section.stockpile);
+                });
         }
     }
 
@@ -374,6 +476,22 @@ impl DevApp {
     }
 }
 
+/// Lists a stockpile: "Empty." when it has nothing, else each good's line with its groups
+/// indented below it. `salt` keeps the indents of different stockpiles apart.
+fn stockpile_listing(ui: &mut Ui, salt: impl Hash + Debug, lines: Vec<StockLine>) {
+    if lines.is_empty() {
+        ui.label("Empty.");
+    }
+    for stock in lines {
+        ui.label(stock.good);
+        ui.indent(&salt, |ui| {
+            for part in stock.parts {
+                ui.label(part);
+            }
+        });
+    }
+}
+
 impl eframe::App for DevApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         self.shortcuts(ui);
@@ -398,8 +516,9 @@ fn to_pos(p: Point) -> Pos2 {
 }
 
 /// Draws the map canvas for `world` in the remaining area, and handles panning, zooming and
-/// hovering. A `view` of None is fitted to the canvas first. Hexes with deposits get a mark,
-/// and `selected` gets an outline. Returns `Some(hex under the pointer, or None)` if the
+/// hovering. A `view` of None is fitted to the canvas first. Hexes with deposits get a filled
+/// mark below the label and hexes with POPs a hollow one above it, and `selected` gets an
+/// outline. Returns `Some(hex under the pointer, or None)` if the
 /// canvas was clicked this frame (a click, not a drag), for the caller to select.
 fn draw_map(
     ui: &mut Ui,
@@ -472,6 +591,7 @@ fn draw_map(
                 highlight: is_hovered.then_some(highlight),
                 stroke,
                 has_deposits: !world.deposits().on_hex(id).is_empty(),
+                has_pops: !world.pops().on_hex(id).is_empty(),
             },
             (coord.q, coord.r),
         );
@@ -514,8 +634,12 @@ struct HexLook {
     highlight: Option<Color32>,
     /// The outline stroke.
     stroke: Stroke,
-    /// Whether the hex has any deposits (it then gets a mark, unless it is drawn as a dot).
+    /// Whether the hex has any deposits (it then gets a filled mark below the label, unless
+    /// it is drawn as a dot).
     has_deposits: bool,
+    /// Whether the hex has any POPs (it then gets a hollow mark above the label, unless it is
+    /// drawn as a dot).
+    has_pops: bool,
 }
 
 /// Paints one visible hex centered at the screen point `center`, in the style for `shape`.
@@ -556,14 +680,21 @@ fn paint_hex(
                     look.foreground,
                 );
             }
+            // The marks sit below and above the label, so they never cover the coordinates.
+            let offset = (0.55 * scale) as f32;
+            // Capped at 0.35 of the hexagon scale so they stay inside the hexagon.
+            let radius = ((0.12 * scale) as f32)
+                .clamp(2.0, 6.0)
+                .min((0.35 * scale) as f32);
             if look.has_deposits {
-                // Below the label, so it never covers the coordinates.
-                let offset = (0.55 * scale) as f32;
-                // Capped at 0.35 of the hexagon scale so it stays inside the hexagon.
-                let radius = ((0.12 * scale) as f32)
-                    .clamp(2.0, 6.0)
-                    .min((0.35 * scale) as f32);
                 painter.circle_filled(pos + egui::vec2(0.0, offset), radius, look.foreground);
+            }
+            if look.has_pops {
+                painter.circle_stroke(
+                    pos - egui::vec2(0.0, offset),
+                    radius,
+                    Stroke::new(1.0, look.foreground),
+                );
             }
         }
     }

@@ -1,12 +1,14 @@
 //! All the text the dev UI shows: the `check` output (load errors, counts, turn lines) and
-//! the window's panels. It's built from engine types without egui, so it can be tested. The
+//! the window's panels (the world's goods, resource types and POP types, and a hex's deposits,
+//! stockpile, market and POPs). It's built from engine types without egui, so it can be tested. The
 //! wording follows the Step 02–08 designs. Amounts are written with `Quantity`'s `Display`,
 //! the same way `check --turns` writes them.
 
 use std::path::Path;
 
 use policyspace_engine::{
-    GoodId, HexId, LoadErrors, Perishes, PerishesAt, Quantity, Turn, TurnReport, World,
+    GoodId, HexId, LoadErrors, Perishes, PerishesAt, PopId, Quantity, Stockpile, Turn, TurnReport,
+    World,
 };
 
 /// The lines reported for a failed load: each error's `Display`, in order, then
@@ -113,7 +115,16 @@ pub struct StockLine {
 
 /// The stockpile of `hex`, in good ID order. Empty if the stockpile is empty.
 pub fn stockpile_lines(world: &World, hex: HexId) -> Vec<StockLine> {
-    let stockpile = world.hex_stockpile(hex);
+    stock_lines(world, world.hex_stockpile(hex))
+}
+
+/// The stockpile of `pop`, written exactly like a hex's (`stockpile_lines`).
+pub fn pop_stockpile_lines(world: &World, pop: PopId) -> Vec<StockLine> {
+    stock_lines(world, world.pop_stockpile(pop))
+}
+
+/// The lines for any stockpile, in good ID order. Empty if the stockpile is empty.
+fn stock_lines(world: &World, stockpile: &Stockpile) -> Vec<StockLine> {
     let goods = &world.rules().goods;
     stockpile
         .iter()
@@ -127,6 +138,140 @@ pub fn stockpile_lines(world: &World, hex: HexId) -> Vec<StockLine> {
         .collect()
 }
 
+/// The Market section of `hex`: `"Currency: {currency}"`, then one line per posted price in
+/// good ID order, `"{good}: {price} {currency}"` (the currency itself is never posted, so it
+/// never appears); or, after the currency line, `"No prices posted."` for a market with no
+/// prices, or `"No market."` for a hex with no market. Never empty.
+pub fn market_lines(world: &World, hex: HexId) -> Vec<String> {
+    let market = world.market(hex);
+    let goods = &world.rules().goods;
+    let currency = goods.name(market.currency());
+    let mut lines = vec![format!("Currency: {currency}")];
+    if !market.has_market() {
+        lines.push("No market.".to_string());
+        return lines;
+    }
+    for (good, price) in market.prices() {
+        lines.push(format!("{}: {price} {currency}", goods.name(good)));
+    }
+    if lines.len() == 1 {
+        lines.push("No prices posted.".to_string());
+    }
+    lines
+}
+
+/// The subsistence index to 4 fixed decimals: "0.6667", "1.0000", "0.0000", "-1.0000".
+pub fn format_index(index: f64) -> String {
+    // Adding 0.0 turns -0.0 into 0.0, which would otherwise print as "-0.0000".
+    format!("{:.4}", index + 0.0)
+}
+
+/// The growth rate as a signed percentage to 2 fixed decimals: "+2.67%", "-10.00%", "+0.00%".
+pub fn format_rate(rate: f64) -> String {
+    // Adding 0.0 turns -0.0 into 0.0, which would otherwise print as "-0.00%".
+    format!("{:+.2}%", rate * 100.0 + 0.0)
+}
+
+/// A normalized share rounded to 4 decimals with trailing zeros dropped: "0.8", "0.1",
+/// "0.3333", "1", "0".
+pub fn format_share(share: f64) -> String {
+    ((share * 10_000.0).round() / 10_000.0 + 0.0).to_string()
+}
+
+/// One row of a POP's goods table. Every field is formatted; `below_subsistence` flags a row
+/// whose demanded quantity falls short of its subsistence (drawn in the error color).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PopGoodRow {
+    /// The good's name.
+    pub good: String,
+    /// What the POP held (`DemandedGood::held`).
+    pub held: String,
+    /// What the POP wanted to end up with (`DemandedGood::quantity`).
+    pub demanded: String,
+    /// The subsistence amount, already the type's amount times the starting size.
+    pub subsistence: String,
+    /// What the POP sold ("0" when nothing).
+    pub sold: String,
+    /// What the POP bought ("0" when nothing).
+    pub bought: String,
+    /// What the POP consumed ("0" when nothing).
+    pub consumed: String,
+    /// `DemandedGood::below_subsistence()`.
+    pub below_subsistence: bool,
+}
+
+/// Everything the hex panel shows for one POP.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PopSection {
+    /// "{type} × {current size}", e.g. "peasant × 61.6".
+    pub heading: String,
+    /// "Started at {starting size}; index {format_index}; rate {format_rate}".
+    pub growth: String,
+    /// The hover text of the growth line: "index {index}; rate {rate}" with both as full
+    /// f64 `Display` (e.g. "index 0.6666666666666666; rate 0.02666666666666667").
+    pub growth_hover: String,
+    /// "Income {M} {currency}; subsistence cost {C} {currency}; supernumerary {M-C} {currency}".
+    /// M and C are `Quantity`; the supernumerary is an f64 written with f64 `Display`
+    /// (so 240.0 writes "240", and a negative value keeps its "-").
+    pub demand: String,
+    /// One row per good in the recorded demand, in good ID order.
+    pub goods: Vec<PopGoodRow>,
+    /// "Carried over: {amount} {currency}".
+    pub carried_over: String,
+    /// `pop_stockpile_lines(world, pop)`.
+    pub stockpile: Vec<StockLine>,
+}
+
+/// The section for `pop` from the current turn's outcome and the POP's current size.
+pub fn pop_section(world: &World, pop: PopId) -> PopSection {
+    let rules = world.rules();
+    let record = world.pops().get(pop);
+    let outcome = world.pop_outcome(pop);
+    let demand = outcome.demand();
+    let currency = rules.goods.name(world.hex_currency(record.hex));
+    PopSection {
+        heading: format!(
+            "{} × {}",
+            rules.pop_types.name(record.pop_type),
+            record.size
+        ),
+        growth: format!(
+            "Started at {}; index {}; rate {}",
+            outcome.starting_size(),
+            format_index(outcome.subsistence_index()),
+            format_rate(outcome.growth_rate())
+        ),
+        growth_hover: format!(
+            "index {}; rate {}",
+            outcome.subsistence_index(),
+            outcome.growth_rate()
+        ),
+        demand: format!(
+            "Income {} {currency}; subsistence cost {} {currency}; supernumerary {} {currency}",
+            demand.income(),
+            demand.subsistence_cost(),
+            // Adding 0.0 turns -0.0 into 0.0, which would otherwise print as "-0".
+            demand.supernumerary() + 0.0
+        ),
+        goods: demand
+            .goods()
+            .iter()
+            .map(|g| PopGoodRow {
+                good: rules.goods.name(g.good).to_string(),
+                held: g.held.to_string(),
+                demanded: g.quantity.to_string(),
+                subsistence: g.subsistence.to_string(),
+                sold: outcome.sold_of(g.good).to_string(),
+                bought: outcome.bought_of(g.good).to_string(),
+                consumed: outcome.consumed_of(g.good).to_string(),
+                below_subsistence: g.below_subsistence(),
+            })
+            .collect(),
+        carried_over: format!("Carried over: {} {currency}", outcome.carried_over()),
+        stockpile: pop_stockpile_lines(world, pop),
+    }
+}
+
 /// One row of the Goods table.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GoodRow {
@@ -137,17 +282,26 @@ pub struct GoodRow {
     /// "movable" or "fixed".
     pub movable: &'static str,
     /// The world total over every hex stockpile, formatted (`Quantity` Display; "0" if none).
-    pub held: String,
+    pub in_hexes: String,
+    /// The world total over every POP stockpile, formatted ("0" if none).
+    pub in_pops: String,
 }
 
 /// Every good, in good ID order.
 pub fn good_rows(world: &World) -> Vec<GoodRow> {
     let goods = &world.rules().goods;
-    // Walk the hexes once, adding each stockpile's totals into the good's slot.
-    let mut held = vec![Quantity::ZERO; goods.len()];
+    // Walk the hexes once, then the POPs once, adding each stockpile's totals into the
+    // good's slot.
+    let mut in_hexes = vec![Quantity::ZERO; goods.len()];
     for (hex, _) in world.map().iter() {
         for (good, total) in world.hex_stockpile(hex).iter() {
-            held[good.index()] = held[good.index()].saturating_add(total);
+            in_hexes[good.index()] = in_hexes[good.index()].saturating_add(total);
+        }
+    }
+    let mut in_pops = vec![Quantity::ZERO; goods.len()];
+    for (pop, _) in world.pops().iter() {
+        for (good, total) in world.pop_stockpile(pop).iter() {
+            in_pops[good.index()] = in_pops[good.index()].saturating_add(total);
         }
     }
     goods
@@ -156,7 +310,8 @@ pub fn good_rows(world: &World) -> Vec<GoodRow> {
             name: name.to_string(),
             lasts: lasts(good.perishes),
             movable: if good.movable { "movable" } else { "fixed" },
-            held: held[id.index()].to_string(),
+            in_hexes: in_hexes[id.index()].to_string(),
+            in_pops: in_pops[id.index()].to_string(),
         })
         .collect()
 }
@@ -189,6 +344,93 @@ pub fn resource_rows(world: &World) -> Vec<ResourceRow> {
             produces: rules.goods.name(resource.produces).to_string(),
             output: resource.output.to_string(),
             deposits: counts[id.index()],
+        })
+        .collect()
+}
+
+/// One utility good of a POP type.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UtilityLine {
+    /// "{good}: subsistence {amount}, share {format_share}", e.g. "grain: subsistence 2,
+    /// share 0.8".
+    pub line: String,
+    /// The hover text: the full normalized share with f64 `Display`, e.g. "0.8".
+    pub share: String,
+}
+
+/// One row of the POP types table.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PopTypeRow {
+    /// The POP type's name.
+    pub name: String,
+    /// One per endowed good, in good ID order: "{amount} {good}"; or exactly ["nothing"] for
+    /// an empty endowment.
+    pub endowment: Vec<String>,
+    /// One per utility good, in good ID order.
+    pub utility: Vec<UtilityLine>,
+    /// "growth [{c1}, {c2}, …]; decline {d}; max {m}", every number with f64 `Display`,
+    /// coefficients joined by ", ": "growth [0.06, -0.03]; decline 0.1; max 0.05".
+    pub growth: String,
+    /// The number of POPs of this type in the world.
+    pub pops: usize,
+    /// The sum of their current sizes, formatted; "0" with no POPs.
+    pub total_size: String,
+}
+
+/// Every POP type, in POP type ID order.
+pub fn pop_type_rows(world: &World) -> Vec<PopTypeRow> {
+    let rules = world.rules();
+    let mut counts = vec![0usize; rules.pop_types.len()];
+    let mut sizes = vec![Quantity::ZERO; rules.pop_types.len()];
+    for (_, pop) in world.pops().iter() {
+        let slot = pop.pop_type.index();
+        counts[slot] += 1;
+        sizes[slot] = sizes[slot].saturating_add(pop.size);
+    }
+    rules
+        .pop_types
+        .iter()
+        .map(|(id, name, pop_type)| {
+            let endowment = if pop_type.endowment().is_empty() {
+                vec!["nothing".to_string()]
+            } else {
+                pop_type
+                    .endowment()
+                    .iter()
+                    .map(|e| format!("{} {}", e.amount, rules.goods.name(e.good)))
+                    .collect()
+            };
+            let growth = pop_type.growth();
+            let coefficients: Vec<String> = growth
+                .coefficients()
+                .iter()
+                .map(ToString::to_string)
+                .collect();
+            PopTypeRow {
+                name: name.to_string(),
+                endowment,
+                utility: pop_type
+                    .utility()
+                    .iter()
+                    .map(|u| UtilityLine {
+                        line: format!(
+                            "{}: subsistence {}, share {}",
+                            rules.goods.name(u.good),
+                            u.subsistence,
+                            format_share(u.share)
+                        ),
+                        share: u.share.to_string(),
+                    })
+                    .collect(),
+                growth: format!(
+                    "growth [{}]; decline {}; max {}",
+                    coefficients.join(", "),
+                    growth.decline(),
+                    growth.max_growth()
+                ),
+                pops: counts[id.index()],
+                total_size: sizes[id.index()].to_string(),
+            }
         })
         .collect()
 }
@@ -376,8 +618,20 @@ mod tests {
                     "silver"
                 ]
             );
-            let held: Vec<&str> = rows.iter().map(|row| row.held.as_str()).collect();
-            assert_eq!(held, ["0", "10", "24", "0", "0", "0"]);
+            let in_hexes: Vec<&str> = rows.iter().map(|row| row.in_hexes.as_str()).collect();
+            assert_eq!(in_hexes, ["0", "10", "24", "0", "0", "0"]);
+            // Only silver is held by POPs: it is what they sell their labor for.
+            let silver = world.rules().goods.id("silver").unwrap();
+            let pop_silver = world
+                .pops()
+                .iter()
+                .fold(Quantity::ZERO, |sum, (id, _)| {
+                    sum.saturating_add(world.pop_stockpile(id).total(silver))
+                })
+                .to_string();
+            let in_pops: Vec<&str> = rows.iter().map(|row| row.in_pops.as_str()).collect();
+            assert_eq!(&in_pops[..5], ["0", "0", "0", "0", "0"]);
+            assert_eq!(in_pops[5], pop_silver);
             assert_eq!(rows[4].lasts, "perishes after 3 turns");
             assert_eq!(rows[4].movable, "movable");
             assert_eq!(rows[0].movable, "fixed");
@@ -386,7 +640,7 @@ mod tests {
     }
 
     #[test]
-    fn good_rows_held_matches_the_per_hex_totals_on_turns_valid() {
+    fn good_rows_in_hexes_matches_the_per_hex_totals_on_turns_valid() {
         let world = turns_valid_at_2();
         let expected: Vec<String> = world
             .rules()
@@ -402,8 +656,10 @@ mod tests {
                     .to_string()
             })
             .collect();
-        let held: Vec<String> = good_rows(&world).into_iter().map(|row| row.held).collect();
-        assert_eq!(held, expected);
+        let rows = good_rows(&world);
+        let in_hexes: Vec<String> = rows.iter().map(|row| row.in_hexes.clone()).collect();
+        assert_eq!(in_hexes, expected);
+        assert!(rows.iter().all(|row| row.in_pops == "0"));
     }
 
     #[test]
@@ -438,6 +694,346 @@ mod tests {
                 ("meadow".to_string(), 1),
                 ("pot".to_string(), 1),
                 ("mine".to_string(), 1),
+            ]
+        );
+    }
+
+    /// The POP of the type named `name` on the hex (q, r).
+    fn pop_on(world: &World, q: i32, r: i32, name: &str) -> PopId {
+        let hex = hex(world, q, r);
+        let pop_type = world.rules().pop_types.id(name).expect("pop type exists");
+        world
+            .pops()
+            .of_type_on_hex(hex, pop_type)
+            .expect("the POP exists")
+    }
+
+    /// The goods table row of the good called `name`.
+    fn row_of<'a>(rows: &'a [PopGoodRow], name: &str) -> &'a PopGoodRow {
+        rows.iter()
+            .find(|row| row.good == name)
+            .unwrap_or_else(|| panic!("no row for {name}"))
+    }
+
+    /// A goods table row's cells: held, demanded, subsistence, sold, bought, consumed.
+    fn cells(row: &PopGoodRow) -> [&str; 6] {
+        [
+            &row.held,
+            &row.demanded,
+            &row.subsistence,
+            &row.sold,
+            &row.bought,
+            &row.consumed,
+        ]
+    }
+
+    #[test]
+    fn market_lines_on_the_sample() {
+        let world = sample();
+        assert_eq!(
+            market_lines(&world, hex(&world, 0, 0)),
+            strings(&[
+                "Currency: silver",
+                "unskilled_labor: 1 silver",
+                "unimproved_copper: 1 silver",
+                "unimproved_grain: 0.5 silver",
+                "copper: 5 silver",
+                "grain: 2 silver",
+            ])
+        );
+        assert_eq!(
+            market_lines(&world, hex(&world, 2, -2)),
+            strings(&["Currency: silver", "No market."])
+        );
+    }
+
+    #[test]
+    fn market_lines_on_markets_valid() {
+        let world = world_at("crates/engine/tests/settings/markets_valid");
+        assert_eq!(
+            market_lines(&world, hex(&world, 0, 0)),
+            strings(&["Currency: coin", "grain: 2 coin", "fish: 1.5 coin"])
+        );
+        assert_eq!(
+            market_lines(&world, hex(&world, 2, 0)),
+            strings(&["Currency: coin", "No prices posted."])
+        );
+        assert_eq!(
+            market_lines(&world, hex(&world, 3, 0)),
+            strings(&["Currency: coin", "No market."])
+        );
+    }
+
+    #[test]
+    fn format_index_uses_four_fixed_decimals() {
+        assert_eq!(format_index(2.0 / 3.0), "0.6667");
+        assert_eq!(format_index(1.0), "1.0000");
+        assert_eq!(format_index(0.0), "0.0000");
+        assert_eq!(format_index(-0.0), "0.0000");
+        assert_eq!(format_index(-1.0), "-1.0000");
+    }
+
+    #[test]
+    fn format_rate_is_a_signed_percentage() {
+        assert_eq!(format_rate(0.026_666_666_666_666_67), "+2.67%");
+        assert_eq!(format_rate(0.03), "+3.00%");
+        assert_eq!(format_rate(-0.1), "-10.00%");
+        assert_eq!(format_rate(0.0), "+0.00%");
+        assert_eq!(format_rate(-0.0), "+0.00%");
+    }
+
+    #[test]
+    fn format_share_rounds_to_four_decimals_and_drops_trailing_zeros() {
+        assert_eq!(format_share(0.8), "0.8");
+        assert_eq!(format_share(0.1), "0.1");
+        assert_eq!(format_share(1.0 / 3.0), "0.3333");
+        assert_eq!(format_share(1.0), "1");
+        assert_eq!(format_share(0.0), "0");
+    }
+
+    #[test]
+    fn pop_section_of_the_center_peasant() {
+        let world = sample();
+        let id = pop_on(&world, 0, 0, "peasant");
+        let section = pop_section(&world, id);
+        let outcome = world.pop_outcome(id);
+        assert_eq!(
+            section.heading,
+            format!("peasant × {}", world.pops().get(id).size)
+        );
+        assert_eq!(section.growth, "Started at 60; index 0.6667; rate +2.67%");
+        assert_eq!(
+            section.demand,
+            "Income 600 silver; subsistence cost 360 silver; supernumerary 240 silver"
+        );
+        // The rows are exactly the demand's goods.
+        let goods = &world.rules().goods;
+        let names: Vec<&str> = section.goods.iter().map(|row| row.good.as_str()).collect();
+        let demanded: Vec<&str> = outcome
+            .demand()
+            .goods()
+            .iter()
+            .map(|g| goods.name(g.good))
+            .collect();
+        assert_eq!(names, demanded);
+        let labor = row_of(&section.goods, "unskilled_labor");
+        assert_eq!(cells(labor), ["600", "168", "120", "432", "0", "168"]);
+        assert!(!labor.below_subsistence);
+        let grain = row_of(&section.goods, "grain");
+        assert_eq!(cells(grain), ["0", "216", "120", "0", "216", "216"]);
+        assert!(!grain.below_subsistence);
+        assert!(section.carried_over.starts_with("Carried over: "));
+        assert!(section.carried_over.ends_with(" silver"));
+        assert!(outcome.carried_over().get() < 1e-6);
+        match section.stockpile.as_slice() {
+            [] => {}
+            [line] => {
+                let amount = line.good.strip_suffix(" silver").expect("it is silver");
+                assert_eq!(line.parts, vec![format!("{amount}: never perishes")]);
+            }
+            other => panic!("unexpected stockpile {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pop_section_of_the_center_artisan() {
+        let world = sample();
+        let id = pop_on(&world, 0, 0, "artisan");
+        let section = pop_section(&world, id);
+        assert_eq!(
+            section.heading,
+            format!("artisan × {}", world.pops().get(id).size)
+        );
+        assert_eq!(section.growth, "Started at 10; index 1.0000; rate +3.00%");
+        assert_eq!(
+            section.demand,
+            "Income 100 silver; subsistence cost 50 silver; supernumerary 50 silver"
+        );
+        let labor = row_of(&section.goods, "unskilled_labor");
+        assert_eq!((labor.sold.as_str(), labor.consumed.as_str()), ("85", "15"));
+        let grain = row_of(&section.goods, "grain");
+        assert_eq!(
+            (grain.bought.as_str(), grain.consumed.as_str()),
+            ("30", "30")
+        );
+        let copper = row_of(&section.goods, "copper");
+        assert_eq!(
+            (
+                copper.bought.as_str(),
+                copper.consumed.as_str(),
+                copper.subsistence.as_str()
+            ),
+            ("5", "5", "0")
+        );
+        assert!(section.goods.iter().all(|row| !row.below_subsistence));
+    }
+
+    #[test]
+    fn pop_section_of_the_north_east_peasant_flags_the_row_below_subsistence() {
+        let world = sample();
+        let id = pop_on(&world, 2, -2, "peasant");
+        let size = world.pops().get(id).size;
+        assert!((size.get() - 12.0 * 0.9).abs() < 1e-9);
+        let section = pop_section(&world, id);
+        assert_eq!(section.heading, format!("peasant × {size}"));
+        assert_eq!(section.growth, "Started at 12; index -1.0000; rate -10.00%");
+        assert_eq!(
+            section.demand,
+            "Income 0 silver; subsistence cost 0 silver; supernumerary 0 silver"
+        );
+        let labor = row_of(&section.goods, "unskilled_labor");
+        assert_eq!(cells(labor), ["120", "120", "24", "0", "0", "120"]);
+        assert!(!labor.below_subsistence);
+        let grain = row_of(&section.goods, "grain");
+        assert_eq!(grain.demanded, "0");
+        assert_eq!(grain.subsistence, "24");
+        assert!(grain.below_subsistence);
+        assert_eq!(section.carried_over, "Carried over: 0 silver");
+        assert!(section.stockpile.is_empty());
+    }
+
+    #[test]
+    fn pop_section_after_a_step_shows_the_size_the_turn_started_with() {
+        let mut world = sample();
+        let id = pop_on(&world, 2, -2, "peasant");
+        let before = world.pops().get(id).size;
+        world.step().unwrap();
+        let section = pop_section(&world, id);
+        assert_eq!(section.growth, {
+            format!("Started at {before}; index -1.0000; rate -10.00%")
+        });
+        let after = world.pops().get(id).size;
+        assert!((after.get() - 12.0 * 0.9 * 0.9).abs() < 1e-9);
+        assert_eq!(section.heading, format!("peasant × {after}"));
+    }
+
+    #[test]
+    fn pop_section_at_exact_subsistence() {
+        let world = world_at("crates/engine/tests/settings/pops_growth");
+        let id = world.pops().iter().nth(7).expect("POP 7 exists").0;
+        let section = pop_section(&world, id);
+        assert_eq!(section.heading, "peasant × 10");
+        assert_eq!(section.growth, "Started at 10; index 0.0000; rate +0.00%");
+    }
+
+    #[test]
+    fn the_growth_hover_has_the_full_values() {
+        let world = sample();
+        let id = pop_on(&world, 0, 0, "peasant");
+        let section = pop_section(&world, id);
+        let outcome = world.pop_outcome(id);
+        assert_eq!(
+            section.growth_hover,
+            format!(
+                "index {}; rate {}",
+                outcome.subsistence_index(),
+                outcome.growth_rate()
+            )
+        );
+        // More digits than the growth line's "0.6667" and "+2.67%".
+        assert!(outcome.subsistence_index().to_string().len() > "0.6667".len());
+        assert!(outcome.growth_rate().to_string().len() > "0.0267".len());
+    }
+
+    #[test]
+    fn pop_type_rows_on_the_sample() {
+        let (world, report) = {
+            let setting = load_setting(crate::test_support::repo_path("settings/sample"))
+                .expect("the sample loads");
+            World::new(setting)
+        };
+        let rows = pop_type_rows(&world);
+        assert_eq!(rows.len(), 2);
+
+        let size_of = |name: &str| {
+            let pop_type = world.rules().pop_types.id(name).unwrap();
+            world
+                .pops()
+                .iter()
+                .filter(|(_, pop)| pop.pop_type == pop_type)
+                .fold(Quantity::ZERO, |sum, (_, pop)| sum.saturating_add(pop.size))
+        };
+        let shares = |name: &str| -> Vec<String> {
+            let pop_type = world.rules().pop_types.id(name).unwrap();
+            world
+                .rules()
+                .pop_types
+                .get(pop_type)
+                .utility()
+                .iter()
+                .map(|u| u.share.to_string())
+                .collect()
+        };
+
+        let peasant = &rows[0];
+        assert_eq!(peasant.name, "peasant");
+        assert_eq!(peasant.endowment, strings(&["10 unskilled_labor"]));
+        let lines: Vec<&str> = peasant.utility.iter().map(|u| u.line.as_str()).collect();
+        assert_eq!(
+            lines,
+            [
+                "unskilled_labor: subsistence 2, share 0.2",
+                "grain: subsistence 2, share 0.8"
+            ]
+        );
+        let hovers: Vec<String> = peasant.utility.iter().map(|u| u.share.clone()).collect();
+        assert_eq!(hovers, shares("peasant"));
+        assert_eq!(
+            peasant.growth,
+            "growth [0.06, -0.03]; decline 0.1; max 0.05"
+        );
+        assert_eq!(peasant.pops, 15);
+        assert_eq!(peasant.total_size, size_of("peasant").to_string());
+
+        let artisan = &rows[1];
+        assert_eq!(artisan.name, "artisan");
+        // In good ID order (labor, copper, grain), not the order written in the setting.
+        let lines: Vec<&str> = artisan.utility.iter().map(|u| u.line.as_str()).collect();
+        assert_eq!(
+            lines,
+            [
+                "unskilled_labor: subsistence 1, share 0.1",
+                "copper: subsistence 0, share 0.5",
+                "grain: subsistence 2, share 0.4"
+            ]
+        );
+        let hovers: Vec<String> = artisan.utility.iter().map(|u| u.share.clone()).collect();
+        assert_eq!(hovers, shares("artisan"));
+        assert_eq!(artisan.pops, 1);
+        assert_eq!(artisan.total_size, size_of("artisan").to_string());
+
+        let total = size_of("peasant").get() + size_of("artisan").get();
+        assert!((total - report.population.get()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn pop_type_rows_write_an_empty_endowment_as_nothing() {
+        let world = world_at("crates/engine/tests/settings/pops_valid");
+        let idle = pop_type_rows(&world)
+            .into_iter()
+            .find(|row| row.name == "idle")
+            .expect("idle exists");
+        assert_eq!(idle.endowment, strings(&["nothing"]));
+        assert_eq!(idle.pops, 0);
+        assert_eq!(idle.total_size, "0");
+    }
+
+    #[test]
+    fn pop_stockpile_lines_are_written_like_a_hexs() {
+        let mut world = world_at("crates/engine/tests/settings/pops_placed");
+        world.step().unwrap();
+        let hoarder = world.pops().iter().nth(1).expect("POP 1 exists").0;
+        assert_eq!(
+            pop_stockpile_lines(&world, hoarder),
+            vec![
+                StockLine {
+                    good: "8 labor".to_string(),
+                    parts: strings(&["8: perishes this turn"]),
+                },
+                StockLine {
+                    good: "6 gold".to_string(),
+                    parts: strings(&["6: never perishes"]),
+                },
             ]
         );
     }

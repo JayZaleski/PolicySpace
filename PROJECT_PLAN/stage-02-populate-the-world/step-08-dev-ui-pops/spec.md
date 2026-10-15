@@ -63,7 +63,7 @@ pub fn format_rate(rate: f64) -> String
 /// "0.3333", "1", "0".
 pub fn format_share(share: f64) -> String
 ```
-Pitfalls: a value of `-0.0` would print as `-0.0000` / `-0.00%`; add `0.0` to the value first (`x + 0.0` turns `-0.0` into `0.0`) before formatting. `format_rate` is `format!("{:+.2}%", rate * 100.0 + 0.0)`. `format_share` is `(share * 10_000.0).round() / 10_000.0` written with f64 `Display` (which already drops trailing zeros: `0.8`, `1`, `0.3333`).
+Pitfalls: a value of `-0.0` would print as `-0.0000` / `-0.00%` (and `-0` for the supernumerary in the demand line); add `0.0` to the value first (`x + 0.0` turns `-0.0` into `0.0`) before formatting. `format_rate` is `format!("{:+.2}%", rate * 100.0 + 0.0)`. `format_share` is `(share * 10_000.0).round() / 10_000.0` written with f64 `Display` (which already drops trailing zeros: `0.8`, `1`, `0.3333`).
 
 ### POP sections
 ```rust
@@ -206,7 +206,7 @@ All unit tests in `text.rs`'s `tests` module, loading settings with `test_suppor
 | `growth_hover` of the center peasant equals `format!("index {}; rate {}", o.subsistence_index(), o.growth_rate())` and contains more digits than the growth line | hover shows full values |
 | `good_rows` on the sample at turn 0 and after 3 steps: `in_hexes` = `["0", "10", "24", "0", "0", "0"]`, `in_pops` all `"0"` except silver, whose value equals the sum of every POP stockpile's silver total formatted | In hexes / In POPs |
 | `good_rows` on `turns_valid` at turn 2: `in_hexes` matches the per-hex totals (existing test, renamed) and every `in_pops` is `"0"` | no POPs → In POPs empty |
-| `pop_type_rows` on the sample: `peasant` (endowment `["10 unskilled_labor"]`, utility lines `unskilled_labor: subsistence 2, share 0.2` and `grain: subsistence 2, share 0.8`, growth `growth [0.06, -0.03]; decline 0.1; max 0.05`, pops 15, total_size = the formatted sum of the 15 peasants' sizes) and `artisan` (utility shares `0.1`, `0.4`, `0.5`, `copper: subsistence 0, share 0.5`, pops 1, total_size = the artisan's size formatted); the two total sizes added equal the turn-0 report's `population` within 1e-9 | POP types table |
+| `pop_type_rows` on the sample: `peasant` (endowment `["10 unskilled_labor"]`, utility lines `unskilled_labor: subsistence 2, share 0.2` and `grain: subsistence 2, share 0.8`, growth `growth [0.06, -0.03]; decline 0.1; max 0.05`, pops 15, total_size = the formatted sum of the 15 peasants' sizes) and `artisan` (utility lines in good ID order: `unskilled_labor: subsistence 1, share 0.1`, `copper: subsistence 0, share 0.5`, `grain: subsistence 2, share 0.4`; pops 1, total_size = the artisan's size formatted); the two total sizes added equal the turn-0 report's `population` within 1e-9 | POP types table |
 | `pop_type_rows` on `pops_valid`: `idle` has endowment `["nothing"]` and pops 0, total_size `"0"` | empty endowment |
 | `pop_stockpile_lines` on `pops_placed` after one `step()` (turn 1) for the hoarder (`PopId` index 1, size 2, endowed 4 labor and 1.5 gold per individual, no market, utility grain only): `[StockLine { good: "8 labor", parts: ["8: perishes this turn"] }, StockLine { good: "6 gold", parts: ["6: never perishes"] }]` (turn 0's labor perished, both turns' gold merged into one durable group); the existing hex `stockpile_lines` tests still pass unchanged | POP stockpile written like a hex's |
 
