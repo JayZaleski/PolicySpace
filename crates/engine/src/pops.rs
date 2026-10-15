@@ -8,7 +8,7 @@
 //!   endowed so the POP system can be tested before production and the live market exist.
 //!   Shares are stored normalized (they sum to 1 over the type's utility goods); the
 //!   weights as written in the setting aren't kept. A good with share 0 but a positive
-//!   subsistence is a pure necessity. Step 05 computes demand from the utility.
+//!   subsistence is a pure necessity. The [`demand`](crate::demand) module computes demand from the utility.
 //! - A **POP** (`[[pop]]` in `start/`) is N identical individuals of one POP type on one
 //!   hex. N (its size) is continuous: a POP is an aggregate, so its endowment scales with N
 //!   and its size will later grow by a rate. A hex holds at most one POP of each type, and

@@ -30,7 +30,7 @@ The closed-form Stone-Geary demand as a pure function: given a hex's posted pric
 
 **Examples from the sample setting**, with N of 1 and a typical hex's prices (labor 1, grain 2, copper 5).
 - A peasant (10 labor; labor subsistence 2 share 0.2; grain subsistence 2 share 0.8): M is 10, C is 6, supernumerary 4. Demand: labor 2.8, grain 3.6. It would sell 7.2 labor for 7.2 silver and buy 3.6 grain with it.
-- An artisan (10 labor; labor subsistence 1 share 0.1; grain subsistence 2 share 0.4; copper share 0.5): M is 10, C is 10, supernumerary 0. Demand is exactly the subsistence bundle: labor 1, grain 2, copper 0. The sample's artisan sits exactly at subsistence at these prices.
+- An artisan (10 labor; labor subsistence 1 share 0.1; grain subsistence 2 share 0.4; copper share 0.5): M is 10, C is 5 (labor 1 at price 1, grain 2 at price 2; copper has no subsistence), supernumerary 5. Demand: labor 1.5, grain 3, copper 0.5. It would sell 8.5 labor for 8.5 silver and spend 6 on grain and 2.5 on copper.
 - A peasant where grain costs 10: C is 22, so the fraction is 10/22. Demand: labor and grain each about 0.909, below subsistence on both.
 - A peasant on the north-east hex with no market: everything is untradable. Demand: labor 10 (kept whole), grain 0. M and C are zero, and grain is below subsistence.
 
@@ -56,7 +56,7 @@ None. No setting file changes, and the sample setting is unchanged. The checker'
 - Changes to setting files, the sample setting, the checker, or the dev UI.
 
 ## Acceptance Criteria
-- With the sample's typical prices and N of 1, a peasant's demand is labor 2.8 and grain 3.6 with income 10, subsistence cost 6 and supernumerary 4; an artisan's demand is labor 1, grain 2, copper 0 with supernumerary 0 and no good below subsistence.
+- With the sample's typical prices and N of 1, a peasant's demand is labor 2.8 and grain 3.6 with income 10, subsistence cost 6 and supernumerary 4; an artisan's demand is labor 1.5, grain 3 and copper 0.5 with income 10, subsistence cost 5, supernumerary 5 and no good below subsistence.
 - Demand for N of 50 is 50 times the demand for N of 1, for both types.
 - The value of the demanded tradable goods equals the income, within floating-point tolerance, in every test case including below subsistence.
 - Below subsistence (a peasant with grain at 10): both goods are scaled to 10/22 of their subsistence, both are reported below subsistence, and supernumerary income is negative. At exactly M equal to C the result is the subsistence bundle and nothing is below subsistence.

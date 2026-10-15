@@ -208,7 +208,7 @@ Load the sample with `common::load(&sample_setting())`, build a `World`, and use
 | Test | Criterion | Expectation |
 |---|---|---|
 | `a_peasant_at_typical_prices` | AC 1 | N 1, holds unskilled_labor 10 → labor 2.8, grain 3.6; income 10, cost 6, supernumerary 4; nothing below; budget balances |
-| `an_artisan_at_typical_prices` | AC 1 | N 1, holds unskilled_labor 10 → labor 1, grain 2, copper 0; supernumerary 0; nothing below |
+| `an_artisan_at_typical_prices` | AC 1 | N 1, holds unskilled_labor 10 → labor 1.5, copper 0.5, grain 3 (ID order); income 10, cost 5, supernumerary 5; nothing below; budget balances |
 | `demand_is_linear_in_size` | AC 2 | N 50 holding 500 labor gives 50 × the N 1 quantities, income, and cost, for both types |
 | `a_pop_on_a_hex_with_no_market_keeps_what_it_holds` | untradable | hex (2, −2), peasant N 1 holding labor 10 → `goods()` is exactly labor 10 (not below) and grain 0 (below); M 0, C 0, supernumerary 0; `below_subsistence()` true |
 | `a_pops_stockpile_is_a_valid_holdings_list` | purity, AC last | the peasant POP at (0, 0) (size 60) after `World::new`: `demand(type, pop.size, world.pop_stockpile(id).iter(), &market)` gives labor 168, grain 216, income 600; the stockpile is unchanged afterwards (compare clones) and `world.turn()` is still 0 |

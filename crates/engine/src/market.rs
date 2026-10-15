@@ -2,13 +2,15 @@
 //! against any stockpile at those prices. It holds nothing: goods sold to it vanish, goods
 //! bought appear from nothing, and currency likewise. A good with no posted price isn't
 //! traded on that hex; the hex's currency has price 1 and can't be traded against itself.
-//! This is the seam Stage 05 replaces with the live market. Prices are starting state and
+//! A `Market` is a [`PriceList`], so the [`demand`](crate::demand) module can compute a POP's
+//! demand against it. This is the seam Stage 05 replaces with the live market. Prices are starting state and
 //! nothing changes them yet. Knows nothing about files.
 
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
+use crate::demand::PriceList;
 use crate::goods::{GoodId, Goods};
 use crate::id::IdVec;
 use crate::map::{HexId, HexKind};
@@ -301,6 +303,16 @@ impl<'a> Market<'a> {
         }
         stockpile.add(good, amount, self.perishes_at(good));
         Ok(needed)
+    }
+}
+
+impl PriceList for Market<'_> {
+    fn currency(&self) -> GoodId {
+        Market::currency(self)
+    }
+
+    fn price(&self, good: GoodId) -> Option<Quantity> {
+        Market::price(self, good)
     }
 }
 

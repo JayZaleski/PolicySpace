@@ -5,7 +5,7 @@
 //! one representation that can be swapped later (for example, to fixed decimal for
 //! cross-platform determinism) in one place. A [`Quantity`] is always finite and never
 //! negative. Arithmetic is added when a system needs it; so far, `saturating_add`,
-//! `checked_sub` and `saturating_mul`.
+//! `checked_sub`, `saturating_mul` and `checked_div`.
 
 use std::fmt;
 
@@ -59,6 +59,18 @@ impl Quantity {
         // Both values are finite and non-negative, so only overflow to infinity needs the
         // clamp. (Zero times a finite value is zero, never NaN.)
         Quantity((self.0 * other.0).min(f64::MAX))
+    }
+
+    /// `self / other`, or None if `other` is zero. Clamped at `f64::MAX`.
+    pub fn checked_div(self, other: Quantity) -> Option<Quantity> {
+        if other.0 == 0.0 {
+            None
+        } else {
+            // Both values are finite and non-negative and `other` is positive, so the
+            // quotient is non-negative and only overflow to infinity needs the clamp.
+            // (Zero divided by a positive value is zero, never NaN.)
+            Some(Quantity((self.0 / other.0).min(f64::MAX)))
+        }
     }
 }
 
@@ -172,5 +184,28 @@ mod tests {
         let max = Quantity::new(f64::MAX).unwrap();
         let product = max.saturating_mul(Quantity::new(2.0).unwrap());
         assert_eq!(product.get(), f64::MAX);
+    }
+
+    #[test]
+    fn checked_div_divides_normal_values() {
+        let a = Quantity::new(6.0).unwrap();
+        let b = Quantity::new(4.0).unwrap();
+        assert_eq!(a.checked_div(b).map(Quantity::get), Some(1.5));
+        assert_eq!(Quantity::ZERO.checked_div(b), Some(Quantity::ZERO));
+        assert_eq!(a.checked_div(Quantity::ONE), Some(a));
+    }
+
+    #[test]
+    fn checked_div_by_zero_is_none() {
+        let a = Quantity::new(6.0).unwrap();
+        assert_eq!(a.checked_div(Quantity::ZERO), None);
+        assert_eq!(Quantity::ZERO.checked_div(Quantity::ZERO), None);
+    }
+
+    #[test]
+    fn checked_div_clamps_at_the_largest_finite_value() {
+        let max = Quantity::new(f64::MAX).unwrap();
+        let quotient = max.checked_div(Quantity::new(0.5).unwrap()).unwrap();
+        assert_eq!(quotient.get(), f64::MAX);
     }
 }
