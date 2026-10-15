@@ -13,7 +13,8 @@
 //! module, and amounts of goods are [`Quantity`] values (see the [`quantity`] module).
 //! Each hex designates a currency good (see the [`currency`] module), and may have a
 //! dummy market that posts prices in that currency and exchanges goods against a stockpile
-//! (see the [`market`] module).
+//! (see the [`market`] module). POP types (the per-individual endowment and Stone-Geary
+//! utility parameters) are rules in the [`pops`] module; nothing uses them yet.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -29,6 +30,8 @@ pub mod map;
 pub use map::{HexCoord, HexId, HexKind, HexMap};
 pub mod market;
 pub use market::{HexPrices, Market, TradeError};
+pub mod pops;
+pub use pops::{Endowment, PopId, PopKind, PopType, PopTypes, UtilityGood};
 pub mod quantity;
 pub use quantity::Quantity;
 pub mod resources;

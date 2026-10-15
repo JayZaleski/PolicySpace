@@ -35,7 +35,7 @@ pub(crate) struct EntryReader<'a, 'i> {
     table: &'a DeTable<'i>,
     entry: Location,
     missing_at: MissingAt,
-    label: &'static str,
+    label: String,
     read: Vec<String>,
     sink: &'a mut ErrorSink,
 }
@@ -53,7 +53,7 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         file: &'a SourceFile,
         table: &'a DeTable<'i>,
         entry: Location,
-        label: &'static str,
+        label: &str,
         sink: &'a mut ErrorSink,
     ) -> Self {
         EntryReader {
@@ -61,7 +61,7 @@ impl<'a, 'i> EntryReader<'a, 'i> {
             table,
             entry,
             missing_at: MissingAt::Entry,
-            label,
+            label: label.to_string(),
             read: Vec::new(),
             sink,
         }
@@ -80,7 +80,7 @@ impl<'a, 'i> EntryReader<'a, 'i> {
             table,
             entry,
             missing_at: MissingAt::File,
-            label: "manifest",
+            label: "manifest".to_string(),
             read: Vec::new(),
             sink,
         }
@@ -92,8 +92,8 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     }
 
     /// The label used in messages ("good", "hex", "manifest", ...).
-    pub fn label(&self) -> &'static str {
-        self.label
+    pub fn label(&self) -> &str {
+        &self.label
     }
 
     /// The error collector, for section-specific checks and `Definitions`.
@@ -172,9 +172,9 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         }
     }
 
-    /// A number that must be present: an integer or a float, as `f64`.
-    fn number(&mut self, key: &str) -> Option<Located<f64>> {
-        let Found::Value(value) = self.find(key, true) else {
+    /// A number: an integer or a float, as `f64`. Reported if `required` and missing.
+    fn number(&mut self, key: &str, required: bool) -> Option<Located<f64>> {
+        let Found::Value(value) = self.find(key, required) else {
             return None;
         };
         let prefix = format!("key '{key}' in {}", self.label);
@@ -263,7 +263,18 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     /// A number that must be present: an integer or a float, as `f64`. The value is
     /// returned as written (including `inf` and `nan`); range checks belong to the caller.
     pub fn required_number(&mut self, key: &str) -> Option<Located<f64>> {
-        self.number(key)
+        self.number(key, true)
+    }
+
+    /// A number that may be absent. Absent and wrong-type both give None (the latter is
+    /// reported); use [`has`](Self::has) to tell them apart.
+    pub fn optional_number(&mut self, key: &str) -> Option<Located<f64>> {
+        self.number(key, false)
+    }
+
+    /// True if the table has `key`. Doesn't mark the key as read.
+    pub fn has(&self, key: &str) -> bool {
+        self.table.iter().any(|(k, _)| k.get_ref().as_ref() == key)
     }
 
     /// Reads `key` as a table whose values are numbers. Returns every (key, value) pair in the
@@ -297,6 +308,73 @@ impl<'a, 'i> EntryReader<'a, 'i> {
             pairs.push((name, number));
         }
         Some(pairs)
+    }
+
+    /// Reads `key` as a table whose values are tables. Returns every (name, table) pair in
+    /// the table's order, each name with its location. A value that isn't a table is
+    /// reported (`key '<k>' in <key> of <label> must be a table, found <type>`) and returned
+    /// as None, so the caller still sees the name. A missing key reports the usual
+    /// missing-key error; a value that isn't a table reports `key '<key>' in <label> must
+    /// be a table, found <type>`. Both return None. The nested table's keys are data, not
+    /// fields: not name-checked, not tracked as read or unknown. Read each sub-table with
+    /// [`nested`](Self::nested).
+    #[allow(clippy::type_complexity)]
+    pub fn required_table_of_tables(
+        &mut self,
+        key: &str,
+    ) -> Option<Vec<(Located<String>, Option<&'a DeTable<'i>>)>> {
+        let Found::Value(value) = self.find(key, true) else {
+            return None;
+        };
+        let Some(table) = value.get_ref().as_table() else {
+            self.wrong_type(key, "a table", value);
+            return None;
+        };
+        let mut pairs = Vec::new();
+        for (k, v) in table.iter() {
+            let name = Located {
+                value: k.get_ref().to_string(),
+                at: self.file.location_of(k.span()),
+            };
+            let sub = v.get_ref().as_table();
+            if sub.is_none() {
+                let at = self.file.location_of(v.span());
+                self.sink.at(
+                    &at,
+                    format!(
+                        "key '{}' in {key} of {} must be a table, found {}",
+                        name.value,
+                        self.label,
+                        v.get_ref().type_str()
+                    ),
+                );
+            }
+            pairs.push((name, sub));
+        }
+        Some(pairs)
+    }
+
+    /// A reader for one sub-table returned by
+    /// [`required_table_of_tables`](Self::required_table_of_tables): `key` is the outer key and `name` the sub-table's
+    /// key. Its label is `<key>.<name> of <label>` (for example `utility.grain of
+    /// pop_type`), so its messages read `key 'share' in utility.grain of pop_type must be
+    /// a number, found string`. Missing required keys are reported at `name`'s location.
+    /// Call `finish` on it to report its unknown keys.
+    pub fn nested(
+        &mut self,
+        key: &str,
+        name: &Located<String>,
+        table: &'a DeTable<'i>,
+    ) -> EntryReader<'_, 'i> {
+        EntryReader {
+            file: self.file,
+            table,
+            entry: name.at.clone(),
+            missing_at: MissingAt::Entry,
+            label: format!("{key}.{} of {}", name.value, self.label),
+            read: Vec::new(),
+            sink: &mut *self.sink,
+        }
     }
 
     /// A boolean value that must be present.
@@ -512,6 +590,103 @@ x = 3
             },
         );
         assert_eq!(errors, Vec::<String>::new());
+    }
+
+    #[test]
+    fn optional_numbers_present_absent_and_wrong_type() {
+        let errors = run("a = 2\nb = \"x\"\n", |r| {
+            assert_eq!(r.optional_number("a").unwrap().value, 2.0);
+            assert!(r.optional_number("b").is_none());
+            assert!(r.optional_number("missing").is_none());
+        });
+        assert_eq!(
+            errors,
+            vec!["rules/t.toml:2:5: key 'b' in thing must be a number, found string"]
+        );
+    }
+
+    #[test]
+    fn has_does_not_mark_a_key_as_read() {
+        let errors = run("a = 1\nb = 2\n", |r| {
+            assert!(r.has("a"));
+            assert!(!r.has("zzz"));
+            r.optional_integer("b");
+        });
+        assert_eq!(errors, vec!["rules/t.toml:1:1: unknown key 'a' in thing"]);
+    }
+
+    #[test]
+    fn tables_of_tables_give_every_name_and_report_non_tables() {
+        let errors = run(
+            "p = { a = { n = 1 }, b = 5, c = {} }
+q = 7
+",
+            |r| {
+                let pairs = r.required_table_of_tables("p").unwrap();
+                let names: Vec<&str> = pairs.iter().map(|(k, _)| k.value.as_str()).collect();
+                assert_eq!(names, vec!["a", "b", "c"]);
+                assert!(pairs[0].1.is_some());
+                assert!(pairs[1].1.is_none());
+                assert_eq!(pairs[2].1.unwrap().len(), 0);
+                assert_eq!((pairs[0].0.at.line, pairs[0].0.at.column), (1, 7));
+                assert!(r.required_table_of_tables("q").is_none());
+                assert!(r.required_table_of_tables("missing").is_none());
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:1:1: missing required key 'missing' in thing",
+                "rules/t.toml:1:26: key 'b' in p of thing must be a table, found integer",
+                "rules/t.toml:2:5: key 'q' in thing must be a table, found integer",
+            ]
+        );
+    }
+
+    #[test]
+    fn tables_of_tables_work_in_sub_table_form() {
+        let errors = run(
+            "[p.x]
+n = 1
+
+[p.y]
+",
+            |r| {
+                let pairs = r.required_table_of_tables("p").unwrap();
+                assert_eq!(pairs.len(), 2);
+                assert_eq!(pairs[0].0.value, "x");
+                assert_eq!(pairs[1].0.value, "y");
+                assert!(pairs.iter().all(|(_, t)| t.is_some()));
+            },
+        );
+        assert_eq!(errors, Vec::<String>::new());
+    }
+
+    #[test]
+    fn nested_readers_report_with_the_nested_label_and_location() {
+        let errors = run(
+            "[p.x]
+a = \"s\"
+z = 1
+",
+            |r| {
+                let pairs = r.required_table_of_tables("p").unwrap();
+                let (name, table) = &pairs[0];
+                let mut sub = r.nested("p", name, table.unwrap());
+                assert_eq!(sub.label(), "p.x of thing");
+                assert!(sub.optional_number("a").is_none());
+                assert!(sub.required_number("b").is_none());
+                sub.finish();
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:1:4: missing required key 'b' in p.x of thing",
+                "rules/t.toml:2:5: key 'a' in p.x of thing must be a number, found string",
+                "rules/t.toml:3:1: unknown key 'z' in p.x of thing",
+            ]
+        );
     }
 
     #[test]

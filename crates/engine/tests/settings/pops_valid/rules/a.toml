@@ -1,0 +1,4 @@
+[[pop_type]]
+name = "farmer"
+endowment = { labor = 10 }
+utility = { grain = { subsistence = 2, share = 3 }, labor = { subsistence = 1, share = 1 } }

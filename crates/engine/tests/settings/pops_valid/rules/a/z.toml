@@ -1,0 +1,15 @@
+[[pop_type]]
+name = "fisher"
+
+[pop_type.endowment]
+fish = 2
+labor = 8
+
+[pop_type.utility.fish]
+subsistence = 1
+
+[pop_type.utility.coin]
+share = 0.5
+
+[pop_type.utility.grain]
+share = 1.5

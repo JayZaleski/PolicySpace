@@ -2,3 +2,8 @@
 name = "gold_ore"
 produces = "gold"
 output = 1
+
+[[pop_type]]
+name = "ghost"
+endowment = { tin = 1 }
+utility = { nothing = { share = 1 } }

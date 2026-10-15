@@ -1,0 +1,55 @@
+# POP types: the kinds of individual in a POP. Every POP type comes from a [[pop_type]]
+# section here. A POP type needs three keys:
+#
+#   name       The type's name (lowercase snake_case).
+#   endowment  The goods one individual receives at the start of every turn: a table of
+#              good name = amount, each amount a number greater than 0. May be empty.
+#   utility    The goods one individual wants, a table of good name = sub-table. Each
+#              sub-table may have two keys, `subsistence` and `share`, each a number of
+#              at least 0 that defaults to 0 when left out:
+#                subsistence  The amount the individual needs before anything else.
+#                share        Its weight when spending whatever is left beyond subsistence.
+#              A good needs a positive subsistence or a positive share, and at least one
+#              good needs a positive share.
+#
+# Shares are weights: the engine normalizes them to sum to 1 over the type's utility goods,
+# so shares of 1, 4 and 5 mean 10%, 40% and 50%. A good with share 0 and a positive
+# subsistence is bought only up to its subsistence (a pure necessity).
+#
+# An endowed good that is also in the utility is kept as leisure: it is consumed rather than
+# sold. Unskilled labor is the intended endowment (here, unskilled_labor). The engine allows
+# any good to be endowed only so the POP system can be tested before production and the
+# live market exist. All amounts are per individual per turn.
+#
+# Nothing uses POP types yet: POPs of these types are placed in a later step.
+
+# Peasants keep a fifth of their spare income as leisure and spend the rest on grain.
+# Shares here already sum to 1; the engine would normalize them anyway.
+[[pop_type]]
+name = "peasant"
+endowment = { unskilled_labor = 10 }
+
+[pop_type.utility.unskilled_labor]
+subsistence = 2
+share = 0.2
+
+[pop_type.utility.grain]
+subsistence = 2
+share = 0.8
+
+# Artisans keep less leisure and weight copper heavily. The shares are weights: 1, 4 and 5
+# become 0.1, 0.4 and 0.5.
+[[pop_type]]
+name = "artisan"
+endowment = { unskilled_labor = 10 }
+
+[pop_type.utility.unskilled_labor]
+subsistence = 1
+share = 1
+
+[pop_type.utility.grain]
+subsistence = 2
+share = 4
+
+[pop_type.utility.copper]
+share = 5

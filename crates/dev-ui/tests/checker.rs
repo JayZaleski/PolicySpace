@@ -32,7 +32,7 @@ fn checks_the_sample_setting() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets"
+        "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types"
     );
 }
 
@@ -43,7 +43,7 @@ fn says_1_good_for_one_good_and_0_goods_for_none() {
     let stdout = String::from_utf8(one.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Goods Test' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets"
+        "Loaded setting 'Goods Test' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types"
     );
 
     let none = run(&[&repo_path("crates/engine/tests/settings/valid_minimal")]);
@@ -51,7 +51,7 @@ fn says_1_good_for_one_good_and_0_goods_for_none() {
     let stdout = String::from_utf8(none.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Minimal Setting' (format version 1): 0 goods, 0 hexes, 0 resources, 0 deposits, 0 markets"
+        "Loaded setting 'Minimal Setting' (format version 1): 0 goods, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types"
     );
 }
 
@@ -62,7 +62,7 @@ fn says_1_hex_for_one_hex() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Hexes Test' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets"
+        "Loaded setting 'Hexes Test' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 0 pop types"
     );
 }
 
@@ -73,7 +73,18 @@ fn says_1_resource_and_1_deposit_for_one_of_each() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Resources Test' (format version 1): 1 good, 1 hex, 1 resource, 1 deposit, 1 market"
+        "Loaded setting 'Resources Test' (format version 1): 1 good, 1 hex, 1 resource, 1 deposit, 1 market, 0 pop types"
+    );
+}
+
+#[test]
+fn says_1_pop_type_for_one_pop_type() {
+    let output = run(&[&repo_path("crates/engine/tests/settings/pops_one")]);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(
+        stdout.trim(),
+        "Loaded setting 'Pops One' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 1 pop type"
     );
 }
 
@@ -112,7 +123,7 @@ const USAGE: &str = "usage: dev-ui [SETTING_FOLDER]
        dev-ui check SETTING_FOLDER [--turns N]
        dev-ui --version";
 
-const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets";
+const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types";
 
 /// Runs with the setting folder (relative to the repository) and then extra arguments.
 fn run_with(folder: &str, extra: &[&str]) -> Output {

@@ -49,7 +49,8 @@
 //!   hex's currency refers to a good by name, and each market refers to a hex by
 //!   coordinates and to the goods it prices by name (and no market may price its hex's
 //!   currency). `MapReader::resolve` runs before `MarketsReader::resolve`, since the
-//!   market check needs the resolved currencies.
+//!   market check needs the resolved currencies. POP types (`[[pop_type]]`, the third
+//!   `rules/` kind) name goods in their endowment and utility, which are resolved here too.
 //!   A reader's `finish` that depends on phase 2 (such as `ResourcesReader::finish`) is
 //!   only called after a successful load.
 //!
@@ -64,7 +65,9 @@
 //!    types (`Rules::resources`) and deposits (`StartState::deposits`) follow the same two
 //!    patterns, in [`crate::resources`] and `setting/resources.rs`. Markets
 //!    (`StartState::prices`) are a starting-state section identified by a hex's coordinates,
-//!    in [`crate::market`] and `setting/market.rs`.
+//!    in [`crate::market`] and `setting/market.rs`. POP types (`Rules::pop_types`) are
+//!    another named kind, in [`crate::pops`] and `setting/pops.rs`; their reader keeps
+//!    every entry for phase 2, so the goods of an entry with a bad name are still checked.
 //! 2. Add a `SectionType` to `WorldContent::section_types`, naming its header, the one
 //!    folder it belongs in, and a `read` function.
 //! 3. Check references in `WorldContent::resolve`. Resources and deposits are the worked
@@ -81,6 +84,7 @@ mod error;
 mod goods;
 mod map;
 mod market;
+mod pops;
 mod reader;
 mod resources;
 mod source;
@@ -97,11 +101,13 @@ use crate::currency::HexCurrencies;
 use crate::goods::Goods;
 use crate::map::HexMap;
 use crate::market::HexPrices;
+use crate::pops::PopTypes;
 use crate::resources::{Deposits, ResourceTypes};
 use error::{ErrorSink, Location};
 use goods::GoodsReader;
 use map::MapReader;
 use market::MarketsReader;
+use pops::PopTypesReader;
 use reader::EntryReader;
 use resources::{DepositsReader, ResourcesReader};
 use source::{SourceFile, read_toml};
@@ -138,6 +144,8 @@ pub struct Rules {
     pub goods: Goods,
     /// Every resource type the setting defines, in load order.
     pub resources: ResourceTypes,
+    /// Every POP type the setting defines, in load order; see [`crate::pops`].
+    pub pop_types: PopTypes,
 }
 
 /// Starting state (turn 0). Later Steps add more fields.
@@ -166,6 +174,7 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
         rules: Rules {
             goods: content.goods.finish(),
             resources: content.resources.finish(),
+            pop_types: content.pop_types.finish(),
         },
         start: StartState {
             map,
@@ -238,6 +247,7 @@ pub(crate) struct WorldContent {
     pub resources: ResourcesReader,
     pub deposits: DepositsReader,
     pub markets: MarketsReader,
+    pub pop_types: PopTypesReader,
 }
 
 impl SettingContent for WorldContent {
@@ -268,18 +278,25 @@ impl SettingContent for WorldContent {
                 folder: Folder::Start,
                 read: |content, reader| content.markets.read(reader),
             },
+            SectionType {
+                header: "pop_type",
+                folder: Folder::Rules,
+                read: |content, reader| content.pop_types.read(reader),
+            },
         ]
     }
 
     // Goods refer to nothing. Hexes refer to goods (their currency), resource types refer
     // to goods, deposits refer to resource types and hexes, and markets refer to hexes and
-    // goods (and need the hexes' resolved currencies, so the map resolves first).
+    // goods (and need the hexes' resolved currencies, so the map resolves first). POP types
+    // refer to goods in their endowment and utility.
     fn resolve(&mut self, sink: &mut ErrorSink) {
         self.map.resolve(self.goods.defs(), sink);
         self.resources.resolve(self.goods.defs(), sink);
         self.deposits
             .resolve(self.resources.defs(), &self.map, sink);
         self.markets.resolve(self.goods.defs(), &self.map, sink);
+        self.pop_types.resolve(self.goods.defs(), sink);
     }
 }
 

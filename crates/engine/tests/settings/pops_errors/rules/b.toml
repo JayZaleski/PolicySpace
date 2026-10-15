@@ -1,0 +1,4 @@
+[[pop_type]]
+name = "ok"
+endowment = { grain = 1 }
+utility = { grain = { share = 1 } }

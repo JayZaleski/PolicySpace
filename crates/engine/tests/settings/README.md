@@ -36,6 +36,13 @@ Valid settings:
   (0, 0) `coin`, (1, 0) `shell`, (2, 0) `coin`, (3, 0) `coin`. Prices: (0, 0) `grain` 2 and
   `fish` 1.5; (1, 0) `grain` 3 and `coin` 0.25 (`coin` is not that hex's currency, so it may
   be priced); (2, 0) none; (3, 0) has no market.
+- `pops_valid`: POP types across several files and a nested folder, in the inline form and
+  the sub-table form (`[pop_type.endowment]`, `[pop_type.utility.<good>]`), with the goods
+  and a hex (whose currency is `coin`) in files read after them. Goods: `coin`, `labor`,
+  `grain`, `fish`. POP types: `farmer` (endows `labor`), `fisher` (endows `fish` and
+  `labor` written out of ID order; a pure-necessity `fish`, and the currency `coin` in its
+  utility), `idle` (empty endowment).
+- `pops_one`: one good and one POP type (for the setting checker's `1 pop type`).
 
 Folder-structure errors:
 - `missing_manifest`, `missing_rules`, `missing_start`: a required entry is absent.
@@ -67,10 +74,17 @@ File-content errors:
   not finite and above 0, an unknown good, a priced currency, a coordinate with no hex, one
   market with several problems, an unknown key, a duplicate across files, and a `[[market]]`
   in `rules/`. Its goods are `coin` (every hex's currency) and `grain`.
+- `pops_errors`: every kind of `[[pop_type]]` error, including a missing `name`,
+  `endowment` or `utility`, a bad or duplicate name, a non-table `endowment` or `utility`,
+  endowment amounts that are a string, zero, negative or infinite, a non-table utility entry,
+  a negative or non-finite `subsistence` or `share`, a utility good with nothing positive, a
+  utility with no positive share, unknown goods, unknown keys in the entry and in a
+  sub-table, one entry with several problems, a duplicate across files, and a `[[pop_type]]`
+  in `start/`. Its goods are `coin` and `grain`.
 - `resources_broken_file`: a broken TOML file next to resources that refer to a good and a
-  hex that don't exist, plus a hex whose currency is an unknown good
-  and a market that prices goods that don't exist: only the syntax error
-  is reported.
+  hex that don't exist, plus a hex whose currency is an unknown good, a market that prices
+  goods that don't exist, and a POP type whose endowment and utility name goods that don't
+  exist: only the syntax error is reported.
 - `resources_missing_start`: no `start/` folder, and a resource that refers to a good that
   doesn't exist: only the missing folder is reported.
 - `many_errors`: several kinds of problem at once, to check that all are reported in order.

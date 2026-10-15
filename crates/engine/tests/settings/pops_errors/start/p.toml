@@ -1,0 +1,4 @@
+[[pop_type]]
+name = "misplaced"
+endowment = {}
+utility = { grain = { share = 1 } }
