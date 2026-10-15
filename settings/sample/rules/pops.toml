@@ -21,7 +21,7 @@
 # any good to be endowed only so the POP system can be tested before production and the
 # live market exist. All amounts are per individual per turn.
 #
-# Nothing uses POP types yet: POPs of these types are placed in a later step.
+# POPs of these types are placed in start/pops.toml.
 
 # Peasants keep a fifth of their spare income as leisure and spend the rest on grain.
 # Shares here already sum to 1; the engine would normalize them anyway.

@@ -12,3 +12,9 @@ currency = "nothing"
 q = 0
 r = 0
 prices = { tin = 1, nothing = 2 }
+
+[[pop]]
+type = "nobody"
+q = 9
+r = 9
+size = 1

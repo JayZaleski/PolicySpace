@@ -32,7 +32,7 @@ fn checks_the_sample_setting() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types"
+        "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops"
     );
 }
 
@@ -43,7 +43,7 @@ fn says_1_good_for_one_good_and_0_goods_for_none() {
     let stdout = String::from_utf8(one.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Goods Test' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types"
+        "Loaded setting 'Goods Test' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops"
     );
 
     let none = run(&[&repo_path("crates/engine/tests/settings/valid_minimal")]);
@@ -51,7 +51,7 @@ fn says_1_good_for_one_good_and_0_goods_for_none() {
     let stdout = String::from_utf8(none.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Minimal Setting' (format version 1): 0 goods, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types"
+        "Loaded setting 'Minimal Setting' (format version 1): 0 goods, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops"
     );
 }
 
@@ -62,7 +62,7 @@ fn says_1_hex_for_one_hex() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Hexes Test' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 0 pop types"
+        "Loaded setting 'Hexes Test' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops"
     );
 }
 
@@ -73,7 +73,7 @@ fn says_1_resource_and_1_deposit_for_one_of_each() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Resources Test' (format version 1): 1 good, 1 hex, 1 resource, 1 deposit, 1 market, 0 pop types"
+        "Loaded setting 'Resources Test' (format version 1): 1 good, 1 hex, 1 resource, 1 deposit, 1 market, 0 pop types, 0 pops"
     );
 }
 
@@ -84,7 +84,25 @@ fn says_1_pop_type_for_one_pop_type() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Pops One' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 1 pop type"
+        "Loaded setting 'Pops One' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 1 pop type, 1 pop"
+    );
+}
+
+#[test]
+fn counts_pops_and_prints_the_endowment_for_a_setting_with_pops() {
+    let output = run_with(
+        "crates/engine/tests/settings/pops_placed",
+        &["--turns", "1"],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        stdout_lines(&output),
+        vec![
+            "Loaded setting 'Pops Placed' (format version 1): 3 goods, 3 hexes, 1 resource, 1 deposit, 0 markets, 3 pop types, 4 pops",
+            "Turn 0: perished nothing; emitted 2 grain; endowed 43 labor, 3 gold",
+            "Turn 1: perished 43 labor, 2 grain; emitted 2 grain; endowed 43 labor, 3 gold",
+        ]
     );
 }
 
@@ -123,7 +141,7 @@ const USAGE: &str = "usage: dev-ui [SETTING_FOLDER]
        dev-ui check SETTING_FOLDER [--turns N]
        dev-ui --version";
 
-const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types";
+const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops";
 
 /// Runs with the setting folder (relative to the repository) and then extra arguments.
 fn run_with(folder: &str, extra: &[&str]) -> Output {
@@ -146,12 +164,12 @@ fn turns_prints_a_line_for_each_turn() {
     let output = run_with("settings/sample", &["--turns", "2"]);
     assert_eq!(output.status.code(), Some(0));
     assert!(output.stderr.is_empty());
-    let steady = "perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain";
+    let steady = "perished 4100 unskilled_labor, 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor";
     assert_eq!(
         stdout_lines(&output),
         vec![
             SAMPLE_LINE.to_string(),
-            "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain"
+            "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor"
                 .to_string(),
             format!("Turn 1: {steady}"),
             format!("Turn 2: {steady}"),
@@ -180,8 +198,8 @@ fn empty_lists_print_nothing_and_decimals_print_as_is() {
     assert_eq!(
         &lines[1..],
         [
-            "Turn 0: perished nothing; emitted nothing",
-            "Turn 1: perished nothing; emitted nothing"
+            "Turn 0: perished nothing; emitted nothing; endowed nothing",
+            "Turn 1: perished nothing; emitted nothing; endowed nothing"
         ]
     );
 
@@ -193,7 +211,7 @@ fn empty_lists_print_nothing_and_decimals_print_as_is() {
     let lines = stdout_lines(&output);
     assert_eq!(
         lines.last().unwrap(),
-        "Turn 3: perished 6.5 daily, 5 stew; emitted 6.5 daily, 5 stew, 1.5 gold"
+        "Turn 3: perished 6.5 daily, 5 stew; emitted 6.5 daily, 5 stew, 1.5 gold; endowed nothing"
     );
 }
 

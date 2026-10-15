@@ -1,0 +1,14 @@
+[[pop_type]]
+name = "worker"
+endowment = { labor = 10 }
+utility = { labor = { share = 1 } }
+
+[[pop_type]]
+name = "hoarder"
+endowment = { labor = 4, gold = 1.5 }
+utility = { gold = { share = 1 } }
+
+[[pop_type]]
+name = "idle"
+endowment = {}
+utility = { grain = { share = 1 } }

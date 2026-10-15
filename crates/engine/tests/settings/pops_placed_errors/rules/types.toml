@@ -1,0 +1,4 @@
+[[pop_type]]
+name = "worker"
+endowment = { labor = 1 }
+utility = { labor = { share = 1 } }

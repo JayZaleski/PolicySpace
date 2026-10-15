@@ -14,7 +14,9 @@
 //! Each hex designates a currency good (see the [`currency`] module), and may have a
 //! dummy market that posts prices in that currency and exchanges goods against a stockpile
 //! (see the [`market`] module). POP types (the per-individual endowment and Stone-Geary
-//! utility parameters) are rules in the [`pops`] module; nothing uses them yet.
+//! utility parameters) are rules in the [`pops`] module. POPs (groups of individuals of a POP
+//! type, placed on hexes) live in the same module; each POP receives its type's endowment
+//! into its own stockpile every turn.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -31,7 +33,9 @@ pub use map::{HexCoord, HexId, HexKind, HexMap};
 pub mod market;
 pub use market::{HexPrices, Market, TradeError};
 pub mod pops;
-pub use pops::{Endowment, PopId, PopKind, PopType, PopTypes, UtilityGood};
+pub use pops::{
+    Endowment, Pop, PopId, PopKind, PopType, PopTypeId, PopTypeKind, PopTypes, Pops, UtilityGood,
+};
 pub mod quantity;
 pub use quantity::Quantity;
 pub mod resources;

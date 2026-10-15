@@ -92,6 +92,10 @@ fn sample_setting_at_turn_0() {
             pair("unimproved_grain", 24.0)
         ]
     );
+    assert_eq!(
+        named(&world, &report.endowed),
+        vec![pair("unskilled_labor", 4100.0)]
+    );
 }
 
 #[test]
@@ -105,8 +109,12 @@ fn sample_setting_steps() {
             pair("unimproved_copper", 10.0),
             pair("unimproved_grain", 24.0),
         ];
-        assert_eq!(named(&world, &report.perished), both);
+        let labor = pair("unskilled_labor", 4100.0);
+        let mut perished = vec![labor.clone()];
+        perished.extend(both.clone());
+        assert_eq!(named(&world, &report.perished), perished);
         assert_eq!(named(&world, &report.emitted), both);
+        assert_eq!(named(&world, &report.endowed), vec![labor]);
         assert_eq!(
             totals(&world, 0, 0),
             vec![
@@ -164,6 +172,7 @@ fn reports_match_the_expected_numbers() {
     let (mut world, report) = world_of(&test_setting("turns_valid"));
     let emitted = vec![pair("daily", 6.5), pair("stew", 5.0), pair("gold", 1.5)];
     assert!(report.perished.is_empty());
+    assert!(report.endowed.is_empty());
     assert_eq!(named(&world, &report.emitted), emitted);
     for t in 1..=4u64 {
         let report = world.step().unwrap();
@@ -174,7 +183,9 @@ fn reports_match_the_expected_numbers() {
         };
         assert_eq!(named(&world, &report.perished), perished, "turn {t}");
         assert_eq!(named(&world, &report.emitted), emitted, "turn {t}");
+        assert!(report.endowed.is_empty(), "turn {t}");
     }
+    assert!(world.pops().is_empty());
 }
 
 #[test]
@@ -232,16 +243,19 @@ fn worlds_without_deposits_stay_empty() {
     for name in ["valid_minimal", "hexes_one"] {
         let (mut world, report) = world_of(&test_setting(name));
         assert!(
-            report.perished.is_empty() && report.emitted.is_empty(),
+            report.perished.is_empty() && report.emitted.is_empty() && report.endowed.is_empty(),
             "{name}"
         );
         for _ in 0..3 {
             let report = world.step().unwrap();
             assert!(
-                report.perished.is_empty() && report.emitted.is_empty(),
+                report.perished.is_empty()
+                    && report.emitted.is_empty()
+                    && report.endowed.is_empty(),
                 "{name}"
             );
         }
+        assert!(world.pops().is_empty(), "{name}");
         assert_eq!(world.map().len(), if name == "hexes_one" { 1 } else { 0 });
         for (id, _) in world.map().iter() {
             assert!(world.hex_stockpile(id).is_empty(), "{name}");
@@ -258,6 +272,9 @@ fn identical_runs_give_identical_results() {
         assert_eq!(a.step().unwrap(), b.step().unwrap());
         for (id, _) in a.map().iter() {
             assert_eq!(a.hex_stockpile(id), b.hex_stockpile(id));
+        }
+        for (id, _) in a.pops().iter() {
+            assert_eq!(a.pop_stockpile(id), b.pop_stockpile(id));
         }
     }
 }

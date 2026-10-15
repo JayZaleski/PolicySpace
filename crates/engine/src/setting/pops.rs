@@ -1,24 +1,33 @@
-//! Reading `[[pop_type]]` sections. Domain types in `crate::pops`. POP types are a named
-//! kind, so they go through `Definitions` like resource types; the goods named in
-//! `endowment` and `utility` are resolved in phase 2. Every entry is kept for phase 2,
-//! even one whose name was bad, so its unknown goods are still reported; only entries
-//! with an ID reach `finish`.
+//! Reading `[[pop_type]]` and `[[pop]]` sections. Domain types in `crate::pops`.
+//!
+//! POP types are a named kind, so they go through `Definitions` like resource types; the
+//! goods named in `endowment` and `utility` are resolved in phase 2. Every entry is kept
+//! for phase 2, even one whose name was bad, so its unknown goods are still reported; only
+//! entries with an ID reach `finish`.
+//!
+//! POPs have no names: they are identified by POP type and hex, so their reader checks its
+//! own duplicates (like deposits). A POP refers to its type by name and to its hex by
+//! coordinates, and both are resolved in phase 2.
+
+use std::collections::HashMap;
 
 use crate::goods::{GoodId, GoodKind};
-use crate::pops::{PopId, PopKind, PopType, PopTypes};
+use crate::map::HexCoord;
+use crate::pops::{Pop, PopType, PopTypeId, PopTypeKind, PopTypes, Pops};
 use crate::quantity::Quantity;
 
 use super::defs::Definitions;
-use super::error::{ErrorSink, Located};
+use super::error::{ErrorSink, Located, Location};
+use super::map::{MapReader, coordinate};
 use super::reader::EntryReader;
 
 /// One utility key and, if it was valid, its (subsistence, weight as written).
 type UtilityEntry = (Located<String>, Option<(Quantity, f64)>);
 
 /// One `[[pop_type]]` entry, waiting for phase 2.
-struct PopEntry {
+struct PopTypeEntry {
     /// None if the name was missing, invalid or a duplicate.
-    id: Option<PopId>,
+    id: Option<PopTypeId>,
     /// Every endowment key, in table order; None where the amount was invalid.
     endowment: Vec<(Located<String>, Option<Quantity>)>,
     /// Every utility key, in table order; None where the sub-table or a value was invalid.
@@ -32,8 +41,8 @@ struct PopEntry {
 /// Collects POP types during phase 1, and resolves their goods in phase 2.
 #[derive(Default)]
 pub(crate) struct PopTypesReader {
-    defs: Definitions<PopKind>,
-    entries: Vec<PopEntry>,
+    defs: Definitions<PopTypeKind>,
+    entries: Vec<PopTypeEntry>,
 }
 
 /// What `subsistence` or `share` of a utility good turned out to be.
@@ -157,13 +166,18 @@ impl PopTypesReader {
         }
 
         let id = name.and_then(|n| self.defs.define(&n, reader.errors()));
-        self.entries.push(PopEntry {
+        self.entries.push(PopTypeEntry {
             id,
             endowment,
             utility,
             endowment_ids: Vec::new(),
             utility_ids: Vec::new(),
         });
+    }
+
+    /// The definitions, for resolving references to POP types in phase 2.
+    pub fn defs(&self) -> &Definitions<PopTypeKind> {
+        &self.defs
     }
 
     /// Phase 2: resolves every good named in an endowment or a utility, in every entry.
@@ -210,5 +224,103 @@ impl PopTypesReader {
             types.push(PopType::new(endowment, utility));
         }
         PopTypes::from_parts(self.defs.into_registry(), types)
+    }
+}
+
+/// One `[[pop]]` entry, waiting for phase 2.
+struct PopEntry {
+    /// The `[[pop]]` header.
+    at: Location,
+    pop_type: Located<String>,
+    coord: HexCoord,
+    /// `Quantity::ONE` is a placeholder if the size was invalid (the load fails anyway).
+    size: Quantity,
+}
+
+/// Collects POPs during phase 1, and resolves them in phase 2.
+#[derive(Default)]
+pub(crate) struct PopsReader {
+    entries: Vec<PopEntry>,
+    /// (type name as written, coordinates) to the header of the first entry.
+    /// Lookup only; never iterated.
+    seen: HashMap<(String, HexCoord), Location>,
+    /// Filled in phase 2.
+    pops: Vec<Pop>,
+}
+
+impl PopsReader {
+    /// Reads one `[[pop]]` entry.
+    pub fn read(&mut self, reader: &mut EntryReader<'_, '_>) {
+        let at = reader.location().clone();
+        // Read every key before returning, so none is falsely reported as unknown.
+        // Not name-checked: a bad value is simply an unknown POP type in phase 2.
+        let pop_type = reader.required_string("type");
+        let q = coordinate(reader, "q");
+        let r = coordinate(reader, "r");
+        let size = reader.required_number("size").and_then(|value| {
+            match Quantity::new(value.value).filter(|q| q.get() > 0.0) {
+                Some(quantity) => Some(quantity),
+                None => {
+                    reader.errors().at(
+                        &value.at,
+                        "key 'size' in pop must be a finite number greater than 0",
+                    );
+                    None
+                }
+            }
+        });
+
+        // An entry with a missing or invalid type or coordinate is not stored, so it can't
+        // produce a duplicate error. The load fails anyway.
+        let (Some(pop_type), Some(q), Some(r)) = (pop_type, q, r) else {
+            return;
+        };
+        let coord = HexCoord::new(q, r);
+        let key = (pop_type.value.clone(), coord);
+        if let Some(first) = self.seen.get(&key) {
+            let message = format!(
+                "duplicate pop of '{}' at {coord} (first defined at {first})",
+                pop_type.value
+            );
+            reader.errors().at(&at, message);
+            return;
+        }
+        self.seen.insert(key, at.clone());
+        // With a missing or invalid size, store a placeholder, so phase 2 still checks the
+        // references.
+        self.entries.push(PopEntry {
+            at,
+            pop_type,
+            coord,
+            size: size.unwrap_or(Quantity::ONE),
+        });
+    }
+
+    /// Phase 2: resolves each entry's POP type and hex. Both checks always run.
+    pub fn resolve(
+        &mut self,
+        pop_types: &Definitions<PopTypeKind>,
+        map: &MapReader,
+        sink: &mut ErrorSink,
+    ) {
+        for entry in &self.entries {
+            let pop_type = pop_types.resolve(&entry.pop_type, sink);
+            let hex = map.id(entry.coord);
+            if hex.is_none() {
+                sink.at(&entry.at, format!("no hex at {}", entry.coord));
+            }
+            if let (Some(pop_type), Some(hex)) = (pop_type, hex) {
+                self.pops.push(Pop {
+                    hex,
+                    pop_type,
+                    size: entry.size,
+                });
+            }
+        }
+    }
+
+    /// The finished list. Only call this after a successful load.
+    pub fn finish(self, hex_count: usize) -> Pops {
+        Pops::from_pops(self.pops, hex_count)
     }
 }

@@ -1,0 +1,93 @@
+[[pop]]
+type = "worker"
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+type = "worker"
+r = 0
+size = 10
+
+[[pop]]
+type = "worker"
+q = 0
+size = 10
+
+[[pop]]
+type = "worker"
+q = 1
+r = 0
+
+[[pop]]
+type = 5
+q = 2
+r = 0
+size = 10
+
+[[pop]]
+type = "worker"
+q = 1.5
+r = 0
+size = 10
+
+[[pop]]
+type = "worker"
+q = 2147483648
+r = 0
+size = 10
+
+[[pop]]
+type = "worker"
+q = 9
+r = 9
+size = 10
+
+[[pop]]
+type = "worker"
+q = 3
+r = 0
+size = "10"
+
+[[pop]]
+type = "worker"
+q = 4
+r = 0
+size = 0
+
+[[pop]]
+type = "worker"
+q = 5
+r = 0
+size = -2
+
+[[pop]]
+type = "worker"
+q = 6
+r = 0
+size = inf
+
+[[pop]]
+type = "ghost"
+q = 7
+r = 0
+size = 10
+
+[[pop]]
+type = "worker"
+q = 8
+r = 0
+size = 10
+colour = "red"
+
+[[pop]]
+type = "ghost"
+q = 10
+r = 10
+size = nan
+colour = "red"

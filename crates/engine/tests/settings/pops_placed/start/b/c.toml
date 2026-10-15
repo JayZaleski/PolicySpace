@@ -1,0 +1,11 @@
+[[pop]]
+type = "worker"
+q = 1
+r = 0
+size = 0.5
+
+[[pop]]
+type = "idle"
+q = 1
+r = 0
+size = 7

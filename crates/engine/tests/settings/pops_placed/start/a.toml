@@ -1,0 +1,11 @@
+[[pop]]
+type = "worker"
+q = 0
+r = 0
+size = 3
+
+[[pop]]
+type = "hoarder"
+q = 0
+r = 0
+size = 2

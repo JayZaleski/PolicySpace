@@ -1,0 +1,118 @@
+# POPs: groups of individuals placed on the map. Every [[pop]] needs four keys:
+#
+#   type  The name of a POP type (see rules/pops.toml).
+#   q, r  The axial coordinates of a hex that exists in the map, as for deposits.
+#   size  N, the number of individuals in the POP: a number greater than 0, and decimals
+#         are allowed. A POP is an aggregate: its endowment (and later its demand) scales
+#         with N, and its size will grow by a rate.
+#
+# A hex holds at most one POP of each type: two entries with the same type and coordinates
+# are an error. A hex may hold POPs of several types, or none. Every POP starts with
+# nothing; its first endowment arrives at the start of turn 0.
+#
+# The POPs are listed in the map's order (row by row, north to south, west to east). Four
+# hexes have no POP: (2, -1), (-2, 0), (1, 1) and (-2, 2). The sizes total 410, so POPs are
+# endowed 4100 unskilled_labor every turn.
+
+[[pop]]
+type = "peasant"
+q = 0
+r = -2
+size = 20
+
+[[pop]]
+type = "peasant"
+q = 1
+r = -2
+size = 15
+
+# This hex has no market, so this POP's labor can never be sold.
+[[pop]]
+type = "peasant"
+q = 2
+r = -2
+size = 12
+
+[[pop]]
+type = "peasant"
+q = -1
+r = -1
+size = 25
+
+[[pop]]
+type = "peasant"
+q = 0
+r = -1
+size = 30
+
+[[pop]]
+type = "peasant"
+q = 1
+r = -1
+size = 35
+
+# No POP at (2, -1) (end of row r = -1) or at (-2, 0) (start of row r = 0).
+
+[[pop]]
+type = "peasant"
+q = -1
+r = 0
+size = 40
+
+# The center holds two POPs.
+[[pop]]
+type = "peasant"
+q = 0
+r = 0
+size = 60
+
+# The only hex that prices every good.
+[[pop]]
+type = "artisan"
+q = 0
+r = 0
+size = 10
+
+[[pop]]
+type = "peasant"
+q = 1
+r = 0
+size = 35
+
+[[pop]]
+type = "peasant"
+q = 2
+r = 0
+size = 18
+
+[[pop]]
+type = "peasant"
+q = -2
+r = 1
+size = 22
+
+[[pop]]
+type = "peasant"
+q = -1
+r = 1
+size = 28
+
+[[pop]]
+type = "peasant"
+q = 0
+r = 1
+size = 24
+
+# No POP at (1, 1) (end of row r = 1) or at (-2, 2) (start of row r = 2).
+
+[[pop]]
+type = "peasant"
+q = -1
+r = 2
+size = 16
+
+[[pop]]
+type = "peasant"
+q = 0
+r = 2
+size = 20

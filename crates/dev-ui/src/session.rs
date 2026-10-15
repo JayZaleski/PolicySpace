@@ -309,7 +309,9 @@ mod tests {
         session.open(repo_path("settings/sample"));
         assert_eq!(
             session.log(),
-            ["Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain"]
+            [
+                "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor"
+            ]
         );
         assert_eq!(session.step_error(), None);
         assert_eq!(session.selected(), None);
@@ -325,7 +327,7 @@ mod tests {
         assert_eq!(
             session.log().last().map(String::as_str),
             Some(
-                "Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain"
+                "Turn 1: perished 4100 unskilled_labor, 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor"
             )
         );
         assert_eq!(session.step(STEP_MANY), 10);
