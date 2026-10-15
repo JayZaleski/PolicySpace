@@ -59,34 +59,34 @@
 - Description: A per-hex dummy market that posts fixed prices in the hex's currency and buys and sells any amount at those prices. Decide where the dummy prices live in the setting folder. Add the first way to take goods out of a stockpile, including which perish group goes first. This is the seam Stage 05 replaces with the live market.
 
 ### Step 03: pop-types
-- Status: planned
+- Status: specified
 - Tags: #pops #utility #setting-data #goods
-- Description: Define POP types in the rules: the labor each individual produces per turn, and the Stone-Geary parameters (subsistence and share per named good). Leisure is the labor good appearing in the utility function, so it needs no special case. Validate the parameters and check their references to goods. Add POP types to the sample setting.
+- Description: Define POP types in the rules: the endowment each individual receives per turn (any goods, intended to be only unskilled labor; other goods exist for testing), and the Stone-Geary parameters (subsistence and share per named good, shares normalized by the engine). Leisure is an endowed good appearing in the utility function, so it needs no special case. Validate the parameters and check their references to goods. Add POP types to the sample setting.
 
 ### Step 04: pops
 - Status: planned
 - Tags: #pops #setting-data #turn-loop
-- Description: Place POPs in the starting state: hex, POP type, and size N. Each POP owns its own stockpile of goods. At the start of each turn every POP's labor is emitted into its stockpile. POPs start with no cash. Add POPs to the sample setting.
+- Description: Place POPs in the starting state: hex, POP type, and size N. Each POP owns its own stockpile of goods. At the start of each turn every POP's endowment is emitted into its stockpile. POPs start with no cash. Add POPs to the sample setting.
 
 ### Step 05: stone-geary-demand
 - Status: planned
 - Tags: #pops #utility #engine
-- Description: The closed-form Stone-Geary demand: given prices, the wage, and the labor endowment, the quantity of each good and of leisure a POP wants. Includes the below-subsistence rule: a POP whose full income can't cover its subsistence bundle spends everything, buying toward subsistence. A pure function with its own tests, not yet wired into the turn.
+- Description: The closed-form Stone-Geary demand: given prices and the endowment, the quantity of each good a POP wants, including the endowed goods it keeps as leisure. Includes the below-subsistence rule: a POP whose full income can't cover its subsistence bundle spends everything, buying toward subsistence. A pure function with its own tests, not yet wired into the turn.
 
 ### Step 06: pop-trade
 - Status: planned
 - Tags: #pops #market #turn-loop
-- Description: The first behavior in the "actors act" part of the turn: each POP computes its demand against the dummy market's prices, sells the labor it doesn't keep as leisure, buys goods with the proceeds, and consumes them. The turn report gains POP totals.
+- Description: The first behavior in the "actors act" part of the turn: each POP computes its demand against the dummy market's prices, sells the endowment it doesn't keep as leisure, buys goods with the proceeds, and consumes them. The turn report gains POP totals.
 
 ### Step 07: pop-growth
 - Status: planned
 - Tags: #pops #turn-loop #setting-data
-- Description: Each POP's size N grows or shrinks by a rate that is a function of its utility: zero at subsistence, positive above, negative below. The function's parameters live in the setting. Per-individual parameters don't change; next turn's labor endowment follows the new N.
+- Description: Each POP's size N grows or shrinks by a rate that is a function of its utility: zero at subsistence, positive above, negative below. The function's parameters live in the setting. Per-individual parameters don't change; next turn's endowment follows the new N.
 
 ### Step 08: dev-ui-pops
 - Status: planned
 - Tags: #dev-ui #pops #currency #market
-- Description: Inspect a hex's currency, its posted prices, and its POPs in the dev UI: each POP's type, size, inventory, last turn's labor sold, goods bought and consumed, utility, and growth. Show the POP totals in the turn log.
+- Description: Inspect a hex's currency, its posted prices, and its POPs in the dev UI: each POP's type, size, inventory, last turn's endowment sold, goods bought and consumed, utility, and growth. Show the POP totals in the turn log.
 
 ## Stage 03: industries
 - Status: outline
