@@ -84,7 +84,7 @@
 - Description: Each POP's size N grows or shrinks by a rate that is a function of its utility: zero at subsistence, positive above, negative below. The function's parameters live in the setting. Per-individual parameters don't change; next turn's endowment follows the new N.
 
 ### Step 08: dev-ui-pops
-- Status: planned
+- Status: specified
 - Tags: #dev-ui #pops #currency #market
 - Description: Inspect a hex's currency, its posted prices, and its POPs in the dev UI: each POP's type, size, inventory, last turn's submission and trade outcome (endowment sold, goods bought and consumed, currency carried over), utility, and growth. Show the POP totals in the turn log.
 
