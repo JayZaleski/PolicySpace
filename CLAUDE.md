@@ -112,10 +112,11 @@ Work proceeds Stage by Stage, and within each Stage, Step by Step. **Skills** ar
 7. **Comprehensive Review** — user invokes the `comp-review` skill to review changes across the Stage's Steps and look for opportunities to consolidate and optimize the code. Recommendations are written to `consolidate.md` in the Stage folder.
 8. **Implement Consolidation** — agent deploys the `update-status` subagent at the **consolidate** checkpoint to commit `consolidate.md` as a safe point, then deploys the `build` subagent to incorporate the approved recommendations, plus any requested tests (several at once when `consolidate.md` has Packages), and then the `build-review` subagent. *Requires user permission (one question covers all three).*
 9. **Code Review** — agent summarizes the diff, test results, and `build-review` findings for the user, and waits for the user's approval before continuing. If the user rejects the build, see [Rejected builds](#rejected-builds).
-10. **Update Documentation** — agent deploys the `update-docs` and `update-manual` subagents:
+10. **Update Vision and Roadmap** — agent proposes edits to `vision.md` and `roadmap.md` that reflect the decisions made during the Stage (in the Steps' `design.md` files, roadmap changes, `wont-fix` bugs, and the consolidation), and applies them with the user's approval. The vision stays at the level of goals and player experience; the roadmap keeps its format, statuses, and numbering.
+11. **Update Documentation** — agent deploys the `update-docs` and `update-manual` subagents:
    - `update-docs` uses the Stage's `docs_changes.md` files and `consolidate.md` to update `docs/`.
    - `update-manual` uses the Stage's `manual_changes.md` files to write the changes into `manual.ipynb`, then regenerates `manual.html`.
-11. **Update Status** — agent deploys the `update-status` subagent. *Requires user permission.*
+12. **Update Status** — agent deploys the `update-status` subagent. *Requires user permission.*
 
 Each session starts fresh, so all state needed to continue the loop must live in files (the plan, Step folders, and git history), not in conversation context.
 

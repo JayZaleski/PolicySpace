@@ -32,7 +32,7 @@ Work through this table from the top, and stop at the first row that matches. "S
 | The bug is `specified`, its `fix.md` is committed, and there are code changes | Bug fix build interrupted, or finished but not reviewed | **You:** recommend `build` in **continue** mode, then Code Review (below) |
 | The bug is `built` | After the bug fix's Code Review | **You:** `bugfix` section 7 |
 | `roadmap.md` is empty, or the current Stage is `outline` | Start of a Stage | User invokes `brainstorm` (or `project-plan` if `vision.md` has uncommitted changes and the scratchpad is empty) |
-| `vision.md` has uncommitted changes, and `roadmap.md` doesn't | During or after `brainstorm` | User invokes `brainstorm` if the scratchpad isn't empty, otherwise `project-plan` |
+| `vision.md` has uncommitted changes, `roadmap.md` doesn't, and the current Stage isn't `in-progress` | During or after `brainstorm` | User invokes `brainstorm` if the scratchpad isn't empty, otherwise `project-plan` |
 | The current Stage is `planned` and `roadmap.md` has uncommitted changes | After `project-plan`, before the plan commit | **You:** `update-status` at the **plan** checkpoint |
 | The Step is `planned` | Before or during `step-design` | User invokes `step-design` |
 | The Step is `designed` | Before or during `step-spec`, or a build that was set aside | User invokes `step-spec` |
@@ -46,7 +46,7 @@ Work through this table from the top, and stop at the first row that matches. "S
 | `consolidate.md` has uncommitted changes otherwise, or the scratchpad isn't empty | During `comp-review` | User invokes `comp-review`, and resumes from the existing `consolidate.md` |
 | `consolidate.md` is committed, it has `approved` recommendations, and there are no code changes | Safe point committed, build never started | **You:** build in **new** mode, as in `comp-review` section 6 |
 | `consolidate.md` is committed, it has `approved` recommendations, and there are code changes | Consolidation build interrupted, or finished but not reviewed | **You:** recommend `build` in **continue** mode, then Code Review (below) |
-| No recommendations are left `approved`, and the Stage isn't `done` | Before or during the documentation update | **You:** `comp-review` section 7 |
+| No recommendations are left `approved`, and the Stage isn't `done` | Before or during the vision and roadmap update, or the documentation update | **You:** `comp-review` section 7. Uncommitted `vision.md` or `roadmap.md` edits mean it was started: confirm them with the user, then go on to section 8 |
 
 If the state doesn't fit any row, or doesn't hang together (for example, code changes while the Step is only `designed`), don't guess. Describe what you found to the user and ask how to proceed.
 

@@ -1,6 +1,6 @@
 ---
 name: comp-review
-description: Review all the code changes from a completed Stage, look for chances to consolidate and optimize, and write the approved recommendations to the Stage's consolidate.md. Then run the end-of-Stage loop (build, code review, docs, status).
+description: Review all the code changes from a completed Stage, look for chances to consolidate and optimize, and write the approved recommendations to the Stage's consolidate.md. Then run the end-of-Stage loop (build, code review, vision and roadmap update, docs, status).
 model: best
 argument-hint: "[stage, e.g. 01 or economy]"
 disable-model-invocation: true
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 # Comprehensive Review
 
-Review the code changes across all of a Stage's Steps, look for chances to consolidate and optimize, and write the recommendations to `consolidate.md` in the Stage folder. Then run the rest of the end-of-Stage loop (see `CLAUDE.md`).
+Review the code changes across all of a Stage's Steps, look for chances to consolidate and optimize, and write the recommendations to `consolidate.md` in the Stage folder. Then run the rest of the end-of-Stage loop (see `CLAUDE.md`): the consolidation build and its Code Review, an update of `vision.md` and `roadmap.md` to reflect the decisions made during the Stage, the documentation update, and the stage checkpoint.
 
 **Two audiences.** Everything you say to the user (findings, recommendations, summaries, proposed changes) is in plain English: what it means for the code and the project, without code jargon. Bring in a technical term only when it's needed, and explain it when you do. `consolidate.md` is written for the `build` subagent and should be as precise and technical as that requires.
 
@@ -100,9 +100,20 @@ Then empty `scratchpad.md`. Do not commit.
      2. **Discard and re-plan:** discard the build as `CLAUDE.md` describes, return to section 4 to revise the recommendations with the user, and continue from section 5. The revised `consolidate.md` gets its own (revised) commit.
      3. **Discard and set aside:** discard the build, and set every approved recommendation to `rejected` with the reason "set aside after Code Review". Then continue with section 7, so the Stage can finish without consolidation.
 
-## 7. Documentation and status
+## 7. Update the vision and roadmap
+
+The Stage's Steps were designed one at a time, and each design settled questions the vision left open, changed details, or reshaped what later Stages should expect. Bring `vision.md` and `roadmap.md` back in line with what was actually decided, so the next `brainstorm` and `project-plan` start from the truth rather than from the plan as it stood before the Stage.
+
+1. Gather the decisions: each Step's `design.md` (the decisions, interactions, and out-of-scope lists), roadmap changes made by `step-design` during the Stage, bugs marked `wont-fix` as design changes, and the consolidation. Compare them against `vision.md` and against the Stage's entry and the outline Stages in `roadmap.md`.
+2. Propose the edits to the user in plain English, and get their approval before editing:
+   - **`vision.md`:** record decisions that settle, refine, or change what the vision says, at the vision's level (goals and player experience, the *what* and *why*). Replace superseded content rather than marking it obsolete. Don't add implementation detail, and don't transcribe `design.md` into it. Write principles, not examples, as `brainstorm` does.
+   - **`roadmap.md`:** update this Stage's goal and its Steps' descriptions to match what was built, and the goals of outline Stages that the decisions affect. Keep the format in `CLAUDE.md`. Don't change statuses, names, numbering, or `done` Stages, and don't break outline Stages into Steps: that is `project-plan`'s job.
+3. Edit the files. Do not commit: the **stage** checkpoint commits them, so the next `brainstorm` sees a clean `vision.md`.
+4. If nothing needs to change, say so to the user and move on.
+
+## 8. Documentation and status
 
 1. Deploy the `update-docs` subagent with the Stage folder. Once it finishes, deploy the `update-manual` subagent. `update-manual` goes second because the manual links to the final `docs/` files.
 2. Summarize the documentation changes for the user.
 3. Ask the user for permission to deploy the `update-status` subagent at the **stage** checkpoint. Deploy it only if they agree.
-4. Tell the user the Stage is complete. The next Stage starts in a fresh session with the `brainstorm` skill.
+4. Tell the user the Stage is complete, and summarize the vision and roadmap changes so they know what the next `brainstorm` will start from. The next Stage starts in a fresh session with the `brainstorm` skill.

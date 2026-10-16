@@ -34,6 +34,8 @@ Run the session as a collaborator, not just an interviewer:
 
 Keep the discussion at the level of goals and player experience: the *what* and *why*. Leave the technical *how* to the Step `design.md` and `spec.md` files. If the user goes deep into implementation, note the idea and move back to the vision.
 
+**Examples illustrate; they aren't requirements.** When the user gives an example to explain an idea, work out the principle or reason behind it, and ask if it isn't clear. Record the principle, not the example: a future agent can't tell an illustration from a required outcome, and may build the example instead of the rule. If the user means an example as the actual outcome, confirm that and record it as a decision.
+
 As the discussion goes on, keep `PROJECT_PLAN/scratchpad.md` up to date with bullet points showing how you're interpreting it: decisions made, ideas accepted or rejected, open questions. Update it after each meaningful exchange, so the user can read it alongside the conversation and correct you. When the user corrects you, fix the bullet rather than adding a new one.
 
 Keep going until the user says they're ready to write.
@@ -42,9 +44,10 @@ Keep going until the user says they're ready to write.
 
 1. Base the edits on `scratchpad.md`. Summarize the changes you plan to make to `vision.md` and get the user's approval.
 2. Edit `vision.md` in place. It has no fixed structure: organize it however best fits the content, and reorganize it when that makes it clearer. Remove content that has been superseded instead of marking it obsolete, since git keeps the history.
-3. Edit only `vision.md` and `scratchpad.md`. Do not touch `roadmap.md` or any other plan files.
-4. **Do not commit.** `project-plan` finds the changes by diffing `vision.md` against the last commit.
-5. Once the edits to `vision.md` are finished, empty `scratchpad.md` so it doesn't confuse future agents.
+3. Write principles and reasons, not the examples the user gave to explain them. Keep an example only when the principle can't be stated clearly without one, and then label it as an illustration ("for example"), never as the outcome.
+4. Edit only `vision.md` and `scratchpad.md`. Do not touch `roadmap.md` or any other plan files.
+5. **Do not commit.** `project-plan` finds the changes by diffing `vision.md` against the last commit.
+6. Once the edits to `vision.md` are finished, empty `scratchpad.md` so it doesn't confuse future agents.
 
 ## 4. Wrap up
 

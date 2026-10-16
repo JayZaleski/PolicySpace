@@ -39,6 +39,8 @@ Open with a short summary of the Step as `roadmap.md` describes it, and what it 
 
 Keep the design in plain English: how the feature behaves and why. Leave code-level detail (files, classes, functions, data structures) to `spec.md`. Naming existing systems and Steps is fine.
 
+**Examples illustrate; they aren't requirements.** When the user gives an example to explain an idea, work out the principle or reason behind it, and ask if it isn't clear. Record the principle, not the example: a future agent can't tell an illustration from a required outcome, and may build the example instead of the rule. If the user means an example as the actual outcome, confirm that and record it as a decision.
+
 As the discussion goes on, keep `scratchpad.md` up to date with bullet points showing how you're interpreting it: decisions made, rules and edge cases, things that are out of scope, open questions. When the user corrects you, fix the bullet rather than adding a new one.
 
 ### Roadmap changes
@@ -49,6 +51,8 @@ If the design shows that the roadmap should change (for example, the Step should
 
 Once the user is ready, summarize the design and get their approval. Then write `design.md` in the Step folder using this template. Leave out sections that don't apply.
 
+Write rules and the reasons behind them, not the examples the user gave to explain them. `step-spec` and `build` treat everything in `design.md` as required, so an example written down as if it were the behavior becomes the behavior. Keep an example only when a rule can't be stated clearly without one, and then label it as an illustration ("for example"), never as the outcome.
+
 ```markdown
 # Step NN: <name>
 
@@ -56,7 +60,7 @@ Once the user is ready, summarize the design and get their approval. Then write 
 One paragraph: what this Step adds and why.
 
 ## Behavior
-How the feature works, from the player's view and the system's view. Rules, edge cases, examples.
+How the feature works, from the player's view and the system's view. Rules and edge cases, with the reasons behind them.
 
 ## Player-facing Changes
 What the user sees or does differently.
