@@ -3,63 +3,10 @@
 
 mod common;
 
-use std::path::Path;
-
-use common::{load, sample_setting, test_setting};
-use policyspace_engine::{
-    GoodId, HexCoord, HexId, PopId, PopOutcome, Quantity, Turn, TurnReport, World,
+use common::{
+    assert_list, close, good, hex, named, outcome, pop_id, sample_setting, test_setting, world_of,
 };
-
-fn close(a: f64, b: f64) -> bool {
-    (a - b).abs() < 1e-9
-}
-
-fn world_of(path: &Path) -> (World, TurnReport) {
-    World::new(load(path))
-}
-
-fn hex(world: &World, q: i32, r: i32) -> HexId {
-    world
-        .map()
-        .id(HexCoord { q, r })
-        .unwrap_or_else(|| panic!("no hex at ({q}, {r})"))
-}
-
-fn good(world: &World, name: &str) -> GoodId {
-    world.rules().goods.id(name).unwrap()
-}
-
-fn pop_id(index: usize, world: &World) -> PopId {
-    world
-        .pops()
-        .iter()
-        .map(|(id, _)| id)
-        .find(|id| id.index() == index)
-        .unwrap_or_else(|| panic!("no POP {index}"))
-}
-
-fn outcome(world: &World, index: usize) -> &PopOutcome {
-    world.pop_outcome(pop_id(index, world))
-}
-
-/// A list of (good, amount) as (good name, amount).
-fn list(world: &World, entries: &[(GoodId, Quantity)]) -> Vec<(String, f64)> {
-    entries
-        .iter()
-        .map(|(g, a)| (world.rules().goods.name(*g).to_string(), a.get()))
-        .collect()
-}
-
-/// Asserts a list of (good, amount) holds exactly these goods, in this order, with amounts
-/// within 1e-9.
-fn assert_list(world: &World, actual: &[(GoodId, Quantity)], expected: &[(&str, f64)]) {
-    let actual = list(world, actual);
-    assert_eq!(actual.len(), expected.len(), "{actual:?} vs {expected:?}");
-    for ((an, aq), (en, eq)) in actual.iter().zip(expected) {
-        assert_eq!(an, en, "{actual:?} vs {expected:?}");
-        assert!(close(*aq, *eq), "{actual:?} vs {expected:?}");
-    }
-}
+use policyspace_engine::{PopOutcome, Quantity, Turn, TurnReport, World};
 
 fn total(world: &World, pop: usize, name: &str) -> f64 {
     world
@@ -185,7 +132,7 @@ fn the_sample_report_totals_pops_in_good_id_order() {
             ("grain", 3.6 * s + 3.0 * a),
         ],
     );
-    let perished = list(&world, &second.perished);
+    let perished = named(&world, &second.perished);
     for (name, amount) in &perished {
         assert!(
             *amount < 1e-9 || name == "unimproved_copper" || name == "unimproved_grain",
@@ -379,7 +326,7 @@ fn check_table(world: &World, report: &TurnReport, t: u64) {
         assert!(
             report.perished.iter().all(|(_, a)| a.get() < 1e-9),
             "{:?}",
-            list(world, &report.perished)
+            named(world, &report.perished)
         );
     }
 }

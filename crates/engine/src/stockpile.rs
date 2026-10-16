@@ -1,8 +1,8 @@
 //! Stockpiles: amounts of goods, grouped by when they perish.
 //!
 //! - A stockpile holds amounts of goods. It is a general type: each hex has a stockpile of
-//!   unowned goods (see the [`world`](crate::world) module), and later Stages give POPs and
-//!   industries their own.
+//!   unowned goods and each POP has its own (see the [`world`](crate::world) module); later
+//!   Stages give industries theirs.
 //! - Each good's amount is split into groups by when it perishes, so `perishes_after`
 //!   works without tracking individual units. A good with `perishes_after = N` added in
 //!   turn T perishes at the end of turn T+N−1. A durable good's amount is one group that
@@ -190,14 +190,6 @@ impl Stockpile {
         removed
     }
 
-    /// Removes every unit of `good` and returns the total removed (zero if it held none).
-    /// Crate-private.
-    pub(crate) fn remove_all(&mut self, good: GoodId) -> Quantity {
-        let total = self.total(good);
-        self.goods.remove(&good);
-        total
-    }
-
     /// Removes every group that perishes at the end of `turn` or earlier, drops goods left
     /// with no groups, and returns the total removed per good, in good ID order, listing
     /// only goods with an amount > 0. Crate-private.
@@ -226,25 +218,8 @@ impl Stockpile {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU32;
-
     use super::*;
-
-    fn q(value: f64) -> Quantity {
-        Quantity::new(value).unwrap()
-    }
-
-    fn good(index: u32) -> GoodId {
-        GoodId::from_index(index)
-    }
-
-    fn after(n: u32) -> Perishes {
-        Perishes::After(NonZeroU32::new(n).unwrap())
-    }
-
-    fn end(t: u64) -> PerishesAt {
-        PerishesAt::EndOfTurn(Turn::new(t))
-    }
+    use crate::test_support::{after, end, good, q};
 
     #[test]
     fn for_good_computes_the_last_turn() {
@@ -428,23 +403,6 @@ mod tests {
         let before = s.clone();
         assert_eq!(s.remove(good(0), Quantity::ZERO), Ok(()));
         assert_eq!(s.remove(good(7), Quantity::ZERO), Ok(()));
-        assert_eq!(s, before);
-    }
-
-    #[test]
-    fn remove_all_returns_the_total_and_drops_the_good() {
-        let mut s = mixed();
-        assert_eq!(s.remove_all(good(0)), q(9.0));
-        assert_eq!(s.groups(good(0)).count(), 0);
-        let listed: Vec<_> = s.iter().collect();
-        assert_eq!(listed, vec![(good(1), q(1.0))]);
-    }
-
-    #[test]
-    fn remove_all_of_a_good_not_held_returns_zero() {
-        let mut s = mixed();
-        let before = s.clone();
-        assert_eq!(s.remove_all(good(7)), Quantity::ZERO);
         assert_eq!(s, before);
     }
 

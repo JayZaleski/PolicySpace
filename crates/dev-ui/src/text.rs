@@ -92,8 +92,9 @@ pub fn deposit_lines(world: &World, hex: HexId) -> Vec<String> {
         if count == 0 {
             continue;
         }
-        // Quantity has no multiply, so the total is the output added `count` times, which
-        // is how emission sums it.
+        // The total is the output added `count` times rather than multiplied, so it matches
+        // the hex stockpile's total, which emission builds by adding each deposit's output
+        // in turn.
         let total = (0..count).fold(Quantity::ZERO, |sum, _| sum.saturating_add(resource.output));
         lines.push(format!(
             "{name} × {count}: {} {} each, {total} total",

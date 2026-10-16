@@ -48,15 +48,9 @@ impl MarketsReader {
             let Some(number) = number else {
                 continue;
             };
-            match Quantity::new(number.value).filter(|q| q.get() > 0.0) {
-                Some(price) => prices.push((name, price)),
-                None => reader.errors().at(
-                    &number.at,
-                    format!(
-                        "key '{}' in prices of market must be a finite number greater than 0",
-                        name.value
-                    ),
-                ),
+            let prefix = format!("key '{}' in prices of market", name.value);
+            if let Some(price) = reader.positive_quantity(&prefix, number) {
+                prices.push((name, price));
             }
         }
 

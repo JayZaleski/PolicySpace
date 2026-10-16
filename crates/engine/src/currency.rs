@@ -52,15 +52,7 @@ impl HexCurrencies {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id::Id;
-
-    fn good(index: usize) -> GoodId {
-        GoodId::from_usize(index)
-    }
-
-    fn hex(index: usize) -> HexId {
-        Id::from_usize(index)
-    }
+    use crate::test_support::{good, hex};
 
     #[test]
     fn from_vec_gives_ids_in_order() {

@@ -3,43 +3,12 @@
 
 mod common;
 
-use std::path::Path;
-
-use common::{load, sample_setting, test_setting};
-use policyspace_engine::{GoodId, PopId, PopOutcome, Quantity, TurnReport, World};
-
-fn close(a: f64, b: f64) -> bool {
-    (a - b).abs() < 1e-9
-}
-
-fn world_of(path: &Path) -> (World, TurnReport) {
-    World::new(load(path))
-}
-
-fn pop_id(index: usize, world: &World) -> PopId {
-    world
-        .pops()
-        .iter()
-        .map(|(id, _)| id)
-        .find(|id| id.index() == index)
-        .unwrap_or_else(|| panic!("no POP {index}"))
-}
-
-fn outcome(world: &World, index: usize) -> &PopOutcome {
-    world.pop_outcome(pop_id(index, world))
-}
+use common::{close, load, named, outcome, pop_id, sample_setting, test_setting, world_of};
+use policyspace_engine::{Quantity, TurnReport, World};
 
 /// The current size of POP `index`.
 fn size(world: &World, index: usize) -> f64 {
     world.pops().get(pop_id(index, world)).size.get()
-}
-
-/// A list of (good, amount) as (good name, amount).
-fn list(world: &World, entries: &[(GoodId, Quantity)]) -> Vec<(String, f64)> {
-    entries
-        .iter()
-        .map(|(g, a)| (world.rules().goods.name(*g).to_string(), a.get()))
-        .collect()
 }
 
 /// The sum of every POP's current size.
@@ -98,7 +67,7 @@ fn per_individual(world: &World, index: usize) -> Vec<Vec<(String, f64)>> {
     [o.sold(), o.bought(), o.consumed()]
         .iter()
         .map(|l| {
-            list(world, l)
+            named(world, l)
                 .into_iter()
                 .map(|(name, amount)| (name, amount / n))
                 .collect()
@@ -119,7 +88,7 @@ fn stepping_the_sample_grows_again() {
     ));
     assert!(close(size(&world, 8), 10.609));
 
-    let endowed = list(&world, &report.endowed);
+    let endowed = named(&world, &report.endowed);
     assert_eq!(endowed.len(), 1);
     assert_eq!(endowed[0].0, "unskilled_labor");
     assert!(close(endowed[0].1, 10.0 * first.population.get()));
@@ -215,7 +184,7 @@ fn the_pops_growth_table_after_a_step() {
     }
     assert!((report.population.get() - 106.41962).abs() < 1e-4);
     assert!(close(report.population.get(), total_size(&world)));
-    let endowed = list(&world, &report.endowed);
+    let endowed = named(&world, &report.endowed);
     assert_eq!(endowed.len(), 1);
     assert_eq!(endowed[0].0, "labor");
     assert!(close(endowed[0].1, 10.0 * first.population.get()));

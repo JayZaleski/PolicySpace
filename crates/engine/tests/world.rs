@@ -3,42 +3,20 @@
 
 mod common;
 
-use std::path::Path;
-
-use common::{load, sample_setting, test_setting};
-use policyspace_engine::{GoodId, HexCoord, HexId, PerishesAt, Quantity, Turn, TurnReport, World};
-
-fn world_of(path: &Path) -> (World, TurnReport) {
-    World::new(load(path))
-}
-
-fn hex(world: &World, q: i32, r: i32) -> HexId {
-    world
-        .map()
-        .id(HexCoord { q, r })
-        .unwrap_or_else(|| panic!("no hex at ({q}, {r})"))
-}
-
-fn good(world: &World, name: &str) -> GoodId {
-    world.rules().goods.id(name).unwrap()
-}
+use common::{
+    end, good, groups, hex, load, named, pair, sample_setting, stockpile_totals, test_setting,
+    world_of,
+};
+use policyspace_engine::{HexId, PerishesAt, Quantity, Turn, World};
 
 /// A hex's stockpile as (good name, total), in the stockpile's order.
 fn totals(world: &World, q: i32, r: i32) -> Vec<(String, f64)> {
-    world
-        .hex_stockpile(hex(world, q, r))
-        .iter()
-        .map(|(g, amount)| (world.rules().goods.name(g).to_string(), amount.get()))
-        .collect()
+    stockpile_totals(world, world.hex_stockpile(hex(world, q, r)))
 }
 
 /// One good's groups on a hex as (when it perishes, amount), soonest first.
-fn groups(world: &World, q: i32, r: i32, name: &str) -> Vec<(PerishesAt, f64)> {
-    world
-        .hex_stockpile(hex(world, q, r))
-        .groups(good(world, name))
-        .map(|(at, amount)| (at, amount.get()))
-        .collect()
+fn groups_at(world: &World, q: i32, r: i32, name: &str) -> Vec<(PerishesAt, f64)> {
+    groups(world.hex_stockpile(hex(world, q, r)), good(world, name))
 }
 
 fn total(world: &World, q: i32, r: i32, name: &str) -> f64 {
@@ -46,21 +24,6 @@ fn total(world: &World, q: i32, r: i32, name: &str) -> f64 {
         .hex_stockpile(hex(world, q, r))
         .total(good(world, name))
         .get()
-}
-
-fn end(t: u64) -> PerishesAt {
-    PerishesAt::EndOfTurn(Turn::new(t))
-}
-
-/// A report's list as (good name, amount).
-fn named(world: &World, list: &[(GoodId, policyspace_engine::Quantity)]) -> Vec<(String, f64)> {
-    list.iter()
-        .map(|(g, amount)| (world.rules().goods.name(*g).to_string(), amount.get()))
-        .collect()
-}
-
-fn pair(name: &str, amount: f64) -> (String, f64) {
-    (name.to_string(), amount)
 }
 
 #[test]
@@ -75,11 +38,11 @@ fn sample_setting_at_turn_0() {
         ]
     );
     assert_eq!(
-        groups(&world, 0, 0, "unimproved_copper"),
+        groups_at(&world, 0, 0, "unimproved_copper"),
         vec![(end(0), 2.5)]
     );
     assert_eq!(
-        groups(&world, 0, 0, "unimproved_grain"),
+        groups_at(&world, 0, 0, "unimproved_grain"),
         vec![(end(0), 12.0)]
     );
     assert!(world.hex_stockpile(hex(&world, 2, -2)).is_empty());
@@ -132,11 +95,11 @@ fn sample_setting_steps() {
             ]
         );
         assert_eq!(
-            groups(&world, 0, 0, "unimproved_copper"),
+            groups_at(&world, 0, 0, "unimproved_copper"),
             vec![(end(t), 2.5)]
         );
         assert_eq!(
-            groups(&world, 0, 0, "unimproved_grain"),
+            groups_at(&world, 0, 0, "unimproved_grain"),
             vec![(end(t), 12.0)]
         );
         previous = report;
@@ -156,7 +119,7 @@ fn a_three_turn_good_builds_up_and_levels_off() {
             1 => vec![(end(2), 5.0), (end(3), 5.0)],
             _ => vec![(end(t), 5.0), (end(t + 1), 5.0), (end(t + 2), 5.0)],
         };
-        assert_eq!(groups(&world, 0, 0, "stew"), expected, "turn {t}");
+        assert_eq!(groups_at(&world, 0, 0, "stew"), expected, "turn {t}");
         let expected_total = match t {
             0 => 5.0,
             1 => 10.0,
@@ -214,7 +177,7 @@ fn a_durable_good_grows_and_never_perishes() {
             reports.push(world.step().unwrap());
         }
         assert_eq!(
-            groups(&world, 1, 0, "gold"),
+            groups_at(&world, 1, 0, "gold"),
             vec![(PerishesAt::Never, 1.5 * (t + 1) as f64)],
             "turn {t}"
         );
@@ -236,17 +199,17 @@ fn several_deposits_merge_and_do_not_leak_into_other_hexes() {
             world.step().unwrap();
         }
         assert_eq!(
-            groups(&world, 0, 0, "daily"),
+            groups_at(&world, 0, 0, "daily"),
             vec![(end(t), 4.5)],
             "turn {t}"
         );
         assert_eq!(
-            groups(&world, 1, 0, "daily"),
+            groups_at(&world, 1, 0, "daily"),
             vec![(end(t), 2.0)],
             "turn {t}"
         );
         assert_eq!(total(&world, 1, 0, "stew"), 0.0);
-        assert_eq!(groups(&world, 1, 0, "stew"), Vec::new());
+        assert_eq!(groups_at(&world, 1, 0, "stew"), Vec::new());
         assert_eq!(total(&world, 0, 0, "gold"), 0.0);
         assert!(
             world.hex_stockpile(hex(&world, 2, 0)).is_empty(),

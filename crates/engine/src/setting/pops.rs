@@ -68,15 +68,10 @@ fn amount(sub: &mut EntryReader<'_, '_>, key: &str) -> Amount {
     let Some(value) = sub.optional_number(key) else {
         return Amount::Invalid;
     };
-    if value.value.is_finite() && value.value >= 0.0 {
-        Amount::Valid(value.value)
-    } else {
-        let message = format!(
-            "key '{key}' in {} must be a finite number of at least 0",
-            sub.label()
-        );
-        sub.errors().at(&value.at, message);
-        Amount::Invalid
+    let prefix = format!("key '{key}' in {}", sub.label());
+    match sub.non_negative_number(&prefix, value) {
+        Some(amount) => Amount::Valid(amount),
+        None => Amount::Invalid,
     }
 }
 
@@ -126,16 +121,9 @@ fn read_growth(reader: &mut EntryReader<'_, '_>) -> Option<GrowthParams> {
     }
 
     // 3. The cap.
-    let mut max_growth = None;
-    if let Some(v) = sub.required_number("max_growth") {
-        if v.value.is_finite() && v.value >= 0.0 {
-            max_growth = Some(v.value);
-        } else {
-            let message =
-                format!("key 'max_growth' in {label} must be a finite number of at least 0");
-            sub.errors().at(&v.at, message);
-        }
-    }
+    let max_growth = sub
+        .required_number("max_growth")
+        .and_then(|v| sub.non_negative_number(&format!("key 'max_growth' in {label}"), v));
 
     // 4. Unknown keys.
     sub.finish();
@@ -162,16 +150,8 @@ impl PopTypesReader {
             .unwrap_or_default()
         {
             let amount = number.and_then(|v| {
-                let quantity = Quantity::new(v.value).filter(|q| q.get() > 0.0);
-                if quantity.is_none() {
-                    let message = format!(
-                        "key '{}' in endowment of {} must be a finite number greater than 0",
-                        key.value,
-                        reader.label()
-                    );
-                    reader.errors().at(&v.at, message);
-                }
-                quantity
+                let prefix = format!("key '{}' in endowment of {}", key.value, reader.label());
+                reader.positive_quantity(&prefix, v)
             });
             endowment.push((key, amount));
         }
@@ -337,18 +317,9 @@ impl PopsReader {
         let pop_type = reader.required_string("type");
         let q = coordinate(reader, "q");
         let r = coordinate(reader, "r");
-        let size = reader.required_number("size").and_then(|value| {
-            match Quantity::new(value.value).filter(|q| q.get() > 0.0) {
-                Some(quantity) => Some(quantity),
-                None => {
-                    reader.errors().at(
-                        &value.at,
-                        "key 'size' in pop must be a finite number greater than 0",
-                    );
-                    None
-                }
-            }
-        });
+        let size = reader
+            .required_number("size")
+            .and_then(|v| reader.positive_quantity("key 'size' in pop", v));
 
         // An entry with a missing or invalid type or coordinate is not stored, so it can't
         // produce a duplicate error. The load fails anyway.

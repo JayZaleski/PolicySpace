@@ -39,18 +39,9 @@ impl ResourcesReader {
         let name = reader.required_name("name");
         // Not name-checked: a bad value is simply an unknown good in phase 2.
         let produces = reader.required_string("produces");
-        let output = reader.required_number("output").and_then(|value| {
-            match Quantity::new(value.value).filter(|q| q.get() > 0.0) {
-                Some(quantity) => Some(quantity),
-                None => {
-                    reader.errors().at(
-                        &value.at,
-                        "key 'output' in resource must be a finite number greater than 0",
-                    );
-                    None
-                }
-            }
-        });
+        let output = reader
+            .required_number("output")
+            .and_then(|v| reader.positive_quantity("key 'output' in resource", v));
 
         // Define the name even if another key was invalid: the load fails anyway, but a
         // later duplicate must still be caught, and a deposit referring to this resource

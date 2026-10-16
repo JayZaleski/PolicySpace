@@ -3,30 +3,11 @@
 
 mod common;
 
-use common::{load, sample_setting};
-use policyspace_engine::{Demand, GoodId, HexCoord, HexId, Quantity, World, demand};
-
-fn close(a: f64, b: f64) -> bool {
-    (a - b).abs() < 1e-9
-}
-
-fn q(value: f64) -> Quantity {
-    Quantity::new(value).unwrap()
-}
+use common::{close, good, hex, load, q, sample_setting};
+use policyspace_engine::{Demand, Quantity, World, demand};
 
 fn sample_world() -> World {
     World::new(load(&sample_setting())).0
-}
-
-fn hex(world: &World, q: i32, r: i32) -> HexId {
-    world
-        .map()
-        .id(HexCoord { q, r })
-        .unwrap_or_else(|| panic!("no hex at ({q}, {r})"))
-}
-
-fn good(world: &World, name: &str) -> GoodId {
-    world.rules().goods.id(name).unwrap()
 }
 
 /// The demand of a POP of the named type with `size` individuals holding `labor` unskilled

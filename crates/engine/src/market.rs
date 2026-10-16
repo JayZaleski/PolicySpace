@@ -260,21 +260,6 @@ impl<'a> Market<'a> {
         Ok(received)
     }
 
-    /// Sells everything of `good` the stockpile holds. Returns (amount sold, currency
-    /// received); (0, 0) if it held none. Same refusals as [`Market::sell`] except
-    /// `NotEnoughGoods`.
-    pub fn sell_all(
-        &self,
-        stockpile: &mut Stockpile,
-        good: GoodId,
-    ) -> Result<(Quantity, Quantity), TradeError> {
-        let price = self.trade_price(good)?;
-        let sold = stockpile.remove_all(good);
-        let received = sold.saturating_mul(price);
-        stockpile.add(self.currency, received, self.perishes_at(self.currency));
-        Ok((sold, received))
-    }
-
     /// Sells everything of `good` above `keep` from `stockpile` (soonest-perishing first), so
     /// that `keep` remains, and adds the proceeds in currency. Returns (amount sold, currency
     /// received); (0, 0) if the stockpile holds `keep` or less. Same refusals as
@@ -369,19 +354,7 @@ impl PriceList for Market<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::id::Id;
-
-    fn good(index: usize) -> GoodId {
-        GoodId::from_usize(index)
-    }
-
-    fn hex(index: usize) -> HexId {
-        Id::from_usize(index)
-    }
-
-    fn q(value: f64) -> Quantity {
-        Quantity::new(value).unwrap()
-    }
+    use crate::test_support::{good, hex, q};
 
     fn prices() -> HexPrices {
         let mut first = BTreeMap::new();

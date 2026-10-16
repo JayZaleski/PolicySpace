@@ -29,7 +29,8 @@ pub(crate) struct MapReader {
 }
 
 /// Reads one coordinate key as an `i32`. A value outside `i32` is reported at the value.
-/// Shared by hexes and deposits; the message names the entry's label.
+/// Shared by every section placed by coordinates (hexes, deposits, markets, POPs); the
+/// message names the entry's label.
 pub(crate) fn coordinate(reader: &mut EntryReader<'_, '_>, key: &str) -> Option<i32> {
     let value = reader.required_integer(key)?;
     match i32::try_from(value.value) {

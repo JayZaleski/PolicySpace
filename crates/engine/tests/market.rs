@@ -3,43 +3,10 @@
 
 mod common;
 
-use std::path::Path;
-
-use common::{failures_of, load, sample_setting, test_setting};
-use policyspace_engine::{
-    GoodId, HexCoord, HexId, PerishesAt, Quantity, Stockpile, Turn, TurnReport, World,
+use common::{
+    close, end, failures_of, good, groups, hex, pair, q, sample_setting, test_setting, world_of,
 };
-
-fn world_of(path: &Path) -> (World, TurnReport) {
-    World::new(load(path))
-}
-
-fn hex(world: &World, q: i32, r: i32) -> HexId {
-    world
-        .map()
-        .id(HexCoord { q, r })
-        .unwrap_or_else(|| panic!("no hex at ({q}, {r})"))
-}
-
-fn good(world: &World, name: &str) -> GoodId {
-    world.rules().goods.id(name).unwrap()
-}
-
-fn end(t: u64) -> PerishesAt {
-    PerishesAt::EndOfTurn(Turn::new(t))
-}
-
-fn q(value: f64) -> Quantity {
-    Quantity::new(value).unwrap()
-}
-
-/// One good's groups in a stockpile as (when it perishes, amount), soonest first.
-fn groups(stockpile: &Stockpile, good: GoodId) -> Vec<(PerishesAt, f64)> {
-    stockpile
-        .groups(good)
-        .map(|(at, amount)| (at, amount.get()))
-        .collect()
-}
+use policyspace_engine::{GoodId, PerishesAt, Quantity, Stockpile, World};
 
 /// A hex's posted prices as (good name, price), in good ID order.
 fn posted(world: &World, q: i32, r: i32) -> Vec<(String, f64)> {
@@ -48,10 +15,6 @@ fn posted(world: &World, q: i32, r: i32) -> Vec<(String, f64)> {
         .posted(hex(world, q, r))
         .map(|(g, price)| (world.rules().goods.name(g).to_string(), price.get()))
         .collect()
-}
-
-fn pair(name: &str, price: f64) -> (String, f64) {
-    (name.to_string(), price)
 }
 
 #[test]
@@ -210,13 +173,16 @@ fn selling_removes_the_good_and_adds_currency() {
 
     // Selling everything.
     let mut pile = stock(&world, 1);
-    assert_eq!(market.sell_all(&mut pile, daily), Ok((q(2.0), q(1.0))));
+    assert_eq!(
+        market.sell_down_to(&mut pile, daily, Quantity::ZERO),
+        Ok((q(2.0), q(1.0)))
+    );
     assert_eq!(pile.total(daily), Quantity::ZERO);
     assert_eq!(pile.groups(daily).count(), 0);
     assert_eq!(pile.total(gold), q(2.5));
     // Selling everything of a good that isn't held trades nothing.
     assert_eq!(
-        market.sell_all(&mut pile, daily),
+        market.sell_down_to(&mut pile, daily, Quantity::ZERO),
         Ok((Quantity::ZERO, Quantity::ZERO))
     );
     assert_eq!(pile.total(gold), q(2.5));
@@ -277,10 +243,6 @@ fn untraded_goods_and_the_currency_are_refused() {
     let not_traded = Err(policyspace_engine::TradeError::NotTraded { good: daily });
     assert_eq!(none.sell(&mut pile, daily, q(1.0)), not_traded);
     assert_eq!(
-        none.sell_all(&mut pile, daily),
-        Err(policyspace_engine::TradeError::NotTraded { good: daily })
-    );
-    assert_eq!(
         none.buy(&mut pile, daily, q(1.0)),
         Err(policyspace_engine::TradeError::NotTraded { good: daily })
     );
@@ -293,10 +255,6 @@ fn untraded_goods_and_the_currency_are_refused() {
     let is_currency = || Err(policyspace_engine::TradeError::IsCurrency { good: gold });
     assert_eq!(market.sell(&mut pile, gold, q(1.0)), is_currency());
     assert_eq!(market.buy(&mut pile, gold, q(1.0)), is_currency());
-    assert_eq!(
-        market.sell_all(&mut pile, gold),
-        Err(policyspace_engine::TradeError::IsCurrency { good: gold })
-    );
     assert_eq!(pile, before);
 }
 
@@ -370,15 +328,22 @@ fn sell_down_to_at_or_below_keep_sells_nothing() {
 fn sell_down_to_zero_sells_everything() {
     let world = turns_world();
     let daily = good(&world, "daily");
+    let gold = good(&world, "gold");
     let market = world.market(hex(&world, 0, 0));
     let mut down = stock(&world, 0);
-    let mut all = stock(&world, 0);
+    let held = down.total(daily);
+    let price = market.price(daily).unwrap();
+    let gold_before = down.total(gold);
     assert_eq!(
         market.sell_down_to(&mut down, daily, Quantity::ZERO),
-        market.sell_all(&mut all, daily)
+        Ok((held, held.saturating_mul(price)))
     );
-    assert_eq!(down, all);
     assert_eq!(down.total(daily), Quantity::ZERO);
+    assert_eq!(down.groups(daily).count(), 0);
+    assert!(close(
+        down.total(gold).get(),
+        gold_before.get() + held.get() * price.get()
+    ));
 }
 
 #[test]
@@ -410,7 +375,10 @@ fn buy_for_spends_exactly_and_adds_the_good() {
     let market = world.market(hex(&world, 0, 0));
     // Selling all of hex (0, 0)'s 5 stew at 4 gives exactly 20 gold.
     let mut pile = stock(&world, 0);
-    assert_eq!(market.sell_all(&mut pile, stew), Ok((q(5.0), q(20.0))));
+    assert_eq!(
+        market.sell_down_to(&mut pile, stew, Quantity::ZERO),
+        Ok((q(5.0), q(20.0)))
+    );
     assert_eq!(pile.total(gold), q(20.0));
 
     assert_eq!(market.buy_for(&mut pile, stew, q(6.0)), Ok(q(1.5)));

@@ -8,7 +8,7 @@
 //!   is created; a POP's first endowment arrives at the start of turn 0), and each POP's
 //!   latest trade outcome (what it demanded, sold, bought and consumed). Hexes,
 //!   currencies and deposits don't change yet, but they are world state because later
-//!   Steps change them (deposit ownership in Stage 02); a POP's size changes every turn as
+//!   Stages change them (deposit ownership in Stage 04); a POP's size changes every turn as
 //!   it grows. The posted prices don't change yet either; [`World::market`] hands out each
 //!   hex's market view, the seam Stage 05 replaces.
 //! - A turn has three parts:
@@ -34,8 +34,8 @@
 //!   POP, with every sale before every purchase and then consumption, POPs grow in ID
 //!   order, and stockpiles iterate in a fixed order, so the same setting stepped the same
 //!   number of times always gives the same world and reports.
-//! - Stage 02 will send an owned deposit's output to its owner instead of the hex
-//!   stockpile.
+//! - Stage 04 (businesses) will send an owned deposit's output to its owner instead of the
+//!   hex stockpile.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -124,6 +124,13 @@ pub struct World {
     pop_outcomes: IdVec<PopKind, PopOutcome>,
 }
 
+/// The trade round's totals per good, each in good ID order.
+struct TradeTotals {
+    sold: Vec<(GoodId, Quantity)>,
+    bought: Vec<(GoodId, Quantity)>,
+    consumed: Vec<(GoodId, Quantity)>,
+}
+
 impl World {
     /// Builds a world from `setting` at turn 0 and runs turn 0's start, turn 0's trade
     /// round and turn 0's growth.
@@ -149,20 +156,7 @@ impl World {
             pop_stockpiles,
             pop_outcomes: IdVec::from_vec(Vec::new()),
         };
-        let emitted = world.emit();
-        let endowed = world.endow();
-        let (sold, bought, consumed) = world.trade();
-        let population = world.grow();
-        let report = TurnReport {
-            turn: world.turn,
-            perished: Vec::new(),
-            emitted,
-            endowed,
-            sold,
-            bought,
-            consumed,
-            population,
-        };
+        let report = world.run_turn(Vec::new());
         (world, report)
     }
 
@@ -172,20 +166,7 @@ impl World {
         let next = self.turn.next().ok_or(StepError::ClockAtMaximum)?;
         let perished = self.perish();
         self.turn = next;
-        let emitted = self.emit();
-        let endowed = self.endow();
-        let (sold, bought, consumed) = self.trade();
-        let population = self.grow();
-        Ok(TurnReport {
-            turn: self.turn,
-            perished,
-            emitted,
-            endowed,
-            sold,
-            bought,
-            consumed,
-            population,
-        })
+        Ok(self.run_turn(perished))
     }
 
     /// The current turn.
@@ -277,6 +258,30 @@ impl World {
         self.pop_outcomes.get(pop)
     }
 
+    /// Runs the current turn's start (emission, endowment) and part 2 (the trade round,
+    /// consumption, growth) and returns its report; `perished` is what the previous turn's
+    /// end removed.
+    fn run_turn(&mut self, perished: Vec<(GoodId, Quantity)>) -> TurnReport {
+        let emitted = self.emit();
+        let endowed = self.endow();
+        let TradeTotals {
+            sold,
+            bought,
+            consumed,
+        } = self.trade();
+        let population = self.grow();
+        TurnReport {
+            turn: self.turn,
+            perished,
+            emitted,
+            endowed,
+            sold,
+            bought,
+            consumed,
+            population,
+        }
+    }
+
     /// Start of turn: every deposit, in ID order, adds its type's output to its hex's
     /// stockpile. Returns the total emitted per good, in good ID order.
     fn emit(&mut self) -> Vec<(GoodId, Quantity)> {
@@ -314,14 +319,7 @@ impl World {
     /// Part 2 of the turn, after `endow`: runs the trade round and consumption on every
     /// hex in hex ID order, records every POP's outcome, and returns the totals
     /// (sold, bought, consumed) per good, each in good ID order.
-    #[allow(clippy::type_complexity)]
-    fn trade(
-        &mut self,
-    ) -> (
-        Vec<(GoodId, Quantity)>,
-        Vec<(GoodId, Quantity)>,
-        Vec<(GoodId, Quantity)>,
-    ) {
+    fn trade(&mut self) -> TradeTotals {
         let mut outcomes: Vec<Option<PopOutcome>> = (0..self.pops.len()).map(|_| None).collect();
         let mut sold = Vec::new();
         let mut bought = Vec::new();
@@ -371,11 +369,11 @@ impl World {
                 .map(|o| o.expect("every POP is on exactly one hex"))
                 .collect(),
         );
-        (
-            totals_by_good(sold),
-            totals_by_good(bought),
-            totals_by_good(consumed),
-        )
+        TradeTotals {
+            sold: totals_by_good(sold),
+            bought: totals_by_good(bought),
+            consumed: totals_by_good(consumed),
+        }
     }
 
     /// Part 2 of the turn, after `trade`: every POP, in ID order, grows by the rate its

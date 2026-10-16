@@ -2,12 +2,12 @@
 
 mod common;
 
-use std::path::Path;
-
-use common::{failures_of, load, sample_setting, test_setting};
+use common::{
+    close, end, failures_of, good, groups, hex, load, named, pair, pop_id, sample_setting,
+    stockpile_totals, test_setting, world_of,
+};
 use policyspace_engine::{
-    GoodId, GrowthParams, HexCoord, HexId, IdError, LoadedSetting, PerishesAt, PopId, Quantity,
-    Turn, TurnReport, World,
+    GrowthParams, HexCoord, IdError, LoadedSetting, PerishesAt, PopId, Quantity, Turn, World,
 };
 
 /// One POP type as (index, name, endowment as (good name, amount), utility as (good name,
@@ -39,10 +39,6 @@ fn types_of(setting: &LoadedSetting) -> Vec<TypeRow> {
             )
         })
         .collect()
-}
-
-fn close(a: f64, b: f64) -> bool {
-    (a - b).abs() < 1e-9
 }
 
 /// Compares types, with a tolerance for the shares.
@@ -331,69 +327,19 @@ fn pop_row(index: usize, name: &str, q: i32, r: i32, size: f64) -> PopRow {
     (index, s(name), HexCoord { q, r }, size)
 }
 
-fn world_of(path: &Path) -> (World, TurnReport) {
-    World::new(load(path))
-}
-
-fn hex(world: &World, q: i32, r: i32) -> HexId {
-    world
-        .map()
-        .id(HexCoord { q, r })
-        .unwrap_or_else(|| panic!("no hex at ({q}, {r})"))
-}
-
-fn good(world: &World, name: &str) -> GoodId {
-    world.rules().goods.id(name).unwrap()
-}
-
-fn end(t: u64) -> PerishesAt {
-    PerishesAt::EndOfTurn(Turn::new(t))
-}
-
-fn pop_id(index: usize, world: &World) -> PopId {
-    world
-        .pops()
-        .iter()
-        .map(|(id, _)| id)
-        .find(|id| id.index() == index)
-        .unwrap_or_else(|| panic!("no POP {index}"))
-}
-
 /// One good's groups in a POP's stockpile as (when it perishes, amount), soonest first.
 fn pop_groups(world: &World, pop: PopId, name: &str) -> Vec<(PerishesAt, f64)> {
-    world
-        .pop_stockpile(pop)
-        .groups(good(world, name))
-        .map(|(at, amount)| (at, amount.get()))
-        .collect()
+    groups(world.pop_stockpile(pop), good(world, name))
 }
 
 /// A POP's whole stockpile as (good name, total).
 fn pop_totals(world: &World, pop: PopId) -> Vec<(String, f64)> {
-    world
-        .pop_stockpile(pop)
-        .iter()
-        .map(|(g, amount)| (world.rules().goods.name(g).to_string(), amount.get()))
-        .collect()
+    stockpile_totals(world, world.pop_stockpile(pop))
 }
 
 /// A hex's whole stockpile as (good name, total).
 fn hex_totals(world: &World, q: i32, r: i32) -> Vec<(String, f64)> {
-    world
-        .hex_stockpile(hex(world, q, r))
-        .iter()
-        .map(|(g, amount)| (world.rules().goods.name(g).to_string(), amount.get()))
-        .collect()
-}
-
-fn named(world: &World, list: &[(GoodId, Quantity)]) -> Vec<(String, f64)> {
-    list.iter()
-        .map(|(g, amount)| (world.rules().goods.name(*g).to_string(), amount.get()))
-        .collect()
-}
-
-fn pair(name: &str, amount: f64) -> (String, f64) {
-    (s(name), amount)
+    stockpile_totals(world, world.hex_stockpile(hex(world, q, r)))
 }
 
 const SAMPLE_POPS: [(&str, i32, i32, f64); 16] = [

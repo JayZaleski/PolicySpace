@@ -15,7 +15,7 @@ Files `build` must read before starting:
 ## Recommendations
 
 ### C01: Shared helpers for the engine's integration tests
-- **Status:** approved
+- **Status:** applied
 - **Summary:** Six integration test files (`demand.rs`, `growth.rs`, `market.rs`, `pops.rs`, `trade.rs`, `world.rs`) each define their own copies of the same helpers: build a world from a path, find a hex by coordinates, find a good by name, make a `Quantity`, compare floats, find a POP by index, read a POP's outcome, turn a `(GoodId, Quantity)` list into `(name, f64)` pairs. Stage 01's C04 created `tests/common/mod.rs` for exactly this; the Stage 02 Steps added local copies instead of extending it. The copies move into `common`.
 - **Changes:**
   - `crates/engine/tests/common/mod.rs`: add these `pub fn`s, each with a one-line doc comment, keeping the existing ones and the `#![allow(dead_code)]`:
@@ -40,7 +40,7 @@ Files `build` must read before starting:
 - **Tests:** No test is added or removed. The same number of engine integration tests pass with the same assertions.
 
 ### C02: Shared helpers for the engine's unit tests
-- **Status:** approved
+- **Status:** applied
 - **Summary:** Inside the engine crate, the `demand` and `growth` test modules carry an identical hand-written `Prices` price list (about 20 lines) and the same sample POP type builders, and seven modules repeat the same `q`, `good`, `close`, `end`, `after` and `no_growth` helpers. A test-only support module, like the dev UI's `test_support.rs`, holds each once.
 - **Changes:**
   - New `crates/engine/src/test_support.rs`, declared in `lib.rs` as `#[cfg(test)] pub(crate) mod test_support;` (after the existing `pub mod` lines). Module doc: "Helpers shared by the engine's unit tests." Everything in it is `pub(crate)`:
@@ -61,7 +61,7 @@ Files `build` must read before starting:
 - **Tests:** No test is added or removed. The same number of engine unit tests pass with the same assertions.
 
 ### C03: One turn runner in `World`
-- **Status:** approved
+- **Status:** applied
 - **Summary:** `World::new` and `World::step` both run `emit`, `endow`, `trade`, `grow` in that order and assemble the same seven-field `TurnReport` by hand, and `trade` returns a three-tuple that needs `#[allow(clippy::type_complexity)]`. One private function runs a turn's start and part 2 and builds the report; `trade` returns a small named struct.
 - **Changes:** `crates/engine/src/world.rs`:
   - Add a private `struct TradeTotals { sold: Vec<(GoodId, Quantity)>, bought: Vec<(GoodId, Quantity)>, consumed: Vec<(GoodId, Quantity)> }` with a one-line doc ("The trade round's totals per good, each in good ID order").
@@ -75,7 +75,7 @@ Files `build` must read before starting:
 - **Tests:** No new tests. `crates/engine/tests/world.rs`, `trade.rs`, `growth.rs`, `pops.rs` (exact reports, determinism, sizes) and the dev UI's exact turn-line tests pass unchanged.
 
 ### C04: One validation helper for positive and non-negative numbers in the loader
-- **Status:** approved
+- **Status:** applied
 - **Summary:** Four readers hand-write the same check and message for "a finite number greater than 0" (resource `output`, POP `size`, market `prices` values, POP type `endowment` amounts), and two write "a finite number of at least 0" (utility `subsistence`/`share`, growth `max_growth`). Two helpers on `EntryReader` produce byte-identical messages.
 - **Changes:**
   - `crates/engine/src/setting/reader.rs`: add to `EntryReader`:
@@ -96,7 +96,7 @@ Files `build` must read before starting:
 - **Tests:** The new reader unit tests. Every `every_*_error_is_reported_at_its_place` integration test (`resources.rs`, `market.rs`, `pops.rs`) passes unchanged: they pin each message and position.
 
 ### C05: Remove the unused "sell everything" operation
-- **Status:** approved
+- **Status:** applied
 - **Summary:** Step 02 added `Market::sell_all` and `Stockpile::remove_all`. Step 06 added `Market::sell_down_to(keep)` and `Stockpile::retain(keep)`, which with `keep` of zero do the same thing, and the trade round uses only those. The older pair is now called by tests only. Removing it narrows the public API that the Step 02 design named ("a way to sell everything"); the user approved this knowing the capability remains as `sell_down_to(stockpile, good, Quantity::ZERO)`. `Market::sell` (an exact amount) stays, as the mirror of `buy`.
 - **Changes:**
   - `crates/engine/src/market.rs`: delete `sell_all`. In the module doc and `sell_down_to`'s doc nothing refers to it; leave them.
@@ -113,7 +113,7 @@ Files `build` must read before starting:
 - **Tests:** Two engine unit tests are removed; no integration test is removed. `cargo test -p policyspace-engine` passes, and `crates/engine/tests/trade.rs` (which exercises the trade round's real sales path) passes unchanged.
 
 ### C06: Stale comments
-- **Status:** approved
+- **Status:** applied
 - **Summary:** Four comments say something that stopped being true during the Stage. Only comment text changes.
 - **Changes:**
   - `crates/engine/src/world.rs` module doc: "later Steps change them (deposit ownership in Stage 02)" becomes "later Stages change them (deposit ownership in Stage 04)"; the last bullet "Stage 02 will send an owned deposit's output to its owner instead of the hex stockpile." becomes "Stage 04 (businesses) will send an owned deposit's output to its owner instead of the hex stockpile."

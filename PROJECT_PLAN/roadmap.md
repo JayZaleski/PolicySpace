@@ -45,7 +45,7 @@
 - Description: Let the developer inspect hexes, deposits, goods, and stockpiles in the dev UI, and step turns from it, so the minimal turn can be watched working.
 
 ## Stage 02: populate-the-world
-- Status: in-progress
+- Status: done
 - Goal: POPs live on hexes, sell unskilled labor to a dummy market and buy goods from it at fixed prices posted in the hex's currency good, consume according to Stone-Geary utility with leisure, and grow or shrink with their utility. POPs own their own goods only; deposits keep emitting into unowned stockpiles.
 
 ### Step 01: currency

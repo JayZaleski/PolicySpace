@@ -7801,7 +7801,7 @@ a.anchor-link {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="PolicySpace-Manual">PolicySpace Manual<a class="anchor-link" href="#PolicySpace-Manual">¶</a></h1><p>PolicySpace is a game about economies and policy. It is being built one system at a time, and so far the first system exists: <strong>the world</strong>. A <em>setting</em> describes a world (its goods, its map, and its natural resources), the engine loads it and runs turns, and a developer tool lets you look at the result. There is no player-facing game yet, so this manual is written for <strong>setting authors</strong> and developers.</p>
+<h1 id="PolicySpace-Manual">PolicySpace Manual<a class="anchor-link" href="#PolicySpace-Manual">¶</a></h1><p>PolicySpace is a game about economies and policy. It is being built one system at a time, and so far two systems exist: <strong>the world</strong> and <strong>the people in it</strong>. A <em>setting</em> describes a world: its goods, its map with a currency on every hex, its natural resources, the prices its markets post, and the groups of people, called <strong>POPs</strong>, who live on it. The engine loads the setting and runs turns in which the POPs earn, trade, consume and grow, and a developer tool lets you watch all of it happen. There is no player-facing game yet, so this manual is written for <strong>setting authors</strong> and developers.</p>
 <p><em>This manual grows as each part of the project is completed.</em></p>
 </div>
 </div>
@@ -7818,9 +7818,12 @@ a.anchor-link {
 <li><a href="#The-folder-layout">The folder layout</a></li>
 <li><a href="#Naming-rules">Naming rules</a></li>
 <li><a href="#Goods">Goods</a></li>
-<li><a href="#The-map">The map</a></li>
+<li><a href="#The-map">The map</a>, including each hex's currency</li>
 <li><a href="#Natural-resources">Natural resources</a></li>
-<li><a href="#Running-a-setting">Running a setting</a></li>
+<li><a href="#Markets">Markets</a></li>
+<li><a href="#POP-types">POP types</a>, including how POPs grow</li>
+<li><a href="#POPs">POPs</a></li>
+<li><a href="#Running-a-setting">Running a setting</a>: the turn, how POPs trade and grow, turn reports</li>
 <li><a href="#Checking-a-setting">Checking a setting</a></li>
 <li><a href="#The-developer-UI">The developer UI</a></li>
 </ul>
@@ -7851,12 +7854,12 @@ a.anchor-link {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="Writing-a-setting">Writing a setting<a class="anchor-link" href="#Writing-a-setting">¶</a></h2><p>A <strong>setting</strong> is a folder of plain-text <a href="https://toml.io">TOML</a> files that describes a world: what goods exist, what the map looks like, and where natural resources lie. The engine has no built-in content, so everything comes from the setting. A complete example lives in <code>settings/sample/</code>; copy it to start your own.</p>
+<h2 id="Writing-a-setting">Writing a setting<a class="anchor-link" href="#Writing-a-setting">¶</a></h2><p>A <strong>setting</strong> is a folder of plain-text <a href="https://toml.io">TOML</a> files that describes a world: what goods exist, what the map looks like and which good each hex uses as its currency, where natural resources lie, what the markets charge, and which groups of people live where. The engine has no built-in content, so everything comes from the setting. A complete example lives in <code>settings/sample/</code>; copy it to start your own.</p>
 <p>For the technical side of the format, see <a href="docs/setting-loader.md">docs/setting-loader.md</a>.</p>
 <h3 id="The-folder-layout">The folder layout<a class="anchor-link" href="#The-folder-layout">¶</a></h3><pre><code>my_setting/
   setting.toml      the manifest
-  rules/            things that never change during play (goods, resource types)
-  start/            what turn 0 looks like (the map, the deposits)
+  rules/            things that never change during play (goods, resource types, POP types)
+  start/            what turn 0 looks like (the map and its currencies, the deposits, the markets, the POPs)
 </code></pre>
 <p><strong>The manifest, <code>setting.toml</code>,</strong> has these keys:</p>
 <table>
@@ -7896,10 +7899,10 @@ a.anchor-link {
 <li>Organize files however you like, nested to any depth. Files are read in sorted path order.</li>
 <li>What a file defines comes from its section headers (such as <code>[[good]]</code>), not from its file name.</li>
 <li><code>README.md</code> files are the place for notes. Hidden files, <code>Thumbs.db</code> and <code>desktop.ini</code> are ignored. Any other file that does not end in <code>.toml</code> is an error.</li>
-<li>Each section type belongs in one of the two folders: <code>[[good]]</code> and <code>[[resource]]</code> in <code>rules/</code>, <code>[[hex]]</code> and <code>[[deposit]]</code> in <code>start/</code>. Putting one in the wrong folder is an error.</li>
+<li>Each section type belongs in one of the two folders: <code>[[good]]</code>, <code>[[resource]]</code> and <code>[[pop_type]]</code> in <code>rules/</code>; <code>[[hex]]</code>, <code>[[deposit]]</code>, <code>[[market]]</code> and <code>[[pop]]</code> in <code>start/</code>. Putting one in the wrong folder is an error.</li>
 </ul>
-<h3 id="Naming-rules">Naming rules<a class="anchor-link" href="#Naming-rules">¶</a></h3><p>Names of goods and resource types use lowercase letters, digits and underscores, and must start with a letter: <code>copper_ore</code> and <code>grain2</code> are fine; <code>Copper</code>, <code>2grain</code> and <code>copper-ore</code> are not.</p>
-<h3 id="Goods">Goods<a class="anchor-link" href="#Goods">¶</a></h3><p>A <strong>good</strong> is anything an actor can own. The engine has no built-in goods and no built-in categories such as labor or capital: the setting defines them all.</p>
+<h3 id="Naming-rules">Naming rules<a class="anchor-link" href="#Naming-rules">¶</a></h3><p>Names of goods, resource types and POP types use lowercase letters, digits and underscores, and must start with a letter: <code>copper_ore</code> and <code>grain2</code> are fine; <code>Copper</code>, <code>2grain</code> and <code>copper-ore</code> are not. Each kind of thing has its own list of names, so a resource type or a POP type may share a name with a good.</p>
+<h3 id="Goods">Goods<a class="anchor-link" href="#Goods">¶</a></h3><p>A <strong>good</strong> is anything an actor can own. The engine has no built-in goods and no built-in categories such as labor, money or capital: the setting defines them all.</p>
 <p>Define goods with <code>[[good]]</code> sections in <code>rules/</code>, in any file at any depth, as many per file as you like. Goods from all files are merged. A setting with no goods is valid. A <code>[[good]]</code> in <code>start/</code> is an error.</p>
 <table>
 <thead>
@@ -7938,7 +7941,7 @@ a.anchor-link {
 <span class="k">[[good]]</span>
 <span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"copper"</span>
 </pre></div>
-<p>The sample setting defines five goods:</p>
+<p>The sample setting defines six goods:</p>
 <table>
 <thead>
 <tr>
@@ -7953,7 +7956,7 @@ a.anchor-link {
 <td><code>unskilled_labor</code></td>
 <td>1</td>
 <td>false</td>
-<td>Labor (used in later stages)</td>
+<td>Labor: what the sample's POPs receive every turn</td>
 </tr>
 <tr>
 <td><code>unimproved_copper</code></td>
@@ -7971,31 +7974,51 @@ a.anchor-link {
 <td><code>copper</code></td>
 <td>never</td>
 <td>true</td>
-<td>A durable, movable good</td>
+<td>A durable, movable good that artisans buy</td>
 </tr>
 <tr>
 <td><code>grain</code></td>
 <td>3</td>
 <td>true</td>
-<td>A perishable, movable good</td>
+<td>A perishable, movable good that POPs eat</td>
+</tr>
+<tr>
+<td><code>silver</code></td>
+<td>never</td>
+<td>true</td>
+<td>The currency every sample hex uses</td>
 </tr>
 </tbody>
 </table>
 <p>More detail: <a href="docs/goods.md">docs/goods.md</a>.</p>
-<h3 id="The-map">The map<a class="anchor-link" href="#The-map">¶</a></h3><p>The <strong>map</strong> is the set of hex tiles in the setting's starting state. For now a hex has only a position; terrain and other attributes come later. The map goes in <code>start/</code>, which describes what turn 0 looks like. A <code>[[hex]]</code> in <code>rules/</code> is an error.</p>
-<p>Each <code>[[hex]]</code> has exactly two required whole-number keys, <code>q</code> and <code>r</code>. Any other key (such as <code>terrain</code>) is an error. Hexes have no names: the coordinates are the identity, and two hexes at the same coordinates is an error that names both places. Hexes can sit in any file at any depth and are merged.</p>
+<h3 id="The-map">The map<a class="anchor-link" href="#The-map">¶</a></h3><p>The <strong>map</strong> is the set of hex tiles in the setting's starting state. For now a hex has only a position and a currency; terrain and other attributes come later. The map goes in <code>start/</code>, which describes what turn 0 looks like. A <code>[[hex]]</code> in <code>rules/</code> is an error.</p>
+<p>Each <code>[[hex]]</code> has exactly three required keys: the whole numbers <code>q</code> and <code>r</code>, and <code>currency</code>, the name of a good (explained below). Any other key (such as <code>terrain</code>) is an error. Hexes have no names: the coordinates are the identity, and two hexes at the same coordinates is an error that names both places. Hexes can sit in any file at any depth and are merged.</p>
 <div class="highlight"><pre><span></span><span class="k">[[hex]]</span>
 <span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
 <span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">currency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"silver"</span>
 
 <span class="k">[[hex]]</span>
 <span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
 <span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">currency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"silver"</span>
 </pre></div>
 <p><strong>Coordinates and orientation.</strong> The engine fixes the orientation; a setting cannot change it. Hexes are <em>pointy-top</em>. Each value of <code>r</code> is one straight east-west row; <code>q</code> increases eastward and <code>r</code> increases southward. So <code>(1, 0)</code> is the east neighbor of <code>(0, 0)</code>, and the row <code>r = 1</code> lies south of the row <code>r = 0</code>. Values may be negative, up to about plus or minus 2.1 billion.</p>
 <p><strong>Shape.</strong> There are no shape rules. Holes, islands and negative coordinates are all fine, and a setting with no hexes is valid. Neighbors, distance and wrapping around the edges do not exist yet; wrapping is planned for later as an optional per-setting value.</p>
-<p>The sample map is a hexagon of radius 2 around <code>(0, 0)</code>: 19 hexes. The diagram below shows it, with each hex labelled <code>q, r</code>.</p>
-<p>More detail: <a href="docs/map.md">docs/map.md</a>.</p>
+<p><strong>Currency.</strong> Every hex names the good that prices on that hex are quoted in: its market posts prices in it, and the POPs there are paid in it when they sell and pay with it when they buy. Any good the setting defines can be a currency. The engine has no idea of "money", so a perishable or unmovable good is allowed, and if you name labor as the currency, that is exactly what you get. Different hexes may name different goods, and there is no map-wide default: every hex writes its own.</p>
+<div class="highlight"><pre><span></span><span class="k">[[hex]]</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">currency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"coin"</span>
+
+<span class="k">[[hex]]</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">currency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"shell"</span><span class="w">     </span><span class="c1"># the next hex along trades in a different good</span>
+</pre></div>
+<p>A hex without a <code>currency</code> key, one whose value is not text, and one naming a good that does not exist (including a name in the wrong case, such as <code>"Silver"</code>) are each an error with file, line and column. Like the other errors that refer to names, the unknown-good one is not shown while part of the setting could not be read. Because the key is required, a setting written before currencies existed will not load until every hex has one.</p>
+<p>The sample map is a hexagon of radius 2 around <code>(0, 0)</code>: 19 hexes, every one with <code>currency = "silver"</code>. The diagram below shows it, with each hex labelled <code>q, r</code>.</p>
+<p>More detail: <a href="docs/map.md">docs/map.md</a> for the map and <a href="docs/currency.md">docs/currency.md</a> for currencies.</p>
 </div>
 </div>
 </div>
@@ -8173,14 +8196,327 @@ a.anchor-link {
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p>Planned for later: stock, depletion and regeneration as optional data on resource types, so settings written now stay valid.</p>
 <p>More detail: <a href="docs/resources.md">docs/resources.md</a>, with <a href="docs/map.md">docs/map.md</a> for coordinates and <a href="docs/goods.md">docs/goods.md</a> for goods.</p>
-<h3 id="Running-a-setting">Running a setting<a class="anchor-link" href="#Running-a-setting">¶</a></h3><p>A loaded setting becomes a running <strong>world</strong>. The rules stay fixed; the world holds the clock (starting at turn 0) and the goods that exist. Each turn has three parts:</p>
+<h3 id="Markets">Markets<a class="anchor-link" href="#Markets">¶</a></h3><p>A <strong>market</strong> is where the POPs on a hex buy and sell. For now it is a stand-in: it posts fixed prices and buys or sells any amount at them. It holds no stock of its own and never runs out: goods sold to it vanish, goods bought from it appear from nothing, and the currency paid or received does the same. A later stage replaces it with a real market whose prices move with supply and demand. Until then, the prices you write are what everyone trades at.</p>
+<p>Markets are <code>[[market]]</code> sections in <code>start/</code> (in <code>rules/</code> it is an error, since prices are state that a live market will change). Keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>q</code>, <code>r</code></td>
+<td>A hex that exists on the map</td>
+</tr>
+<tr>
+<td><code>prices</code></td>
+<td>A table of <code>good name = price</code>. Each price is a number greater than 0: how many units of the hex's currency one unit of the good costs</td>
+</tr>
+</tbody>
+</table>
+<p>The rules that follow from this:</p>
+<ul>
+<li><strong>A good is traded on a hex only if that hex's market lists a price for it.</strong> A good with no price there is neither bought nor sold there, however much anyone wants it. A good may exist in <code>rules/</code> long before any hex trades it.</li>
+<li>A hex with no <code>[[market]]</code> at all is valid and trades nothing. So is a market with <code>prices = {}</code>.</li>
+<li>At most one market per hex.</li>
+<li>Prices are in the hex's currency (see <a href="#The-map">The map</a>). The currency itself always costs 1, so listing it in <code>prices</code> is an error. A good may be priced on a hex whose currency is a different good.</li>
+<li>Both TOML forms of the table work: inline, or a <code>[market.prices]</code> sub-table.</li>
+</ul>
+<div class="highlight"><pre><span></span><span class="c1"># Inline: grain and fish are traded here; copper, with no price, is not.</span>
+<span class="k">[[market]]</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">prices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">grain</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">fish</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mf">1.5</span><span class="w"> </span><span class="p">}</span>
+
+<span class="c1"># The same thing written as a sub-table.</span>
+<span class="k">[[market]]</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+
+<span class="k">[market.prices]</span>
+<span class="n">grain</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span>
+<span class="n">fish</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+</pre></div>
+<p>How a trade works (what POPs do with it is in <a href="#Running-a-setting">Running a setting</a>): selling removes the good from the seller's stockpile and adds the price times the amount in currency; buying does the reverse. A bought good, and currency received from a sale, counts as appearing in the turn of the trade, so a perishable one starts its countdown then. When goods leave a stockpile, the units that would perish soonest go first.</p>
+<p>Errors, each with file, line and column: a missing or bad <code>q</code> or <code>r</code>; coordinates with no hex; a second market on the same hex (the message names the first); a missing <code>prices</code> or one that is not a table; a price that is not a number or not greater than 0 (<code>inf</code> included); an unknown good in <code>prices</code>; the hex's own currency listed (<code>'silver' is the currency at (0, 0), so it can't have a price</code>); and an unknown key. The unknown-good and currency checks are skipped while part of the setting could not be read.</p>
+<p><strong>The sample setting</strong> gives 18 of its 19 hexes a market, with prices in <code>silver</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Hexes</th>
+<th><code>unskilled_labor</code></th>
+<th><code>grain</code></th>
+<th><code>copper</code></th>
+<th><code>unimproved_grain</code></th>
+<th><code>unimproved_copper</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>the center <code>(0, 0)</code></td>
+<td>1</td>
+<td>2</td>
+<td>5</td>
+<td>0.5</td>
+<td>1</td>
+</tr>
+<tr>
+<td>every other hex except <code>(2, -2)</code></td>
+<td>1</td>
+<td>2</td>
+<td>5</td>
+<td>not traded</td>
+<td>not traded</td>
+</tr>
+<tr>
+<td><code>(2, -2)</code>, the north-east corner</td>
+<td>no market</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>So the sample has one hex that trades every good, seventeen that trade some, and one that trades nothing. The prices are placeholders: nothing is produced for sale yet, so they need not be consistent with production.</p>
+<p>More detail: <a href="docs/market.md">docs/market.md</a>.</p>
+<h3 id="POP-types">POP types<a class="anchor-link" href="#POP-types">¶</a></h3><p>A <strong>POP</strong> is a group of identical people of one kind living on one hex, and a <strong>POP type</strong> describes one person of that kind: what they receive each turn, what they want to consume, and how their numbers grow. POP types are rules, so they go in <code>rules/</code> as <code>[[pop_type]]</code> sections (in <code>start/</code> it is an error). Mind the two headers: <code>[[pop_type]]</code> in <code>rules/</code> describes a person, and <code>[[pop]]</code> in <code>start/</code> places a group of them (see <a href="#POPs">POPs</a>).</p>
+<p>Four keys, all required:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Lowercase snake_case, unique among POP types</td>
+</tr>
+<tr>
+<td><code>endowment</code></td>
+<td><code>good name = amount</code> pairs: what one person receives at the start of every turn. Amounts are numbers greater than 0. May be empty (<code>{}</code>), for a type with no income</td>
+</tr>
+<tr>
+<td><code>utility</code></td>
+<td>One entry per good a person consumes, each with two optional numbers that default to 0: <code>subsistence</code>, the amount needed before anything else, and <code>share</code>, the good's weight when spending whatever is left. Each listed good needs at least one of them above 0, and at least one good needs a <code>share</code> above 0</td>
+</tr>
+<tr>
+<td><code>growth</code></td>
+<td>How a group's size responds to its prosperity: three values described under <a href="#How-POPs-grow">How POPs grow</a> below</td>
+</tr>
+</tbody>
+</table>
+<p>Things worth knowing:</p>
+<ul>
+<li><strong>Shares are weights, not percentages.</strong> The engine scales them to add up to 1, so shares of <code>1</code>, <code>4</code> and <code>5</code> mean 10%, 40% and 50%. You never have to make them add up yourself.</li>
+<li><strong>A pure necessity</strong> is a good with a <code>subsistence</code> and no <code>share</code>: a person buys it up to the subsistence amount and never more.</li>
+<li><strong>Leisure needs no special setting.</strong> A good that is endowed <em>and</em> in the utility is kept and consumed: that is leisure. An endowed good that is not in the utility is sold entirely; a wanted good that is not endowed is bought.</li>
+<li><strong>What to endow.</strong> The intended design gives people nothing but unskilled labor, which they sell and partly keep. Any good is allowed, the currency included, so the system can be tried out before production exists.</li>
+<li><strong>A pitfall.</strong> The engine does not compare a good's subsistence with its endowment. For a good only the person produces, such as labor, a subsistence at or above the endowment can never be reached.</li>
+<li>Both TOML forms work: inline tables, or sub-tables such as <code>[pop_type.utility.grain]</code>.</li>
+</ul>
+<h4 id="How-POPs-grow">How POPs grow<a class="anchor-link" href="#How-POPs-grow">¶</a></h4><p>Each turn, after it has traded and consumed, a POP's size changes by a rate that depends on how far above or below subsistence it was. The measure is its <strong>subsistence index</strong>: how many extra subsistence bundles the POP's income could have bought. It is 0 when income exactly covers subsistence, 1 when income is twice the cost of subsistence, and negative below subsistence, down to −1 for a POP that has nothing. The <code>growth</code> table has three required keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>growth</code></td>
+<td>A list of one or more numbers giving the shape of growth above subsistence: with an index <em>u</em>, the rate is <code>c1·u + c2·u² + …</code>. One number gives a straight line; a negative second number makes growth peak and then fall away as the POP gets richer</td>
+</tr>
+<tr>
+<td><code>decline</code></td>
+<td>A number from 0 up to (not including) 1: how fast a POP with nothing shrinks each turn. Below subsistence the shrinking is in proportion, so a POP that gets half of what it needs shrinks by half of <code>decline</code></td>
+</tr>
+<tr>
+<td><code>max_growth</code></td>
+<td>A number of at least 0: the most a POP can grow in one turn</td>
+</tr>
+</tbody>
+</table>
+<p>The rate always stays between −<code>decline</code> and <code>max_growth</code>, and a POP is never removed: a starving POP loses the same fraction every turn but never reaches zero. <code>growth = [0]</code> with <code>decline = 0</code> freezes a type's size, which is useful for a setting that should stay put.</p>
+<p>Two things about "below subsistence" matter here. A POP that cannot get a good it needs at all, because its hex does not sell it and it holds none, counts as having nothing and shrinks at the full <code>decline</code>, however rich it is otherwise. And a type whose subsistence goods cost nothing where it lives (or that has no subsistence at all) neither grows nor shrinks.</p>
+<div class="highlight"><pre><span></span><span class="c1"># Inline form. Farmers keep some labor as leisure and spend the rest on grain.</span>
+<span class="k">[[pop_type]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"farmer"</span>
+<span class="n">endowment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">labor</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">10</span><span class="w"> </span><span class="p">}</span>
+<span class="n">utility</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">labor</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">subsistence</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">share</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="n">grain</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">subsistence</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">share</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
+<span class="n">growth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">growth</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="mf">0.06</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.03</span><span class="p">],</span><span class="w"> </span><span class="n">decline</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span><span class="w"> </span><span class="n">max_growth</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mf">0.05</span><span class="w"> </span><span class="p">}</span>
+
+<span class="c1"># Sub-table form. Fishers need one fish and want no more than that (a pure</span>
+<span class="c1"># necessity), spend the rest on coin, and grow in a straight line.</span>
+<span class="k">[[pop_type]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fisher"</span>
+
+<span class="k">[pop_type.endowment]</span>
+<span class="n">fish</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+<span class="n">labor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span>
+
+<span class="k">[pop_type.utility.fish]</span>
+<span class="n">subsistence</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+
+<span class="k">[pop_type.utility.coin]</span>
+<span class="n">share</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.5</span>
+
+<span class="k">[pop_type.growth]</span>
+<span class="n">growth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">0.03</span><span class="p">]</span>
+<span class="n">decline</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">max_growth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+</pre></div>
+<p>Errors, each with file, line and column: a missing key; a bad or duplicate name; an <code>endowment</code>, <code>utility</code> or <code>growth</code> that is not a table; an endowment amount that is not a number above 0; a utility entry that is not a table; a negative or non-finite <code>subsistence</code> or <code>share</code>; a utility good with nothing above 0; a utility with no positive share; a <code>growth</code> list that is empty or holds something that is not a finite number; a <code>decline</code> outside 0 to 1; a negative <code>max_growth</code>; an unknown good; and an unknown key anywhere. Unknown-good errors are skipped while part of the setting could not be read. Because <code>growth</code> is required, a type written without it will not load until it is added.</p>
+<p><strong>The sample setting</strong> defines two types, both receiving 10 <code>unskilled_labor</code> per person per turn:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Good</th>
+<th>Subsistence</th>
+<th>Share as written</th>
+<th>Share used</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>peasant</code></td>
+<td><code>unskilled_labor</code> (leisure)</td>
+<td>2</td>
+<td>0.2</td>
+<td>0.2</td>
+</tr>
+<tr>
+<td></td>
+<td><code>grain</code></td>
+<td>2</td>
+<td>0.8</td>
+<td>0.8</td>
+</tr>
+<tr>
+<td><code>artisan</code></td>
+<td><code>unskilled_labor</code> (leisure)</td>
+<td>1</td>
+<td>1</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td></td>
+<td><code>grain</code></td>
+<td>2</td>
+<td>4</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td></td>
+<td><code>copper</code></td>
+<td>0</td>
+<td>5</td>
+<td>0.5</td>
+</tr>
+</tbody>
+</table>
+<p>Peasants keep some labor as leisure and spend mostly on grain; artisans keep less leisure and weight copper heavily. The artisan rows show weights being scaled to shares. Both types grow with <code>growth = [0.06, -0.03]</code>, <code>decline = 0.1</code> and <code>max_growth = 0.05</code>: growth peaks at 3% a turn for a POP whose income is twice its subsistence cost, falls back to zero at three times, and a POP with nothing shrinks 10% a turn. The chart shows that rule, with the three situations the sample's POPs are in (where those numbers come from is in <a href="#Running-a-setting">Running a setting</a>).</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=a1c2e3f4">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2ODAiIGhlaWdodD0iMzQwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMSI+CjxsaW5lIHgxPSI2MC4wIiB5MT0iMzYiIHgyPSI2MC4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNjAuMCIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMTwvdGV4dD4KPGxpbmUgeDE9IjE4MC44IiB5MT0iMzYiIHgyPSIxODAuOCIgeTI9IjI5NCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjE4MC44IiB5PSIzMDgiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjA8L3RleHQ+CjxsaW5lIHgxPSIzMDEuNiIgeTE9IjM2IiB4Mj0iMzAxLjYiIHkyPSIyOTQiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSIzMDEuNiIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xPC90ZXh0Pgo8bGluZSB4MT0iNDIyLjQiIHkxPSIzNiIgeDI9IjQyMi40IiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNDIyLjQiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MjwvdGV4dD4KPGxpbmUgeDE9IjU0My4yIiB5MT0iMzYiIHgyPSI1NDMuMiIgeTI9IjI5NCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0My4yIiB5PSIzMDgiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjM8L3RleHQ+CjxsaW5lIHgxPSI2NjQuMCIgeTE9IjM2IiB4Mj0iNjY0LjAiIHkyPSIyOTQiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI2NjQuMCIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj40PC90ZXh0Pgo8bGluZSB4MT0iNjAiIHkxPSIyNjUuMyIgeDI9IjY2NCIgeTI9IjI2NS4zIiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNTQiIHk9IjI2OS4zIiB0ZXh0LWFuY2hvcj0iZW5kIj4tMTAlPC90ZXh0Pgo8bGluZSB4MT0iNjAiIHkxPSIxOTMuNyIgeDI9IjY2NCIgeTI9IjE5My43IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNTQiIHk9IjE5Ny43IiB0ZXh0LWFuY2hvcj0iZW5kIj4tNSU8L3RleHQ+CjxsaW5lIHgxPSI2MCIgeTE9IjEyMi4wIiB4Mj0iNjY0IiB5Mj0iMTIyLjAiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI1NCIgeT0iMTI2LjAiIHRleHQtYW5jaG9yPSJlbmQiPjAlPC90ZXh0Pgo8bGluZSB4MT0iNjAiIHkxPSI1MC4zIiB4Mj0iNjY0IiB5Mj0iNTAuMyIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0IiB5PSI1NC4zIiB0ZXh0LWFuY2hvcj0iZW5kIj4rNSU8L3RleHQ+CjxsaW5lIHgxPSI2MCIgeTE9IjEyMi4wIiB4Mj0iNjY0IiB5Mj0iMTIyLjAiIHN0cm9rZT0iIzk5OSIvPgo8bGluZSB4MT0iMTgwLjgiIHkxPSIzNiIgeDI9IjE4MC44IiB5Mj0iMjk0IiBzdHJva2U9IiM5OTkiLz4KPHJlY3QgeD0iNjAiIHk9IjM2IiB3aWR0aD0iNjA0IiBoZWlnaHQ9IjI1OCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOTk5Ii8+Cjxwb2x5bGluZSBwb2ludHM9IjYwLjAsMjY1LjMgNjEuMiwyNjMuOSA2Mi40LDI2Mi41IDYzLjYsMjYxLjAgNjQuOCwyNTkuNiA2Ni4wLDI1OC4yIDY3LjIsMjU2LjcgNjguNSwyNTUuMyA2OS43LDI1My45IDcwLjksMjUyLjQgNzIuMSwyNTEuMCA3My4zLDI0OS42IDc0LjUsMjQ4LjEgNzUuNywyNDYuNyA3Ni45LDI0NS4zIDc4LjEsMjQzLjggNzkuMywyNDIuNCA4MC41LDI0MS4wIDgxLjcsMjM5LjUgODMuMCwyMzguMSA4NC4yLDIzNi43IDg1LjQsMjM1LjIgODYuNiwyMzMuOCA4Ny44LDIzMi40IDg5LjAsMjMwLjkgOTAuMiwyMjkuNSA5MS40LDIyOC4xIDkyLjYsMjI2LjYgOTMuOCwyMjUuMiA5NS4wLDIyMy44IDk2LjIsMjIyLjMgOTcuNCwyMjAuOSA5OC43LDIxOS41IDk5LjksMjE4LjAgMTAxLjEsMjE2LjYgMTAyLjMsMjE1LjIgMTAzLjUsMjEzLjcgMTA0LjcsMjEyLjMgMTA1LjksMjEwLjkgMTA3LjEsMjA5LjQgMTA4LjMsMjA4LjAgMTA5LjUsMjA2LjYgMTEwLjcsMjA1LjEgMTExLjksMjAzLjcgMTEzLjIsMjAyLjMgMTE0LjQsMjAwLjggMTE1LjYsMTk5LjQgMTE2LjgsMTk4LjAgMTE4LjAsMTk2LjUgMTE5LjIsMTk1LjEgMTIwLjQsMTkzLjcgMTIxLjYsMTkyLjIgMTIyLjgsMTkwLjggMTI0LjAsMTg5LjQgMTI1LjIsMTg3LjkgMTI2LjQsMTg2LjUgMTI3LjYsMTg1LjEgMTI4LjksMTgzLjYgMTMwLjEsMTgyLjIgMTMxLjMsMTgwLjggMTMyLjUsMTc5LjMgMTMzLjcsMTc3LjkgMTM0LjksMTc2LjUgMTM2LjEsMTc1LjAgMTM3LjMsMTczLjYgMTM4LjUsMTcyLjIgMTM5LjcsMTcwLjcgMTQwLjksMTY5LjMgMTQyLjEsMTY3LjkgMTQzLjQsMTY2LjQgMTQ0LjYsMTY1LjAgMTQ1LjgsMTYzLjYgMTQ3LjAsMTYyLjEgMTQ4LjIsMTYwLjcgMTQ5LjQsMTU5LjMgMTUwLjYsMTU3LjggMTUxLjgsMTU2LjQgMTUzLjAsMTU1LjAgMTU0LjIsMTUzLjUgMTU1LjQsMTUyLjEgMTU2LjYsMTUwLjcgMTU3LjgsMTQ5LjIgMTU5LjEsMTQ3LjggMTYwLjMsMTQ2LjQgMTYxLjUsMTQ0LjkgMTYyLjcsMTQzLjUgMTYzLjksMTQyLjEgMTY1LjEsMTQwLjYgMTY2LjMsMTM5LjIgMTY3LjUsMTM3LjggMTY4LjcsMTM2LjMgMTY5LjksMTM0LjkgMTcxLjEsMTMzLjUgMTcyLjMsMTMyLjAgMTczLjYsMTMwLjYgMTc0LjgsMTI5LjIgMTc2LjAsMTI3LjcgMTc3LjIsMTI2LjMgMTc4LjQsMTI0LjkgMTc5LjYsMTIzLjQgMTgwLjgsMTIyLjAgMTgyLjAsMTIxLjEgMTgzLjIsMTIwLjMgMTg0LjQsMTE5LjUgMTg1LjYsMTE4LjYgMTg2LjgsMTE3LjggMTg4LjAsMTE3LjAgMTg5LjMsMTE2LjIgMTkwLjUsMTE1LjQgMTkxLjcsMTE0LjYgMTkyLjksMTEzLjggMTk0LjEsMTEzLjEgMTk1LjMsMTEyLjMgMTk2LjUsMTExLjUgMTk3LjcsMTEwLjggMTk4LjksMTEwLjEgMjAwLjEsMTA5LjMgMjAxLjMsMTA4LjYgMjAyLjUsMTA3LjkgMjAzLjgsMTA3LjIgMjA1LjAsMTA2LjUgMjA2LjIsMTA1LjggMjA3LjQsMTA1LjIgMjA4LjYsMTA0LjUgMjA5LjgsMTAzLjggMjExLjAsMTAzLjIgMjEyLjIsMTAyLjUgMjEzLjQsMTAxLjkgMjE0LjYsMTAxLjMgMjE1LjgsMTAwLjcgMjE3LjAsMTAwLjEgMjE4LjIsOTkuNSAyMTkuNSw5OC45IDIyMC43LDk4LjMgMjIxLjksOTcuNyAyMjMuMSw5Ny4yIDIyNC4zLDk2LjYgMjI1LjUsOTYuMSAyMjYuNyw5NS41IDIyNy45LDk1LjAgMjI5LjEsOTQuNSAyMzAuMyw5NC4wIDIzMS41LDkzLjUgMjMyLjcsOTMuMCAyMzQuMCw5Mi41IDIzNS4yLDkyLjAgMjM2LjQsOTEuNSAyMzcuNiw5MS4xIDIzOC44LDkwLjYgMjQwLjAsOTAuMiAyNDEuMiw4OS44IDI0Mi40LDg5LjMgMjQzLjYsODguOSAyNDQuOCw4OC41IDI0Ni4wLDg4LjEgMjQ3LjIsODcuNyAyNDguNCw4Ny4zIDI0OS43LDg3LjAgMjUwLjksODYuNiAyNTIuMSw4Ni4yIDI1My4zLDg1LjkgMjU0LjUsODUuNSAyNTUuNyw4NS4yIDI1Ni45LDg0LjkgMjU4LjEsODQuNiAyNTkuMyw4NC4zIDI2MC41LDg0LjAgMjYxLjcsODMuNyAyNjIuOSw4My40IDI2NC4yLDgzLjEgMjY1LjQsODIuOSAyNjYuNiw4Mi42IDI2Ny44LDgyLjQgMjY5LjAsODIuMSAyNzAuMiw4MS45IDI3MS40LDgxLjcgMjcyLjYsODEuNSAyNzMuOCw4MS4zIDI3NS4wLDgxLjEgMjc2LjIsODAuOSAyNzcuNCw4MC43IDI3OC42LDgwLjYgMjc5LjksODAuNCAyODEuMSw4MC4yIDI4Mi4zLDgwLjEgMjgzLjUsODAuMCAyODQuNyw3OS44IDI4NS45LDc5LjcgMjg3LjEsNzkuNiAyODguMyw3OS41IDI4OS41LDc5LjQgMjkwLjcsNzkuMyAyOTEuOSw3OS4zIDI5My4xLDc5LjIgMjk0LjQsNzkuMiAyOTUuNiw3OS4xIDI5Ni44LDc5LjEgMjk4LjAsNzkuMCAyOTkuMiw3OS4wIDMwMC40LDc5LjAgMzAxLjYsNzkuMCAzMDIuOCw3OS4wIDMwNC4wLDc5LjAgMzA1LjIsNzkuMCAzMDYuNCw3OS4xIDMwNy42LDc5LjEgMzA4LjgsNzkuMiAzMTAuMSw3OS4yIDMxMS4zLDc5LjMgMzEyLjUsNzkuMyAzMTMuNyw3OS40IDMxNC45LDc5LjUgMzE2LjEsNzkuNiAzMTcuMyw3OS43IDMxOC41LDc5LjggMzE5LjcsODAuMCAzMjAuOSw4MC4xIDMyMi4xLDgwLjIgMzIzLjMsODAuNCAzMjQuNiw4MC42IDMyNS44LDgwLjcgMzI3LjAsODAuOSAzMjguMiw4MS4xIDMyOS40LDgxLjMgMzMwLjYsODEuNSAzMzEuOCw4MS43IDMzMy4wLDgxLjkgMzM0LjIsODIuMSAzMzUuNCw4Mi40IDMzNi42LDgyLjYgMzM3LjgsODIuOSAzMzkuMCw4My4xIDM0MC4zLDgzLjQgMzQxLjUsODMuNyAzNDIuNyw4NC4wIDM0My45LDg0LjMgMzQ1LjEsODQuNiAzNDYuMyw4NC45IDM0Ny41LDg1LjIgMzQ4LjcsODUuNSAzNDkuOSw4NS45IDM1MS4xLDg2LjIgMzUyLjMsODYuNiAzNTMuNSw4Ny4wIDM1NC44LDg3LjMgMzU2LjAsODcuNyAzNTcuMiw4OC4xIDM1OC40LDg4LjUgMzU5LjYsODguOSAzNjAuOCw4OS4zIDM2Mi4wLDg5LjggMzYzLjIsOTAuMiAzNjQuNCw5MC42IDM2NS42LDkxLjEgMzY2LjgsOTEuNSAzNjguMCw5Mi4wIDM2OS4yLDkyLjUgMzcwLjUsOTMuMCAzNzEuNyw5My41IDM3Mi45LDk0LjAgMzc0LjEsOTQuNSAzNzUuMyw5NS4wIDM3Ni41LDk1LjUgMzc3LjcsOTYuMSAzNzguOSw5Ni42IDM4MC4xLDk3LjIgMzgxLjMsOTcuNyAzODIuNSw5OC4zIDM4My43LDk4LjkgMzg1LjAsOTkuNSAzODYuMiwxMDAuMSAzODcuNCwxMDAuNyAzODguNiwxMDEuMyAzODkuOCwxMDEuOSAzOTEuMCwxMDIuNSAzOTIuMiwxMDMuMiAzOTMuNCwxMDMuOCAzOTQuNiwxMDQuNSAzOTUuOCwxMDUuMiAzOTcuMCwxMDUuOCAzOTguMiwxMDYuNSAzOTkuNCwxMDcuMiA0MDAuNywxMDcuOSA0MDEuOSwxMDguNiA0MDMuMSwxMDkuMyA0MDQuMywxMTAuMSA0MDUuNSwxMTAuOCA0MDYuNywxMTEuNSA0MDcuOSwxMTIuMyA0MDkuMSwxMTMuMSA0MTAuMywxMTMuOCA0MTEuNSwxMTQuNiA0MTIuNywxMTUuNCA0MTMuOSwxMTYuMiA0MTUuMiwxMTcuMCA0MTYuNCwxMTcuOCA0MTcuNiwxMTguNiA0MTguOCwxMTkuNSA0MjAuMCwxMjAuMyA0MjEuMiwxMjEuMSA0MjIuNCwxMjIuMCA0MjMuNiwxMjIuOSA0MjQuOCwxMjMuNyA0MjYuMCwxMjQuNiA0MjcuMiwxMjUuNSA0MjguNCwxMjYuNCA0MjkuNiwxMjcuMyA0MzAuOSwxMjguMiA0MzIuMSwxMjkuMiA0MzMuMywxMzAuMSA0MzQuNSwxMzEuMCA0MzUuNywxMzIuMCA0MzYuOSwxMzIuOSA0MzguMSwxMzMuOSA0MzkuMywxMzQuOSA0NDAuNSwxMzUuOSA0NDEuNywxMzYuOSA0NDIuOSwxMzcuOSA0NDQuMSwxMzguOSA0NDUuNCwxMzkuOSA0NDYuNiwxNDAuOSA0NDcuOCwxNDIuMCA0NDkuMCwxNDMuMCA0NTAuMiwxNDQuMSA0NTEuNCwxNDUuMSA0NTIuNiwxNDYuMiA0NTMuOCwxNDcuMyA0NTUuMCwxNDguNCA0NTYuMiwxNDkuNSA0NTcuNCwxNTAuNiA0NTguNiwxNTEuNyA0NTkuOCwxNTIuOCA0NjEuMSwxNTMuOSA0NjIuMywxNTUuMSA0NjMuNSwxNTYuMiA0NjQuNywxNTcuNCA0NjUuOSwxNTguNSA0NjcuMSwxNTkuNyA0NjguMywxNjAuOSA0NjkuNSwxNjIuMSA0NzAuNywxNjMuMyA0NzEuOSwxNjQuNSA0NzMuMSwxNjUuNyA0NzQuMywxNjYuOSA0NzUuNiwxNjguMiA0NzYuOCwxNjkuNCA0NzguMCwxNzAuNyA0NzkuMiwxNzEuOSA0ODAuNCwxNzMuMiA0ODEuNiwxNzQuNSA0ODIuOCwxNzUuOCA0ODQuMCwxNzcuMCA0ODUuMiwxNzguMyA0ODYuNCwxNzkuNyA0ODcuNiwxODEuMCA0ODguOCwxODIuMyA0OTAuMCwxODMuNiA0OTEuMywxODUuMCA0OTIuNSwxODYuMyA0OTMuNywxODcuNyA0OTQuOSwxODkuMSA0OTYuMSwxOTAuNSA0OTcuMywxOTEuOCA0OTguNSwxOTMuMiA0OTkuNywxOTQuNyA1MDAuOSwxOTYuMSA1MDIuMSwxOTcuNSA1MDMuMywxOTguOSA1MDQuNSwyMDAuNCA1MDUuOCwyMDEuOCA1MDcuMCwyMDMuMyA1MDguMiwyMDQuNyA1MDkuNCwyMDYuMiA1MTAuNiwyMDcuNyA1MTEuOCwyMDkuMiA1MTMuMCwyMTAuNyA1MTQuMiwyMTIuMiA1MTUuNCwyMTMuNyA1MTYuNiwyMTUuMiA1MTcuOCwyMTYuOCA1MTkuMCwyMTguMyA1MjAuMiwyMTkuOSA1MjEuNSwyMjEuNCA1MjIuNywyMjMuMCA1MjMuOSwyMjQuNiA1MjUuMSwyMjYuMiA1MjYuMywyMjcuOCA1MjcuNSwyMjkuNCA1MjguNywyMzEuMCA1MjkuOSwyMzIuNiA1MzEuMSwyMzQuMiA1MzIuMywyMzUuOSA1MzMuNSwyMzcuNSA1MzQuNywyMzkuMiA1MzYuMCwyNDAuOCA1MzcuMiwyNDIuNSA1MzguNCwyNDQuMiA1MzkuNiwyNDUuOSA1NDAuOCwyNDcuNiA1NDIuMCwyNDkuMyA1NDMuMiwyNTEuMCA1NDQuNCwyNTIuNyA1NDUuNiwyNTQuNSA1NDYuOCwyNTYuMiA1NDguMCwyNTcuOSA1NDkuMiwyNTkuNyA1NTAuNCwyNjEuNSA1NTEuNywyNjMuMyA1NTIuOSwyNjUuMCA1NTQuMSwyNjUuMyA1NTUuMywyNjUuMyA1NTYuNSwyNjUuMyA1NTcuNywyNjUuMyA1NTguOSwyNjUuMyA1NjAuMSwyNjUuMyA1NjEuMywyNjUuMyA1NjIuNSwyNjUuMyA1NjMuNywyNjUuMyA1NjQuOSwyNjUuMyA1NjYuMiwyNjUuMyA1NjcuNCwyNjUuMyA1NjguNiwyNjUuMyA1NjkuOCwyNjUuMyA1NzEuMCwyNjUuMyA1NzIuMiwyNjUuMyA1NzMuNCwyNjUuMyA1NzQuNiwyNjUuMyA1NzUuOCwyNjUuMyA1NzcuMCwyNjUuMyA1NzguMiwyNjUuMyA1NzkuNCwyNjUuMyA1ODAuNiwyNjUuMyA1ODEuOSwyNjUuMyA1ODMuMSwyNjUuMyA1ODQuMywyNjUuMyA1ODUuNSwyNjUuMyA1ODYuNywyNjUuMyA1ODcuOSwyNjUuMyA1ODkuMSwyNjUuMyA1OTAuMywyNjUuMyA1OTEuNSwyNjUuMyA1OTIuNywyNjUuMyA1OTMuOSwyNjUuMyA1OTUuMSwyNjUuMyA1OTYuNCwyNjUuMyA1OTcuNiwyNjUuMyA1OTguOCwyNjUuMyA2MDAuMCwyNjUuMyA2MDEuMiwyNjUuMyA2MDIuNCwyNjUuMyA2MDMuNiwyNjUuMyA2MDQuOCwyNjUuMyA2MDYuMCwyNjUuMyA2MDcuMiwyNjUuMyA2MDguNCwyNjUuMyA2MDkuNiwyNjUuMyA2MTAuOCwyNjUuMyA2MTIuMSwyNjUuMyA2MTMuMywyNjUuMyA2MTQuNSwyNjUuMyA2MTUuNywyNjUuMyA2MTYuOSwyNjUuMyA2MTguMSwyNjUuMyA2MTkuMywyNjUuMyA2MjAuNSwyNjUuMyA2MjEuNywyNjUuMyA2MjIuOSwyNjUuMyA2MjQuMSwyNjUuMyA2MjUuMywyNjUuMyA2MjYuNiwyNjUuMyA2MjcuOCwyNjUuMyA2MjkuMCwyNjUuMyA2MzAuMiwyNjUuMyA2MzEuNCwyNjUuMyA2MzIuNiwyNjUuMyA2MzMuOCwyNjUuMyA2MzUuMCwyNjUuMyA2MzYuMiwyNjUuMyA2MzcuNCwyNjUuMyA2MzguNiwyNjUuMyA2MzkuOCwyNjUuMyA2NDEuMCwyNjUuMyA2NDIuMywyNjUuMyA2NDMuNSwyNjUuMyA2NDQuNywyNjUuMyA2NDUuOSwyNjUuMyA2NDcuMSwyNjUuMyA2NDguMywyNjUuMyA2NDkuNSwyNjUuMyA2NTAuNywyNjUuMyA2NTEuOSwyNjUuMyA2NTMuMSwyNjUuMyA2NTQuMywyNjUuMyA2NTUuNSwyNjUuMyA2NTYuOCwyNjUuMyA2NTguMCwyNjUuMyA2NTkuMiwyNjUuMyA2NjAuNCwyNjUuMyA2NjEuNiwyNjUuMyA2NjIuOCwyNjUuMyA2NjQuMCwyNjUuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMWY3N2I0IiBzdHJva2Utd2lkdGg9IjIiLz4KPGxpbmUgeDE9IjYwIiB5MT0iMjAiIHgyPSI3OCIgeTI9IjIwIiBzdHJva2U9IiMxZjc3YjQiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSI4MiIgeT0iMjQiPmdyb3d0aCByYXRlIG9mIHRoZSBzYW1wbGUncyBQT1AgdHlwZXM8L3RleHQ+CjxjaXJjbGUgY3g9IjYwLjAiIGN5PSIyNjUuMyIgcj0iNCIgZmlsbD0iIzIyMiIvPgo8dGV4dCB4PSI2Ny4wIiB5PSIyNTcuMyIgdGV4dC1hbmNob3I9InN0YXJ0Ij5wZWFzYW50IHdpdGggbm8gbWFya2V0OiDiiJIxMCU8L3RleHQ+CjxjaXJjbGUgY3g9IjI2MS4zIiBjeT0iODMuOCIgcj0iNCIgZmlsbD0iIzIyMiIvPgo8dGV4dCB4PSIyNTQuMyIgeT0iOTkuOCIgdGV4dC1hbmNob3I9ImVuZCI+cGVhc2FudCBvbiBhIG1hcmtldCBoZXg6ICsyLjY3JTwvdGV4dD4KPGNpcmNsZSBjeD0iMzAxLjYiIGN5PSI3OS4wIiByPSI0IiBmaWxsPSIjMjIyIi8+Cjx0ZXh0IHg9IjMwOC42IiB5PSI3My4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiPmFydGlzYW46ICszJTwvdGV4dD4KPHRleHQgeD0iMzYyLjAiIHk9IjMzNCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+c3Vic2lzdGVuY2UgaW5kZXggKGV4dHJhIHN1YnNpc3RlbmNlIGJ1bmRsZXMgdGhlIGluY29tZSBjb3VsZCBidXkpPC90ZXh0Pgo8dGV4dCB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxNCAxNjUuMCkgcm90YXRlKC05MCkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPnNpemUgY2hhbmdlIHBlciB0dXJuPC90ZXh0Pgo8L3N2Zz4="/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b2d4f6a8">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>More detail: <a href="docs/pops.md">docs/pops.md</a> for the keys and every error message, <a href="docs/growth.md">docs/growth.md</a> for the growth rule, and <a href="docs/goods.md">docs/goods.md</a> for the goods a type names.</p>
+<h3 id="POPs">POPs<a class="anchor-link" href="#POPs">¶</a></h3><p>A <code>[[pop]]</code> section in <code>start/</code> places a group of people of one type on one hex (in <code>rules/</code> it is an error, since a POP changes during play). Four keys, all required:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>The name of a POP type from <code>rules/</code></td>
+</tr>
+<tr>
+<td><code>q</code>, <code>r</code></td>
+<td>A hex that exists on the map, as for deposits and markets</td>
+</tr>
+<tr>
+<td><code>size</code></td>
+<td>The number of people at turn 0: a number greater than 0, decimals allowed</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Size is a starting value, and it need not be whole.</strong> A POP is an aggregate: what it receives and wants scales with its size, and every turn the size is multiplied by a growth rate, so after the first turn sizes are long decimals anyway. Nothing is rounded, in the engine or on screen.</li>
+<li><strong>At most one POP of each type per hex.</strong> Two groups of the same type on one hex would behave as one group split in two, so a second <code>[[pop]]</code> with the same type and coordinates is an error that names the first. A hex may hold POPs of several types, or none.</li>
+<li><strong>POPs start with nothing.</strong> There is no starting cash or goods. At the start of every turn, turn 0 included, each POP receives its type's endowment times its size, and it perishes like any other good: the sample's labor would be gone at the end of the turn it arrives if the POP did not sell or consume it, while an endowed durable good would pile up.</li>
+<li>Deposits are still unowned: their output goes to the hex's unowned stockpile, not to the POPs there.</li>
+</ul>
+<div class="highlight"><pre><span></span><span class="k">[[pop]]</span>
+<span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"peasant"</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">60</span>
+
+<span class="k">[[pop]]</span>
+<span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"artisan"</span><span class="w">     </span><span class="c1"># a second type on the same hex is fine</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">2.5</span><span class="w">           </span><span class="c1"># sizes need not be whole numbers</span>
+</pre></div>
+<p>Errors, each with file, line and column: a missing <code>type</code>, <code>q</code>, <code>r</code> or <code>size</code>; a <code>type</code> that is not text; bad coordinates or coordinates with no hex; a <code>size</code> that is not a number above 0; a duplicate POP; an unknown POP type; an unknown key; and a <code>[[pop]]</code> in <code>rules/</code>. The unknown-type and no-hex errors are skipped while part of the setting could not be read.</p>
+<p><strong>The sample setting</strong> places 16 POPs, 410 people in all: a <code>peasant</code> POP on 15 of the 19 hexes, with sizes from 12 to 60, and an <code>artisan</code> POP of 10 at the center <code>(0, 0)</code>, the only hex that prices every good, so the center holds two POPs. The peasant POP of 12 on the north-east corner <code>(2, -2)</code> has no market, so it can never sell its labor or buy grain; it is there to show what happens to a POP that cannot trade. Four hexes have no POP: <code>(2, -1)</code>, <code>(-2, 0)</code>, <code>(1, 1)</code> and <code>(-2, 2)</code>. In the diagram, hexes with POPs are shaded.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=c3e5a7b9">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMjEiIGhlaWdodD0iMzEyIiB2aWV3Qm94PSItMTYxIC0xNjggMzIxIDMxMiIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiPgo8dGV4dCB4PSItMTU3IiB5PSItMTUyIiBmb250LXNpemU9IjEyIj5xIGdyb3dzIGVhc3QsIHIgZ3Jvd3Mgc291dGg8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTMxLjIsLTEyNi4wIC0zMS4yLC05MC4wIC02Mi40LC03Mi4wIC05My41LC05MC4wIC05My41LC0xMjYuMCAtNjIuNCwtMTQ0LjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTYyLjQiIHk9Ii0xMTAuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MCwgLTI8L3RleHQ+Cjx0ZXh0IHg9Ii02Mi40IiB5PSItOTkuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPnBlYXNhbnQgMjA8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMzEuMiwtMTI2LjAgMzEuMiwtOTAuMCAwLjAsLTcyLjAgLTMxLjIsLTkwLjAgLTMxLjIsLTEyNi4wIC0wLjAsLTE0NC4wIiBmaWxsPSIjZTZmNGU2IiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjAuMCIgeT0iLTExMC4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAtMjwvdGV4dD4KPHRleHQgeD0iMC4wIiB5PSItOTkuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPnBlYXNhbnQgMTU8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iOTMuNSwtMTI2LjAgOTMuNSwtOTAuMCA2Mi40LC03Mi4wIDMxLjIsLTkwLjAgMzEuMiwtMTI2LjAgNjIuNCwtMTQ0LjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iNjIuNCIgeT0iLTExMC4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yLCAtMjwvdGV4dD4KPHRleHQgeD0iNjIuNCIgeT0iLTk5LjAiIGZvbnQtc2l6ZT0iOC41IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjMjY0Ij5wZWFzYW50IDEyPC90ZXh0Pgo8dGV4dCB4PSI2Mi40IiB5PSItODkuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPihubyBtYXJrZXQpPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii02Mi40LC03Mi4wIC02Mi40LC0zNi4wIC05My41LC0xOC4wIC0xMjQuNywtMzYuMCAtMTI0LjcsLTcyLjAgLTkzLjUsLTkwLjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTkzLjUiIHk9Ii01Ni4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMSwgLTE8L3RleHQ+Cjx0ZXh0IHg9Ii05My41IiB5PSItNDUuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPnBlYXNhbnQgMjU8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMC4wLC03Mi4wIDAuMCwtMzYuMCAtMzEuMiwtMTguMCAtNjIuNCwtMzYuMCAtNjIuNCwtNzIuMCAtMzEuMiwtOTAuMCIgZmlsbD0iI2U2ZjRlNiIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItMzEuMiIgeT0iLTU2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIC0xPC90ZXh0Pgo8dGV4dCB4PSItMzEuMiIgeT0iLTQ1LjAiIGZvbnQtc2l6ZT0iOC41IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjMjY0Ij5wZWFzYW50IDMwPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjYyLjQsLTcyLjAgNjIuNCwtMzYuMCAzMS4yLC0xOC4wIC0wLjAsLTM2LjAgMC4wLC03Mi4wIDMxLjIsLTkwLjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMzEuMiIgeT0iLTU2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEsIC0xPC90ZXh0Pgo8dGV4dCB4PSIzMS4yIiB5PSItNDUuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPnBlYXNhbnQgMzU8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMTI0LjcsLTcyLjAgMTI0LjcsLTM2LjAgOTMuNSwtMTguMCA2Mi40LC0zNi4wIDYyLjQsLTcyLjAgOTMuNSwtOTAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSI5My41IiB5PSItNTYuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MiwgLTE8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTkzLjUsLTE4LjAgLTkzLjUsMTguMCAtMTI0LjcsMzYuMCAtMTU1LjksMTguMCAtMTU1LjksLTE4LjAgLTEyNC43LC0zNi4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9Ii0xMjQuNyIgeT0iLTIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+LTIsIDA8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTMxLjIsLTE4LjAgLTMxLjIsMTguMCAtNjIuNCwzNi4wIC05My41LDE4LjAgLTkzLjUsLTE4LjAgLTYyLjQsLTM2LjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTYyLjQiIHk9Ii0yLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0xLCAwPC90ZXh0Pgo8dGV4dCB4PSItNjIuNCIgeT0iOS4wIiBmb250LXNpemU9IjguNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzI2NCI+cGVhc2FudCA0MDwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIzMS4yLC0xOC4wIDMxLjIsMTguMCAwLjAsMzYuMCAtMzEuMiwxOC4wIC0zMS4yLC0xOC4wIC0wLjAsLTM2LjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMC4wIiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4wLCAwPC90ZXh0Pgo8dGV4dCB4PSIwLjAiIHk9IjkuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPnBlYXNhbnQgNjA8L3RleHQ+Cjx0ZXh0IHg9IjAuMCIgeT0iMTkuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPmFydGlzYW4gMTA8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iOTMuNSwtMTguMCA5My41LDE4LjAgNjIuNCwzNi4wIDMxLjIsMTguMCAzMS4yLC0xOC4wIDYyLjQsLTM2LjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iNjIuNCIgeT0iLTIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MSwgMDwvdGV4dD4KPHRleHQgeD0iNjIuNCIgeT0iOS4wIiBmb250LXNpemU9IjguNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzI2NCI+cGVhc2FudCAzNTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIxNTUuOSwtMTguMCAxNTUuOSwxOC4wIDEyNC43LDM2LjAgOTMuNSwxOC4wIDkzLjUsLTE4LjAgMTI0LjcsLTM2LjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMTI0LjciIHk9Ii0yLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIsIDA8L3RleHQ+Cjx0ZXh0IHg9IjEyNC43IiB5PSI5LjAiIGZvbnQtc2l6ZT0iOC41IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjMjY0Ij5wZWFzYW50IDE4PC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii02Mi40LDM2LjAgLTYyLjQsNzIuMCAtOTMuNSw5MC4wIC0xMjQuNyw3Mi4wIC0xMjQuNywzNi4wIC05My41LDE4LjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTkzLjUiIHk9IjUyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0yLCAxPC90ZXh0Pgo8dGV4dCB4PSItOTMuNSIgeT0iNjMuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPnBlYXNhbnQgMjI8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMC4wLDM2LjAgMC4wLDcyLjAgLTMxLjIsOTAuMCAtNjIuNCw3Mi4wIC02Mi40LDM2LjAgLTMxLjIsMTguMCIgZmlsbD0iI2U2ZjRlNiIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItMzEuMiIgeT0iNTIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+LTEsIDE8L3RleHQ+Cjx0ZXh0IHg9Ii0zMS4yIiB5PSI2My4wIiBmb250LXNpemU9IjguNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzI2NCI+cGVhc2FudCAyODwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSI2Mi40LDM2LjAgNjIuNCw3Mi4wIDMxLjIsOTAuMCAtMC4wLDcyLjAgMC4wLDM2LjAgMzEuMiwxOC4wIiBmaWxsPSIjZTZmNGU2IiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjMxLjIiIHk9IjUyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIDE8L3RleHQ+Cjx0ZXh0IHg9IjMxLjIiIHk9IjYzLjAiIGZvbnQtc2l6ZT0iOC41IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjMjY0Ij5wZWFzYW50IDI0PC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjEyNC43LDM2LjAgMTI0LjcsNzIuMCA5My41LDkwLjAgNjIuNCw3Mi4wIDYyLjQsMzYuMCA5My41LDE4LjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iOTMuNSIgeT0iNTIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MSwgMTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSItMzEuMiw5MC4wIC0zMS4yLDEyNi4wIC02Mi40LDE0NC4wIC05My41LDEyNi4wIC05My41LDkwLjAgLTYyLjQsNzIuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItNjIuNCIgeT0iMTA2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0yLCAyPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjMxLjIsOTAuMCAzMS4yLDEyNi4wIDAuMCwxNDQuMCAtMzEuMiwxMjYuMCAtMzEuMiw5MC4wIC0wLjAsNzIuMCIgZmlsbD0iI2U2ZjRlNiIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSIwLjAiIHk9IjEwNi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMSwgMjwvdGV4dD4KPHRleHQgeD0iMC4wIiB5PSIxMTcuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPnBlYXNhbnQgMTY8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iOTMuNSw5MC4wIDkzLjUsMTI2LjAgNjIuNCwxNDQuMCAzMS4yLDEyNi4wIDMxLjIsOTAuMCA2Mi40LDcyLjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iNjIuNCIgeT0iMTA2LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIDI8L3RleHQ+Cjx0ZXh0IHg9IjYyLjQiIHk9IjExNy4wIiBmb250LXNpemU9IjguNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzI2NCI+cGVhc2FudCAyMDwvdGV4dD4KPC9zdmc+"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d4f6b8c0">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>More detail: <a href="docs/pops.md">docs/pops.md</a>.</p>
+<h3 id="Running-a-setting">Running a setting<a class="anchor-link" href="#Running-a-setting">¶</a></h3><p>A loaded setting becomes a running <strong>world</strong>. The rules stay fixed; the world holds the clock (starting at turn 0), a stockpile of unowned goods on every hex, and for every POP its current size and its own stockpile. Each turn has three parts:</p>
 <ol>
-<li><strong>Emit.</strong> At the start of the turn every deposit produces its resource type's <code>output</code> of its good.</li>
-<li><strong>Actors act.</strong> Nothing acts yet, so this part is empty.</li>
-<li><strong>Perish.</strong> At the end of the turn, goods that have reached their limit are removed.</li>
+<li><strong>Emit and endow.</strong> At the start of the turn every deposit produces its resource type's <code>output</code> of its good, into the unowned stockpile of its hex (deposits have no owners yet). Then every POP receives its type's endowment times its size, into its own stockpile.</li>
+<li><strong>Trade, consume and grow.</strong> On every hex, each POP sells the market what it does not mean to keep, buys what it wants with the proceeds, and consumes. Then every POP's size changes by its growth rate. The rest of this section explains it.</li>
+<li><strong>Perish.</strong> At the end of the turn, goods that have reached their limit are removed from every stockpile, the hexes' and the POPs'.</li>
 </ol>
-<p>The world is observed after the emit and before the perish. Deposits are unowned, so everything lands in an "unowned goods" stockpile on the hex where the deposit sits.</p>
-<p><code>perishes_after</code> takes effect here. With 1, output is usable during the turn it appears and gone when it ends. With 3, it is gone at the end of the third turn it exists. Goods without <code>perishes_after</code> last forever and accumulate. (<code>movable</code> still has no effect.)</p>
+<p>The world is observed after part 2 and before part 3, so what you see at any turn is the world after that turn's trading and growth, with nothing perished yet. That includes turn 0: a freshly loaded world has already run turn 0's trade and growth, which is why its POPs are not at the sizes written in the setting (see <a href="#Turn-reports">Turn reports</a> below).</p>
+<p><code>perishes_after</code> takes effect in part 3. With 1, output is usable during the turn it appears and gone when it ends. With 3, it is gone at the end of the third turn it exists. Goods without <code>perishes_after</code> last forever and accumulate. (<code>movable</code> still has no effect.)</p>
 <p>A <strong>stockpile</strong> holds the total of each good, and for each total, how much perishes at the end of which turn. For example, a good with <code>perishes_after = 3</code> produced at 5 per turn:</p>
 <table>
 <thead>
@@ -8218,7 +8554,119 @@ a.anchor-link {
 </tr>
 </tbody>
 </table>
-<p><strong>Turn reports.</strong> Each turn produces a report with totals per good, over the whole map, of what perished (when the previous turn ended) and what was emitted. The sample setting over turns 0 to 2 (see the next section for the command) looks like this:</p>
+<h4 id="How-POPs-trade">How POPs trade<a class="anchor-link" href="#How-POPs-trade">¶</a></h4><p>Each turn, once the endowment has arrived, the market on the POP's hex works out what the POP wants to end up with and makes the trades. In plain terms:</p>
+<ul>
+<li><strong>Income is everything the POP holds</strong>, valued at the hex's prices: this turn's endowment, plus any durable goods it still has, plus any currency left over from earlier turns.</li>
+<li><strong>Subsistence comes first.</strong> The POP first covers every utility good's subsistence amount, times its size. Whatever income is left is split between its utility goods by their shares. Goods the hex does not price are left out of this sum: a held one is simply kept, and a wanted one cannot be bought.</li>
+<li><strong>Below subsistence, everything is scaled down.</strong> If the income cannot cover the subsistence bundle, the POP spends all of it and gets the same fraction of every subsistence amount, leisure included: a peasant facing dear grain sells more of its labor than it would like to keep and still goes short of grain.</li>
+<li><strong>Sales first, then purchases.</strong> On each hex every POP sells before any POP buys. With today's fixed-price market this changes nothing; it is there so that the later live market, which can run short, is fair.</li>
+<li><strong>Then it consumes</strong> the goods in its utility, up to what it wanted. The labor it kept is its leisure, consumed the same way. Goods outside its utility are never consumed: they are sold if the hex prices them and kept if it does not.</li>
+<li><strong>Leftover currency stays.</strong> A POP spends essentially all its income; floating-point rounding can leave a tiny sliver of currency, which stays in its stockpile and counts as income next turn. Nothing is rounded.</li>
+<li><strong>No market, no trade.</strong> A POP on a hex with no market keeps what it has and consumes what it can. The sample's north-east peasant consumes all its labor as leisure and goes without grain every turn.</li>
+</ul>
+<p>Some consequences for setting authors: a durable good a POP is endowed with but neither wants nor can sell piles up in its stockpile; if none of the goods a type gives a share to is priced on its hex, its spare income is kept as currency and, for a durable currency, piles up too; and a POP that cannot afford its subsistence falls short on everything in the same proportion.</p>
+<p>A worked example from the sample at turn 0, at a typical hex's prices (labor 1, grain 2 and copper 5 silver):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Center peasant, size 60</th>
+<th>North-east peasant, size 12 (no market)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Receives</td>
+<td>600 labor</td>
+<td>120 labor</td>
+</tr>
+<tr>
+<td>Income</td>
+<td>600 silver</td>
+<td>nothing can be sold, so 0</td>
+</tr>
+<tr>
+<td>Subsistence needs</td>
+<td>120 labor and 120 grain, costing 360 silver</td>
+<td>24 labor and 24 grain, but grain cannot be bought</td>
+</tr>
+<tr>
+<td>Left over</td>
+<td>240 silver, split 0.2 to labor and 0.8 to grain</td>
+<td>nothing</td>
+</tr>
+<tr>
+<td>Wants to end up with</td>
+<td>168 labor and 216 grain</td>
+<td>the 120 labor it holds, and 0 grain</td>
+</tr>
+<tr>
+<td>Sells</td>
+<td>432 labor for 432 silver</td>
+<td>nothing</td>
+</tr>
+<tr>
+<td>Buys</td>
+<td>216 grain for 432 silver</td>
+<td>nothing</td>
+</tr>
+<tr>
+<td>Consumes</td>
+<td>168 labor and 216 grain</td>
+<td>120 labor</td>
+</tr>
+<tr>
+<td>Holds afterwards</td>
+<td>at most a rounding sliver of silver</td>
+<td>nothing</td>
+</tr>
+</tbody>
+</table>
+<p>Per person: a peasant sells 7.2 of its 10 labor, buys 3.6 grain and keeps 2.8 labor as leisure, and an artisan at the center sells 8.5 labor and buys 3 grain and 0.5 copper. The chart shows how a peasant's choices change with the price of grain. Above a price of 4 (with labor at 1) its 10 labor can no longer cover its subsistence, and everything scales down together.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=e5a7c9d1">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2ODAiIGhlaWdodD0iMzQwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMSI+CjxsaW5lIHgxPSI2MC4wIiB5MT0iMzYiIHgyPSI2MC4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNjAuMCIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xPC90ZXh0Pgo8bGluZSB4MT0iMTI3LjEiIHkxPSIzNiIgeDI9IjEyNy4xIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iMTI3LjEiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MjwvdGV4dD4KPGxpbmUgeDE9IjE5NC4yIiB5MT0iMzYiIHgyPSIxOTQuMiIgeTI9IjI5NCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjE5NC4yIiB5PSIzMDgiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjM8L3RleHQ+CjxsaW5lIHgxPSIyNjEuMyIgeTE9IjM2IiB4Mj0iMjYxLjMiIHkyPSIyOTQiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSIyNjEuMyIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj40PC90ZXh0Pgo8bGluZSB4MT0iMzI4LjQiIHkxPSIzNiIgeDI9IjMyOC40IiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iMzI4LjQiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+NTwvdGV4dD4KPGxpbmUgeDE9IjM5NS42IiB5MT0iMzYiIHgyPSIzOTUuNiIgeTI9IjI5NCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjM5NS42IiB5PSIzMDgiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjY8L3RleHQ+CjxsaW5lIHgxPSI0NjIuNyIgeTE9IjM2IiB4Mj0iNDYyLjciIHkyPSIyOTQiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI0NjIuNyIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj43PC90ZXh0Pgo8bGluZSB4MT0iNTI5LjgiIHkxPSIzNiIgeDI9IjUyOS44IiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNTI5LjgiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+ODwvdGV4dD4KPGxpbmUgeDE9IjU5Ni45IiB5MT0iMzYiIHgyPSI1OTYuOSIgeTI9IjI5NCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU5Ni45IiB5PSIzMDgiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjk8L3RleHQ+CjxsaW5lIHgxPSI2NjQuMCIgeTE9IjM2IiB4Mj0iNjY0LjAiIHkyPSIyOTQiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI2NjQuMCIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xMDwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iMjk0LjAiIHgyPSI2NjQiIHkyPSIyOTQuMCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0IiB5PSIyOTguMCIgdGV4dC1hbmNob3I9ImVuZCI+MDwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iMjQyLjQiIHgyPSI2NjQiIHkyPSIyNDIuNCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0IiB5PSIyNDYuNCIgdGV4dC1hbmNob3I9ImVuZCI+MjwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iMTkwLjgiIHgyPSI2NjQiIHkyPSIxOTAuOCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0IiB5PSIxOTQuOCIgdGV4dC1hbmNob3I9ImVuZCI+NDwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iMTM5LjIiIHgyPSI2NjQiIHkyPSIxMzkuMiIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0IiB5PSIxNDMuMiIgdGV4dC1hbmNob3I9ImVuZCI+NjwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iODcuNiIgeDI9IjY2NCIgeTI9Ijg3LjYiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI1NCIgeT0iOTEuNiIgdGV4dC1hbmNob3I9ImVuZCI+ODwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iMzYuMCIgeDI9IjY2NCIgeTI9IjM2LjAiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI1NCIgeT0iNDAuMCIgdGV4dC1hbmNob3I9ImVuZCI+MTA8L3RleHQ+CjxyZWN0IHg9IjYwIiB5PSIzNiIgd2lkdGg9IjYwNCIgaGVpZ2h0PSIyNTgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzk5OSIvPgo8bGluZSB4MT0iMjYxLjMiIHkxPSIzNiIgeDI9IjI2MS4zIiB5Mj0iMjk0IiBzdHJva2U9IiNhNDAiIHN0cm9rZS1kYXNoYXJyYXk9IjQgMyIvPgo8dGV4dCB4PSIyNjUuMyIgeT0iNDgiIGZpbGw9IiNhNDAiPmJlbG93IHN1YnNpc3RlbmNlIGZyb20gaGVyZTwvdGV4dD4KPHBvbHlsaW5lIHBvaW50cz0iNjAuMCwxMTguNiA2MS4zLDExOC40IDYyLjcsMTE4LjEgNjQuMCwxMTcuOSA2NS40LDExNy43IDY2LjcsMTE3LjUgNjguMSwxMTcuMyA2OS40LDExNy4xIDcwLjcsMTE2LjkgNzIuMSwxMTYuNyA3My40LDExNi41IDc0LjgsMTE2LjMgNzYuMSwxMTYuMSA3Ny40LDExNS45IDc4LjgsMTE1LjcgODAuMSwxMTUuNSA4MS41LDExNS4zIDgyLjgsMTE1LjEgODQuMiwxMTQuOCA4NS41LDExNC42IDg2LjgsMTE0LjQgODguMiwxMTQuMiA4OS41LDExNC4wIDkwLjksMTEzLjggOTIuMiwxMTMuNiA5My42LDExMy40IDk0LjksMTEzLjIgOTYuMiwxMTMuMCA5Ny42LDExMi44IDk4LjksMTEyLjYgMTAwLjMsMTEyLjQgMTAxLjYsMTEyLjIgMTAzLjAsMTEyLjAgMTA0LjMsMTExLjcgMTA1LjYsMTExLjUgMTA3LjAsMTExLjMgMTA4LjMsMTExLjEgMTA5LjcsMTEwLjkgMTExLjAsMTEwLjcgMTEyLjMsMTEwLjUgMTEzLjcsMTEwLjMgMTE1LjAsMTEwLjEgMTE2LjQsMTA5LjkgMTE3LjcsMTA5LjcgMTE5LjEsMTA5LjUgMTIwLjQsMTA5LjMgMTIxLjcsMTA5LjEgMTIzLjEsMTA4LjkgMTI0LjQsMTA4LjcgMTI1LjgsMTA4LjQgMTI3LjEsMTA4LjIgMTI4LjUsMTA4LjAgMTI5LjgsMTA3LjggMTMxLjEsMTA3LjYgMTMyLjUsMTA3LjQgMTMzLjgsMTA3LjIgMTM1LjIsMTA3LjAgMTM2LjUsMTA2LjggMTM3LjgsMTA2LjYgMTM5LjIsMTA2LjQgMTQwLjUsMTA2LjIgMTQxLjksMTA2LjAgMTQzLjIsMTA1LjggMTQ0LjYsMTA1LjYgMTQ1LjksMTA1LjQgMTQ3LjIsMTA1LjEgMTQ4LjYsMTA0LjkgMTQ5LjksMTA0LjcgMTUxLjMsMTA0LjUgMTUyLjYsMTA0LjMgMTU0LjAsMTA0LjEgMTU1LjMsMTAzLjkgMTU2LjYsMTAzLjcgMTU4LjAsMTAzLjUgMTU5LjMsMTAzLjMgMTYwLjcsMTAzLjEgMTYyLjAsMTAyLjkgMTYzLjQsMTAyLjcgMTY0LjcsMTAyLjUgMTY2LjAsMTAyLjMgMTY3LjQsMTAyLjAgMTY4LjcsMTAxLjggMTcwLjEsMTAxLjYgMTcxLjQsMTAxLjQgMTcyLjcsMTAxLjIgMTc0LjEsMTAxLjAgMTc1LjQsMTAwLjggMTc2LjgsMTAwLjYgMTc4LjEsMTAwLjQgMTc5LjUsMTAwLjIgMTgwLjgsMTAwLjAgMTgyLjEsOTkuOCAxODMuNSw5OS42IDE4NC44LDk5LjQgMTg2LjIsOTkuMiAxODcuNSw5OS4wIDE4OC45LDk4LjcgMTkwLjIsOTguNSAxOTEuNSw5OC4zIDE5Mi45LDk4LjEgMTk0LjIsOTcuOSAxOTUuNiw5Ny43IDE5Ni45LDk3LjUgMTk4LjIsOTcuMyAxOTkuNiw5Ny4xIDIwMC45LDk2LjkgMjAyLjMsOTYuNyAyMDMuNiw5Ni41IDIwNS4wLDk2LjMgMjA2LjMsOTYuMSAyMDcuNiw5NS45IDIwOS4wLDk1LjYgMjEwLjMsOTUuNCAyMTEuNyw5NS4yIDIxMy4wLDk1LjAgMjE0LjQsOTQuOCAyMTUuNyw5NC42IDIxNy4wLDk0LjQgMjE4LjQsOTQuMiAyMTkuNyw5NC4wIDIyMS4xLDkzLjggMjIyLjQsOTMuNiAyMjMuOCw5My40IDIyNS4xLDkzLjIgMjI2LjQsOTMuMCAyMjcuOCw5Mi44IDIyOS4xLDkyLjYgMjMwLjUsOTIuMyAyMzEuOCw5Mi4xIDIzMy4xLDkxLjkgMjM0LjUsOTEuNyAyMzUuOCw5MS41IDIzNy4yLDkxLjMgMjM4LjUsOTEuMSAyMzkuOSw5MC45IDI0MS4yLDkwLjcgMjQyLjUsOTAuNSAyNDMuOSw5MC4zIDI0NS4yLDkwLjEgMjQ2LjYsODkuOSAyNDcuOSw4OS43IDI0OS4zLDg5LjUgMjUwLjYsODkuMyAyNTEuOSw4OS4wIDI1My4zLDg4LjggMjU0LjYsODguNiAyNTYuMCw4OC40IDI1Ny4zLDg4LjIgMjU4LjYsODguMCAyNjAuMCw4Ny44IDI2MS4zLDg3LjYgMjYyLjcsODcuNCAyNjQuMCw4Ny4yIDI2NS40LDg3LjAgMjY2LjcsODYuOCAyNjguMCw4Ni42IDI2OS40LDg2LjQgMjcwLjcsODYuMiAyNzIuMSw4Ni4wIDI3My40LDg1LjggMjc0LjgsODUuNiAyNzYuMSw4NS40IDI3Ny40LDg1LjIgMjc4LjgsODUuMCAyODAuMSw4NC45IDI4MS41LDg0LjcgMjgyLjgsODQuNSAyODQuMiw4NC4zIDI4NS41LDg0LjEgMjg2LjgsODQuMCAyODguMiw4My44IDI4OS41LDgzLjYgMjkwLjksODMuNCAyOTIuMiw4My4zIDI5My41LDgzLjEgMjk0LjksODIuOSAyOTYuMiw4Mi43IDI5Ny42LDgyLjYgMjk4LjksODIuNCAzMDAuMyw4Mi4yIDMwMS42LDgyLjEgMzAyLjksODEuOSAzMDQuMyw4MS43IDMwNS42LDgxLjYgMzA3LjAsODEuNCAzMDguMyw4MS4zIDMwOS43LDgxLjEgMzExLjAsODAuOSAzMTIuMyw4MC44IDMxMy43LDgwLjYgMzE1LjAsODAuNSAzMTYuNCw4MC4zIDMxNy43LDgwLjIgMzE5LjAsODAuMCAzMjAuNCw3OS45IDMyMS43LDc5LjcgMzIzLjEsNzkuNiAzMjQuNCw3OS40IDMyNS44LDc5LjMgMzI3LjEsNzkuMSAzMjguNCw3OS4wIDMyOS44LDc4LjkgMzMxLjEsNzguNyAzMzIuNSw3OC42IDMzMy44LDc4LjQgMzM1LjIsNzguMyAzMzYuNSw3OC4yIDMzNy44LDc4LjAgMzM5LjIsNzcuOSAzNDAuNSw3Ny43IDM0MS45LDc3LjYgMzQzLjIsNzcuNSAzNDQuNiw3Ny4zIDM0NS45LDc3LjIgMzQ3LjIsNzcuMSAzNDguNiw3Ny4wIDM0OS45LDc2LjggMzUxLjMsNzYuNyAzNTIuNiw3Ni42IDM1My45LDc2LjQgMzU1LjMsNzYuMyAzNTYuNiw3Ni4yIDM1OC4wLDc2LjEgMzU5LjMsNzUuOSAzNjAuNyw3NS44IDM2Mi4wLDc1LjcgMzYzLjMsNzUuNiAzNjQuNyw3NS40IDM2Ni4wLDc1LjMgMzY3LjQsNzUuMiAzNjguNyw3NS4xIDM3MC4xLDc1LjAgMzcxLjQsNzQuOSAzNzIuNyw3NC43IDM3NC4xLDc0LjYgMzc1LjQsNzQuNSAzNzYuOCw3NC40IDM3OC4xLDc0LjMgMzc5LjQsNzQuMiAzODAuOCw3NC4xIDM4Mi4xLDczLjkgMzgzLjUsNzMuOCAzODQuOCw3My43IDM4Ni4yLDczLjYgMzg3LjUsNzMuNSAzODguOCw3My40IDM5MC4yLDczLjMgMzkxLjUsNzMuMiAzOTIuOSw3My4xIDM5NC4yLDczLjAgMzk1LjYsNzIuOSAzOTYuOSw3Mi44IDM5OC4yLDcyLjYgMzk5LjYsNzIuNSA0MDAuOSw3Mi40IDQwMi4zLDcyLjMgNDAzLjYsNzIuMiA0MDUuMCw3Mi4xIDQwNi4zLDcyLjAgNDA3LjYsNzEuOSA0MDkuMCw3MS44IDQxMC4zLDcxLjcgNDExLjcsNzEuNiA0MTMuMCw3MS41IDQxNC4zLDcxLjQgNDE1LjcsNzEuMyA0MTcuMCw3MS4yIDQxOC40LDcxLjEgNDE5LjcsNzEuMSA0MjEuMSw3MS4wIDQyMi40LDcwLjkgNDIzLjcsNzAuOCA0MjUuMSw3MC43IDQyNi40LDcwLjYgNDI3LjgsNzAuNSA0MjkuMSw3MC40IDQzMC41LDcwLjMgNDMxLjgsNzAuMiA0MzMuMSw3MC4xIDQzNC41LDcwLjAgNDM1LjgsNjkuOSA0MzcuMiw2OS45IDQzOC41LDY5LjggNDM5LjgsNjkuNyA0NDEuMiw2OS42IDQ0Mi41LDY5LjUgNDQzLjksNjkuNCA0NDUuMiw2OS4zIDQ0Ni42LDY5LjIgNDQ3LjksNjkuMiA0NDkuMiw2OS4xIDQ1MC42LDY5LjAgNDUxLjksNjguOSA0NTMuMyw2OC44IDQ1NC42LDY4LjcgNDU2LjAsNjguNyA0NTcuMyw2OC42IDQ1OC42LDY4LjUgNDYwLjAsNjguNCA0NjEuMyw2OC4zIDQ2Mi43LDY4LjIgNDY0LjAsNjguMiA0NjUuNCw2OC4xIDQ2Ni43LDY4LjAgNDY4LjAsNjcuOSA0NjkuNCw2Ny45IDQ3MC43LDY3LjggNDcyLjEsNjcuNyA0NzMuNCw2Ny42IDQ3NC43LDY3LjUgNDc2LjEsNjcuNSA0NzcuNCw2Ny40IDQ3OC44LDY3LjMgNDgwLjEsNjcuMiA0ODEuNSw2Ny4yIDQ4Mi44LDY3LjEgNDg0LjEsNjcuMCA0ODUuNSw2Ni45IDQ4Ni44LDY2LjkgNDg4LjIsNjYuOCA0ODkuNSw2Ni43IDQ5MC45LDY2LjYgNDkyLjIsNjYuNiA0OTMuNSw2Ni41IDQ5NC45LDY2LjQgNDk2LjIsNjYuNCA0OTcuNiw2Ni4zIDQ5OC45LDY2LjIgNTAwLjIsNjYuMSA1MDEuNiw2Ni4xIDUwMi45LDY2LjAgNTA0LjMsNjUuOSA1MDUuNiw2NS45IDUwNy4wLDY1LjggNTA4LjMsNjUuNyA1MDkuNiw2NS43IDUxMS4wLDY1LjYgNTEyLjMsNjUuNSA1MTMuNyw2NS41IDUxNS4wLDY1LjQgNTE2LjQsNjUuMyA1MTcuNyw2NS4zIDUxOS4wLDY1LjIgNTIwLjQsNjUuMSA1MjEuNyw2NS4xIDUyMy4xLDY1LjAgNTI0LjQsNjQuOSA1MjUuOCw2NC45IDUyNy4xLDY0LjggNTI4LjQsNjQuNyA1MjkuOCw2NC43IDUzMS4xLDY0LjYgNTMyLjUsNjQuNSA1MzMuOCw2NC41IDUzNS4xLDY0LjQgNTM2LjUsNjQuNCA1MzcuOCw2NC4zIDUzOS4yLDY0LjIgNTQwLjUsNjQuMiA1NDEuOSw2NC4xIDU0My4yLDY0LjAgNTQ0LjUsNjQuMCA1NDUuOSw2My45IDU0Ny4yLDYzLjkgNTQ4LjYsNjMuOCA1NDkuOSw2My43IDU1MS4zLDYzLjcgNTUyLjYsNjMuNiA1NTMuOSw2My42IDU1NS4zLDYzLjUgNTU2LjYsNjMuNCA1NTguMCw2My40IDU1OS4zLDYzLjMgNTYwLjYsNjMuMyA1NjIuMCw2My4yIDU2My4zLDYzLjIgNTY0LjcsNjMuMSA1NjYuMCw2My4wIDU2Ny40LDYzLjAgNTY4LjcsNjIuOSA1NzAuMCw2Mi45IDU3MS40LDYyLjggNTcyLjcsNjIuOCA1NzQuMSw2Mi43IDU3NS40LDYyLjcgNTc2LjgsNjIuNiA1NzguMSw2Mi41IDU3OS40LDYyLjUgNTgwLjgsNjIuNCA1ODIuMSw2Mi40IDU4My41LDYyLjMgNTg0LjgsNjIuMyA1ODYuMiw2Mi4yIDU4Ny41LDYyLjIgNTg4LjgsNjIuMSA1OTAuMiw2Mi4xIDU5MS41LDYyLjAgNTkyLjksNjIuMCA1OTQuMiw2MS45IDU5NS41LDYxLjkgNTk2LjksNjEuOCA1OTguMiw2MS43IDU5OS42LDYxLjcgNjAwLjksNjEuNiA2MDIuMyw2MS42IDYwMy42LDYxLjUgNjA0LjksNjEuNSA2MDYuMyw2MS40IDYwNy42LDYxLjQgNjA5LjAsNjEuMyA2MTAuMyw2MS4zIDYxMS43LDYxLjIgNjEzLjAsNjEuMiA2MTQuMyw2MS4xIDYxNS43LDYxLjEgNjE3LjAsNjEuMCA2MTguNCw2MS4wIDYxOS43LDYxLjAgNjIxLjAsNjAuOSA2MjIuNCw2MC45IDYyMy43LDYwLjggNjI1LjEsNjAuOCA2MjYuNCw2MC43IDYyNy44LDYwLjcgNjI5LjEsNjAuNiA2MzAuNCw2MC42IDYzMS44LDYwLjUgNjMzLjEsNjAuNSA2MzQuNSw2MC40IDYzNS44LDYwLjQgNjM3LjIsNjAuMyA2MzguNSw2MC4zIDYzOS44LDYwLjIgNjQxLjIsNjAuMiA2NDIuNSw2MC4yIDY0My45LDYwLjEgNjQ1LjIsNjAuMSA2NDYuNiw2MC4wIDY0Ny45LDYwLjAgNjQ5LjIsNTkuOSA2NTAuNiw1OS45IDY1MS45LDU5LjggNjUzLjMsNTkuOCA2NTQuNiw1OS44IDY1NS45LDU5LjcgNjU3LjMsNTkuNyA2NTguNiw1OS42IDY2MC4wLDU5LjYgNjYxLjMsNTkuNSA2NjIuNyw1OS41IDY2NC4wLDU5LjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Q2MjcyOCIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxsaW5lIHgxPSI2MCIgeTE9IjIwIiB4Mj0iNzgiIHkyPSIyMCIgc3Ryb2tlPSIjZDYyNzI4IiBzdHJva2Utd2lkdGg9IjIiLz4KPHRleHQgeD0iODIiIHk9IjI0Ij5sYWJvciBzb2xkPC90ZXh0Pgo8cG9seWxpbmUgcG9pbnRzPSI2MC4wLDIxMS40IDYxLjMsMjExLjYgNjIuNywyMTEuOSA2NC4wLDIxMi4xIDY1LjQsMjEyLjMgNjYuNywyMTIuNSA2OC4xLDIxMi43IDY5LjQsMjEyLjkgNzAuNywyMTMuMSA3Mi4xLDIxMy4zIDczLjQsMjEzLjUgNzQuOCwyMTMuNyA3Ni4xLDIxMy45IDc3LjQsMjE0LjEgNzguOCwyMTQuMyA4MC4xLDIxNC41IDgxLjUsMjE0LjcgODIuOCwyMTQuOSA4NC4yLDIxNS4yIDg1LjUsMjE1LjQgODYuOCwyMTUuNiA4OC4yLDIxNS44IDg5LjUsMjE2LjAgOTAuOSwyMTYuMiA5Mi4yLDIxNi40IDkzLjYsMjE2LjYgOTQuOSwyMTYuOCA5Ni4yLDIxNy4wIDk3LjYsMjE3LjIgOTguOSwyMTcuNCAxMDAuMywyMTcuNiAxMDEuNiwyMTcuOCAxMDMuMCwyMTguMCAxMDQuMywyMTguMyAxMDUuNiwyMTguNSAxMDcuMCwyMTguNyAxMDguMywyMTguOSAxMDkuNywyMTkuMSAxMTEuMCwyMTkuMyAxMTIuMywyMTkuNSAxMTMuNywyMTkuNyAxMTUuMCwyMTkuOSAxMTYuNCwyMjAuMSAxMTcuNywyMjAuMyAxMTkuMSwyMjAuNSAxMjAuNCwyMjAuNyAxMjEuNywyMjAuOSAxMjMuMSwyMjEuMSAxMjQuNCwyMjEuMyAxMjUuOCwyMjEuNiAxMjcuMSwyMjEuOCAxMjguNSwyMjIuMCAxMjkuOCwyMjIuMiAxMzEuMSwyMjIuNCAxMzIuNSwyMjIuNiAxMzMuOCwyMjIuOCAxMzUuMiwyMjMuMCAxMzYuNSwyMjMuMiAxMzcuOCwyMjMuNCAxMzkuMiwyMjMuNiAxNDAuNSwyMjMuOCAxNDEuOSwyMjQuMCAxNDMuMiwyMjQuMiAxNDQuNiwyMjQuNCAxNDUuOSwyMjQuNiAxNDcuMiwyMjQuOSAxNDguNiwyMjUuMSAxNDkuOSwyMjUuMyAxNTEuMywyMjUuNSAxNTIuNiwyMjUuNyAxNTQuMCwyMjUuOSAxNTUuMywyMjYuMSAxNTYuNiwyMjYuMyAxNTguMCwyMjYuNSAxNTkuMywyMjYuNyAxNjAuNywyMjYuOSAxNjIuMCwyMjcuMSAxNjMuNCwyMjcuMyAxNjQuNywyMjcuNSAxNjYuMCwyMjcuNyAxNjcuNCwyMjguMCAxNjguNywyMjguMiAxNzAuMSwyMjguNCAxNzEuNCwyMjguNiAxNzIuNywyMjguOCAxNzQuMSwyMjkuMCAxNzUuNCwyMjkuMiAxNzYuOCwyMjkuNCAxNzguMSwyMjkuNiAxNzkuNSwyMjkuOCAxODAuOCwyMzAuMCAxODIuMSwyMzAuMiAxODMuNSwyMzAuNCAxODQuOCwyMzAuNiAxODYuMiwyMzAuOCAxODcuNSwyMzEuMCAxODguOSwyMzEuMyAxOTAuMiwyMzEuNSAxOTEuNSwyMzEuNyAxOTIuOSwyMzEuOSAxOTQuMiwyMzIuMSAxOTUuNiwyMzIuMyAxOTYuOSwyMzIuNSAxOTguMiwyMzIuNyAxOTkuNiwyMzIuOSAyMDAuOSwyMzMuMSAyMDIuMywyMzMuMyAyMDMuNiwyMzMuNSAyMDUuMCwyMzMuNyAyMDYuMywyMzMuOSAyMDcuNiwyMzQuMSAyMDkuMCwyMzQuNCAyMTAuMywyMzQuNiAyMTEuNywyMzQuOCAyMTMuMCwyMzUuMCAyMTQuNCwyMzUuMiAyMTUuNywyMzUuNCAyMTcuMCwyMzUuNiAyMTguNCwyMzUuOCAyMTkuNywyMzYuMCAyMjEuMSwyMzYuMiAyMjIuNCwyMzYuNCAyMjMuOCwyMzYuNiAyMjUuMSwyMzYuOCAyMjYuNCwyMzcuMCAyMjcuOCwyMzcuMiAyMjkuMSwyMzcuNCAyMzAuNSwyMzcuNyAyMzEuOCwyMzcuOSAyMzMuMSwyMzguMSAyMzQuNSwyMzguMyAyMzUuOCwyMzguNSAyMzcuMiwyMzguNyAyMzguNSwyMzguOSAyMzkuOSwyMzkuMSAyNDEuMiwyMzkuMyAyNDIuNSwyMzkuNSAyNDMuOSwyMzkuNyAyNDUuMiwyMzkuOSAyNDYuNiwyNDAuMSAyNDcuOSwyNDAuMyAyNDkuMywyNDAuNSAyNTAuNiwyNDAuNyAyNTEuOSwyNDEuMCAyNTMuMywyNDEuMiAyNTQuNiwyNDEuNCAyNTYuMCwyNDEuNiAyNTcuMywyNDEuOCAyNTguNiwyNDIuMCAyNjAuMCwyNDIuMiAyNjEuMywyNDIuNCAyNjIuNywyNDIuNiAyNjQuMCwyNDIuOCAyNjUuNCwyNDMuMCAyNjYuNywyNDMuMiAyNjguMCwyNDMuNCAyNjkuNCwyNDMuNiAyNzAuNywyNDMuOCAyNzIuMSwyNDQuMCAyNzMuNCwyNDQuMiAyNzQuOCwyNDQuNCAyNzYuMSwyNDQuNiAyNzcuNCwyNDQuOCAyNzguOCwyNDUuMCAyODAuMSwyNDUuMSAyODEuNSwyNDUuMyAyODIuOCwyNDUuNSAyODQuMiwyNDUuNyAyODUuNSwyNDUuOSAyODYuOCwyNDYuMCAyODguMiwyNDYuMiAyODkuNSwyNDYuNCAyOTAuOSwyNDYuNiAyOTIuMiwyNDYuNyAyOTMuNSwyNDYuOSAyOTQuOSwyNDcuMSAyOTYuMiwyNDcuMyAyOTcuNiwyNDcuNCAyOTguOSwyNDcuNiAzMDAuMywyNDcuOCAzMDEuNiwyNDcuOSAzMDIuOSwyNDguMSAzMDQuMywyNDguMyAzMDUuNiwyNDguNCAzMDcuMCwyNDguNiAzMDguMywyNDguNyAzMDkuNywyNDguOSAzMTEuMCwyNDkuMSAzMTIuMywyNDkuMiAzMTMuNywyNDkuNCAzMTUuMCwyNDkuNSAzMTYuNCwyNDkuNyAzMTcuNywyNDkuOCAzMTkuMCwyNTAuMCAzMjAuNCwyNTAuMSAzMjEuNywyNTAuMyAzMjMuMSwyNTAuNCAzMjQuNCwyNTAuNiAzMjUuOCwyNTAuNyAzMjcuMSwyNTAuOSAzMjguNCwyNTEuMCAzMjkuOCwyNTEuMSAzMzEuMSwyNTEuMyAzMzIuNSwyNTEuNCAzMzMuOCwyNTEuNiAzMzUuMiwyNTEuNyAzMzYuNSwyNTEuOCAzMzcuOCwyNTIuMCAzMzkuMiwyNTIuMSAzNDAuNSwyNTIuMyAzNDEuOSwyNTIuNCAzNDMuMiwyNTIuNSAzNDQuNiwyNTIuNyAzNDUuOSwyNTIuOCAzNDcuMiwyNTIuOSAzNDguNiwyNTMuMCAzNDkuOSwyNTMuMiAzNTEuMywyNTMuMyAzNTIuNiwyNTMuNCAzNTMuOSwyNTMuNiAzNTUuMywyNTMuNyAzNTYuNiwyNTMuOCAzNTguMCwyNTMuOSAzNTkuMywyNTQuMSAzNjAuNywyNTQuMiAzNjIuMCwyNTQuMyAzNjMuMywyNTQuNCAzNjQuNywyNTQuNiAzNjYuMCwyNTQuNyAzNjcuNCwyNTQuOCAzNjguNywyNTQuOSAzNzAuMSwyNTUuMCAzNzEuNCwyNTUuMSAzNzIuNywyNTUuMyAzNzQuMSwyNTUuNCAzNzUuNCwyNTUuNSAzNzYuOCwyNTUuNiAzNzguMSwyNTUuNyAzNzkuNCwyNTUuOCAzODAuOCwyNTUuOSAzODIuMSwyNTYuMSAzODMuNSwyNTYuMiAzODQuOCwyNTYuMyAzODYuMiwyNTYuNCAzODcuNSwyNTYuNSAzODguOCwyNTYuNiAzOTAuMiwyNTYuNyAzOTEuNSwyNTYuOCAzOTIuOSwyNTYuOSAzOTQuMiwyNTcuMCAzOTUuNiwyNTcuMSAzOTYuOSwyNTcuMiAzOTguMiwyNTcuNCAzOTkuNiwyNTcuNSA0MDAuOSwyNTcuNiA0MDIuMywyNTcuNyA0MDMuNiwyNTcuOCA0MDUuMCwyNTcuOSA0MDYuMywyNTguMCA0MDcuNiwyNTguMSA0MDkuMCwyNTguMiA0MTAuMywyNTguMyA0MTEuNywyNTguNCA0MTMuMCwyNTguNSA0MTQuMywyNTguNiA0MTUuNywyNTguNyA0MTcuMCwyNTguOCA0MTguNCwyNTguOSA0MTkuNywyNTguOSA0MjEuMSwyNTkuMCA0MjIuNCwyNTkuMSA0MjMuNywyNTkuMiA0MjUuMSwyNTkuMyA0MjYuNCwyNTkuNCA0MjcuOCwyNTkuNSA0MjkuMSwyNTkuNiA0MzAuNSwyNTkuNyA0MzEuOCwyNTkuOCA0MzMuMSwyNTkuOSA0MzQuNSwyNjAuMCA0MzUuOCwyNjAuMSA0MzcuMiwyNjAuMSA0MzguNSwyNjAuMiA0MzkuOCwyNjAuMyA0NDEuMiwyNjAuNCA0NDIuNSwyNjAuNSA0NDMuOSwyNjAuNiA0NDUuMiwyNjAuNyA0NDYuNiwyNjAuOCA0NDcuOSwyNjAuOCA0NDkuMiwyNjAuOSA0NTAuNiwyNjEuMCA0NTEuOSwyNjEuMSA0NTMuMywyNjEuMiA0NTQuNiwyNjEuMyA0NTYuMCwyNjEuMyA0NTcuMywyNjEuNCA0NTguNiwyNjEuNSA0NjAuMCwyNjEuNiA0NjEuMywyNjEuNyA0NjIuNywyNjEuOCA0NjQuMCwyNjEuOCA0NjUuNCwyNjEuOSA0NjYuNywyNjIuMCA0NjguMCwyNjIuMSA0NjkuNCwyNjIuMSA0NzAuNywyNjIuMiA0NzIuMSwyNjIuMyA0NzMuNCwyNjIuNCA0NzQuNywyNjIuNSA0NzYuMSwyNjIuNSA0NzcuNCwyNjIuNiA0NzguOCwyNjIuNyA0ODAuMSwyNjIuOCA0ODEuNSwyNjIuOCA0ODIuOCwyNjIuOSA0ODQuMSwyNjMuMCA0ODUuNSwyNjMuMSA0ODYuOCwyNjMuMSA0ODguMiwyNjMuMiA0ODkuNSwyNjMuMyA0OTAuOSwyNjMuNCA0OTIuMiwyNjMuNCA0OTMuNSwyNjMuNSA0OTQuOSwyNjMuNiA0OTYuMiwyNjMuNiA0OTcuNiwyNjMuNyA0OTguOSwyNjMuOCA1MDAuMiwyNjMuOSA1MDEuNiwyNjMuOSA1MDIuOSwyNjQuMCA1MDQuMywyNjQuMSA1MDUuNiwyNjQuMSA1MDcuMCwyNjQuMiA1MDguMywyNjQuMyA1MDkuNiwyNjQuMyA1MTEuMCwyNjQuNCA1MTIuMywyNjQuNSA1MTMuNywyNjQuNSA1MTUuMCwyNjQuNiA1MTYuNCwyNjQuNyA1MTcuNywyNjQuNyA1MTkuMCwyNjQuOCA1MjAuNCwyNjQuOSA1MjEuNywyNjQuOSA1MjMuMSwyNjUuMCA1MjQuNCwyNjUuMSA1MjUuOCwyNjUuMSA1MjcuMSwyNjUuMiA1MjguNCwyNjUuMyA1MjkuOCwyNjUuMyA1MzEuMSwyNjUuNCA1MzIuNSwyNjUuNSA1MzMuOCwyNjUuNSA1MzUuMSwyNjUuNiA1MzYuNSwyNjUuNiA1MzcuOCwyNjUuNyA1MzkuMiwyNjUuOCA1NDAuNSwyNjUuOCA1NDEuOSwyNjUuOSA1NDMuMiwyNjYuMCA1NDQuNSwyNjYuMCA1NDUuOSwyNjYuMSA1NDcuMiwyNjYuMSA1NDguNiwyNjYuMiA1NDkuOSwyNjYuMyA1NTEuMywyNjYuMyA1NTIuNiwyNjYuNCA1NTMuOSwyNjYuNCA1NTUuMywyNjYuNSA1NTYuNiwyNjYuNiA1NTguMCwyNjYuNiA1NTkuMywyNjYuNyA1NjAuNiwyNjYuNyA1NjIuMCwyNjYuOCA1NjMuMywyNjYuOCA1NjQuNywyNjYuOSA1NjYuMCwyNjcuMCA1NjcuNCwyNjcuMCA1NjguNywyNjcuMSA1NzAuMCwyNjcuMSA1NzEuNCwyNjcuMiA1NzIuNywyNjcuMiA1NzQuMSwyNjcuMyA1NzUuNCwyNjcuMyA1NzYuOCwyNjcuNCA1NzguMSwyNjcuNSA1NzkuNCwyNjcuNSA1ODAuOCwyNjcuNiA1ODIuMSwyNjcuNiA1ODMuNSwyNjcuNyA1ODQuOCwyNjcuNyA1ODYuMiwyNjcuOCA1ODcuNSwyNjcuOCA1ODguOCwyNjcuOSA1OTAuMiwyNjcuOSA1OTEuNSwyNjguMCA1OTIuOSwyNjguMCA1OTQuMiwyNjguMSA1OTUuNSwyNjguMSA1OTYuOSwyNjguMiA1OTguMiwyNjguMyA1OTkuNiwyNjguMyA2MDAuOSwyNjguNCA2MDIuMywyNjguNCA2MDMuNiwyNjguNSA2MDQuOSwyNjguNSA2MDYuMywyNjguNiA2MDcuNiwyNjguNiA2MDkuMCwyNjguNyA2MTAuMywyNjguNyA2MTEuNywyNjguOCA2MTMuMCwyNjguOCA2MTQuMywyNjguOSA2MTUuNywyNjguOSA2MTcuMCwyNjkuMCA2MTguNCwyNjkuMCA2MTkuNywyNjkuMCA2MjEuMCwyNjkuMSA2MjIuNCwyNjkuMSA2MjMuNywyNjkuMiA2MjUuMSwyNjkuMiA2MjYuNCwyNjkuMyA2MjcuOCwyNjkuMyA2MjkuMSwyNjkuNCA2MzAuNCwyNjkuNCA2MzEuOCwyNjkuNSA2MzMuMSwyNjkuNSA2MzQuNSwyNjkuNiA2MzUuOCwyNjkuNiA2MzcuMiwyNjkuNyA2MzguNSwyNjkuNyA2MzkuOCwyNjkuOCA2NDEuMiwyNjkuOCA2NDIuNSwyNjkuOCA2NDMuOSwyNjkuOSA2NDUuMiwyNjkuOSA2NDYuNiwyNzAuMCA2NDcuOSwyNzAuMCA2NDkuMiwyNzAuMSA2NTAuNiwyNzAuMSA2NTEuOSwyNzAuMiA2NTMuMywyNzAuMiA2NTQuNiwyNzAuMiA2NTUuOSwyNzAuMyA2NTcuMywyNzAuMyA2NTguNiwyNzAuNCA2NjAuMCwyNzAuNCA2NjEuMywyNzAuNSA2NjIuNywyNzAuNSA2NjQuMCwyNzAuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmNhMDJjIiBzdHJva2Utd2lkdGg9IjIiLz4KPGxpbmUgeDE9IjE1Ni4wIiB5MT0iMjAiIHgyPSIxNzQuMCIgeTI9IjIwIiBzdHJva2U9IiMyY2EwMmMiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIxNzguMCIgeT0iMjQiPmxhYm9yIGtlcHQgYXMgbGVpc3VyZTwvdGV4dD4KPHBvbHlsaW5lIHBvaW50cz0iNjAuMCwxMTguNiA2MS4zLDEyMS44IDYyLjcsMTI0LjkgNjQuMCwxMjcuOSA2NS40LDEzMC44IDY2LjcsMTMzLjYgNjguMSwxMzYuMyA2OS40LDEzOC44IDcwLjcsMTQxLjMgNzIuMSwxNDMuNyA3My40LDE0Ni4xIDc0LjgsMTQ4LjMgNzYuMSwxNTAuNSA3Ny40LDE1Mi42IDc4LjgsMTU0LjcgODAuMSwxNTYuNyA4MS41LDE1OC42IDgyLjgsMTYwLjUgODQuMiwxNjIuMyA4NS41LDE2NC4wIDg2LjgsMTY1LjcgODguMiwxNjcuNCA4OS41LDE2OS4wIDkwLjksMTcwLjYgOTIuMiwxNzIuMSA5My42LDE3My42IDk0LjksMTc1LjAgOTYuMiwxNzYuNSA5Ny42LDE3Ny44IDk4LjksMTc5LjIgMTAwLjMsMTgwLjUgMTAxLjYsMTgxLjggMTAzLjAsMTgzLjAgMTA0LjMsMTg0LjIgMTA1LjYsMTg1LjQgMTA3LjAsMTg2LjYgMTA4LjMsMTg3LjcgMTA5LjcsMTg4LjggMTExLjAsMTg5LjkgMTEyLjMsMTkwLjkgMTEzLjcsMTkxLjkgMTE1LjAsMTkzLjAgMTE2LjQsMTkzLjkgMTE3LjcsMTk0LjkgMTE5LjEsMTk1LjkgMTIwLjQsMTk2LjggMTIxLjcsMTk3LjcgMTIzLjEsMTk4LjYgMTI0LjQsMTk5LjQgMTI1LjgsMjAwLjMgMTI3LjEsMjAxLjEgMTI4LjUsMjAxLjkgMTI5LjgsMjAyLjcgMTMxLjEsMjAzLjUgMTMyLjUsMjA0LjMgMTMzLjgsMjA1LjEgMTM1LjIsMjA1LjggMTM2LjUsMjA2LjUgMTM3LjgsMjA3LjIgMTM5LjIsMjA3LjkgMTQwLjUsMjA4LjYgMTQxLjksMjA5LjMgMTQzLjIsMjEwLjAgMTQ0LjYsMjEwLjYgMTQ1LjksMjExLjMgMTQ3LjIsMjExLjkgMTQ4LjYsMjEyLjUgMTQ5LjksMjEzLjEgMTUxLjMsMjEzLjcgMTUyLjYsMjE0LjMgMTU0LjAsMjE0LjkgMTU1LjMsMjE1LjQgMTU2LjYsMjE2LjAgMTU4LjAsMjE2LjYgMTU5LjMsMjE3LjEgMTYwLjcsMjE3LjYgMTYyLjAsMjE4LjIgMTYzLjQsMjE4LjcgMTY0LjcsMjE5LjIgMTY2LjAsMjE5LjcgMTY3LjQsMjIwLjIgMTY4LjcsMjIwLjcgMTcwLjEsMjIxLjEgMTcxLjQsMjIxLjYgMTcyLjcsMjIyLjEgMTc0LjEsMjIyLjUgMTc1LjQsMjIzLjAgMTc2LjgsMjIzLjQgMTc4LjEsMjIzLjkgMTc5LjUsMjI0LjMgMTgwLjgsMjI0LjcgMTgyLjEsMjI1LjEgMTgzLjUsMjI1LjUgMTg0LjgsMjI1LjkgMTg2LjIsMjI2LjMgMTg3LjUsMjI2LjcgMTg4LjksMjI3LjEgMTkwLjIsMjI3LjUgMTkxLjUsMjI3LjkgMTkyLjksMjI4LjMgMTk0LjIsMjI4LjYgMTk1LjYsMjI5LjAgMTk2LjksMjI5LjQgMTk4LjIsMjI5LjcgMTk5LjYsMjMwLjEgMjAwLjksMjMwLjQgMjAyLjMsMjMwLjggMjAzLjYsMjMxLjEgMjA1LjAsMjMxLjQgMjA2LjMsMjMxLjggMjA3LjYsMjMyLjEgMjA5LjAsMjMyLjQgMjEwLjMsMjMyLjcgMjExLjcsMjMzLjAgMjEzLjAsMjMzLjMgMjE0LjQsMjMzLjYgMjE1LjcsMjMzLjkgMjE3LjAsMjM0LjIgMjE4LjQsMjM0LjUgMjE5LjcsMjM0LjggMjIxLjEsMjM1LjEgMjIyLjQsMjM1LjQgMjIzLjgsMjM1LjcgMjI1LjEsMjM2LjAgMjI2LjQsMjM2LjIgMjI3LjgsMjM2LjUgMjI5LjEsMjM2LjggMjMwLjUsMjM3LjAgMjMxLjgsMjM3LjMgMjMzLjEsMjM3LjYgMjM0LjUsMjM3LjggMjM1LjgsMjM4LjEgMjM3LjIsMjM4LjMgMjM4LjUsMjM4LjYgMjM5LjksMjM4LjggMjQxLjIsMjM5LjEgMjQyLjUsMjM5LjMgMjQzLjksMjM5LjUgMjQ1LjIsMjM5LjggMjQ2LjYsMjQwLjAgMjQ3LjksMjQwLjIgMjQ5LjMsMjQwLjUgMjUwLjYsMjQwLjcgMjUxLjksMjQwLjkgMjUzLjMsMjQxLjEgMjU0LjYsMjQxLjMgMjU2LjAsMjQxLjYgMjU3LjMsMjQxLjggMjU4LjYsMjQyLjAgMjYwLjAsMjQyLjIgMjYxLjMsMjQyLjQgMjYyLjcsMjQyLjYgMjY0LjAsMjQyLjggMjY1LjQsMjQzLjAgMjY2LjcsMjQzLjIgMjY4LjAsMjQzLjQgMjY5LjQsMjQzLjYgMjcwLjcsMjQzLjggMjcyLjEsMjQ0LjAgMjczLjQsMjQ0LjIgMjc0LjgsMjQ0LjQgMjc2LjEsMjQ0LjYgMjc3LjQsMjQ0LjggMjc4LjgsMjQ1LjAgMjgwLjEsMjQ1LjEgMjgxLjUsMjQ1LjMgMjgyLjgsMjQ1LjUgMjg0LjIsMjQ1LjcgMjg1LjUsMjQ1LjkgMjg2LjgsMjQ2LjAgMjg4LjIsMjQ2LjIgMjg5LjUsMjQ2LjQgMjkwLjksMjQ2LjYgMjkyLjIsMjQ2LjcgMjkzLjUsMjQ2LjkgMjk0LjksMjQ3LjEgMjk2LjIsMjQ3LjMgMjk3LjYsMjQ3LjQgMjk4LjksMjQ3LjYgMzAwLjMsMjQ3LjggMzAxLjYsMjQ3LjkgMzAyLjksMjQ4LjEgMzA0LjMsMjQ4LjMgMzA1LjYsMjQ4LjQgMzA3LjAsMjQ4LjYgMzA4LjMsMjQ4LjcgMzA5LjcsMjQ4LjkgMzExLjAsMjQ5LjEgMzEyLjMsMjQ5LjIgMzEzLjcsMjQ5LjQgMzE1LjAsMjQ5LjUgMzE2LjQsMjQ5LjcgMzE3LjcsMjQ5LjggMzE5LjAsMjUwLjAgMzIwLjQsMjUwLjEgMzIxLjcsMjUwLjMgMzIzLjEsMjUwLjQgMzI0LjQsMjUwLjYgMzI1LjgsMjUwLjcgMzI3LjEsMjUwLjkgMzI4LjQsMjUxLjAgMzI5LjgsMjUxLjEgMzMxLjEsMjUxLjMgMzMyLjUsMjUxLjQgMzMzLjgsMjUxLjYgMzM1LjIsMjUxLjcgMzM2LjUsMjUxLjggMzM3LjgsMjUyLjAgMzM5LjIsMjUyLjEgMzQwLjUsMjUyLjMgMzQxLjksMjUyLjQgMzQzLjIsMjUyLjUgMzQ0LjYsMjUyLjcgMzQ1LjksMjUyLjggMzQ3LjIsMjUyLjkgMzQ4LjYsMjUzLjAgMzQ5LjksMjUzLjIgMzUxLjMsMjUzLjMgMzUyLjYsMjUzLjQgMzUzLjksMjUzLjYgMzU1LjMsMjUzLjcgMzU2LjYsMjUzLjggMzU4LjAsMjUzLjkgMzU5LjMsMjU0LjEgMzYwLjcsMjU0LjIgMzYyLjAsMjU0LjMgMzYzLjMsMjU0LjQgMzY0LjcsMjU0LjYgMzY2LjAsMjU0LjcgMzY3LjQsMjU0LjggMzY4LjcsMjU0LjkgMzcwLjEsMjU1LjAgMzcxLjQsMjU1LjEgMzcyLjcsMjU1LjMgMzc0LjEsMjU1LjQgMzc1LjQsMjU1LjUgMzc2LjgsMjU1LjYgMzc4LjEsMjU1LjcgMzc5LjQsMjU1LjggMzgwLjgsMjU1LjkgMzgyLjEsMjU2LjEgMzgzLjUsMjU2LjIgMzg0LjgsMjU2LjMgMzg2LjIsMjU2LjQgMzg3LjUsMjU2LjUgMzg4LjgsMjU2LjYgMzkwLjIsMjU2LjcgMzkxLjUsMjU2LjggMzkyLjksMjU2LjkgMzk0LjIsMjU3LjAgMzk1LjYsMjU3LjEgMzk2LjksMjU3LjIgMzk4LjIsMjU3LjQgMzk5LjYsMjU3LjUgNDAwLjksMjU3LjYgNDAyLjMsMjU3LjcgNDAzLjYsMjU3LjggNDA1LjAsMjU3LjkgNDA2LjMsMjU4LjAgNDA3LjYsMjU4LjEgNDA5LjAsMjU4LjIgNDEwLjMsMjU4LjMgNDExLjcsMjU4LjQgNDEzLjAsMjU4LjUgNDE0LjMsMjU4LjYgNDE1LjcsMjU4LjcgNDE3LjAsMjU4LjggNDE4LjQsMjU4LjkgNDE5LjcsMjU4LjkgNDIxLjEsMjU5LjAgNDIyLjQsMjU5LjEgNDIzLjcsMjU5LjIgNDI1LjEsMjU5LjMgNDI2LjQsMjU5LjQgNDI3LjgsMjU5LjUgNDI5LjEsMjU5LjYgNDMwLjUsMjU5LjcgNDMxLjgsMjU5LjggNDMzLjEsMjU5LjkgNDM0LjUsMjYwLjAgNDM1LjgsMjYwLjEgNDM3LjIsMjYwLjEgNDM4LjUsMjYwLjIgNDM5LjgsMjYwLjMgNDQxLjIsMjYwLjQgNDQyLjUsMjYwLjUgNDQzLjksMjYwLjYgNDQ1LjIsMjYwLjcgNDQ2LjYsMjYwLjggNDQ3LjksMjYwLjggNDQ5LjIsMjYwLjkgNDUwLjYsMjYxLjAgNDUxLjksMjYxLjEgNDUzLjMsMjYxLjIgNDU0LjYsMjYxLjMgNDU2LjAsMjYxLjMgNDU3LjMsMjYxLjQgNDU4LjYsMjYxLjUgNDYwLjAsMjYxLjYgNDYxLjMsMjYxLjcgNDYyLjcsMjYxLjggNDY0LjAsMjYxLjggNDY1LjQsMjYxLjkgNDY2LjcsMjYyLjAgNDY4LjAsMjYyLjEgNDY5LjQsMjYyLjEgNDcwLjcsMjYyLjIgNDcyLjEsMjYyLjMgNDczLjQsMjYyLjQgNDc0LjcsMjYyLjUgNDc2LjEsMjYyLjUgNDc3LjQsMjYyLjYgNDc4LjgsMjYyLjcgNDgwLjEsMjYyLjggNDgxLjUsMjYyLjggNDgyLjgsMjYyLjkgNDg0LjEsMjYzLjAgNDg1LjUsMjYzLjEgNDg2LjgsMjYzLjEgNDg4LjIsMjYzLjIgNDg5LjUsMjYzLjMgNDkwLjksMjYzLjQgNDkyLjIsMjYzLjQgNDkzLjUsMjYzLjUgNDk0LjksMjYzLjYgNDk2LjIsMjYzLjYgNDk3LjYsMjYzLjcgNDk4LjksMjYzLjggNTAwLjIsMjYzLjkgNTAxLjYsMjYzLjkgNTAyLjksMjY0LjAgNTA0LjMsMjY0LjEgNTA1LjYsMjY0LjEgNTA3LjAsMjY0LjIgNTA4LjMsMjY0LjMgNTA5LjYsMjY0LjMgNTExLjAsMjY0LjQgNTEyLjMsMjY0LjUgNTEzLjcsMjY0LjUgNTE1LjAsMjY0LjYgNTE2LjQsMjY0LjcgNTE3LjcsMjY0LjcgNTE5LjAsMjY0LjggNTIwLjQsMjY0LjkgNTIxLjcsMjY0LjkgNTIzLjEsMjY1LjAgNTI0LjQsMjY1LjEgNTI1LjgsMjY1LjEgNTI3LjEsMjY1LjIgNTI4LjQsMjY1LjMgNTI5LjgsMjY1LjMgNTMxLjEsMjY1LjQgNTMyLjUsMjY1LjUgNTMzLjgsMjY1LjUgNTM1LjEsMjY1LjYgNTM2LjUsMjY1LjYgNTM3LjgsMjY1LjcgNTM5LjIsMjY1LjggNTQwLjUsMjY1LjggNTQxLjksMjY1LjkgNTQzLjIsMjY2LjAgNTQ0LjUsMjY2LjAgNTQ1LjksMjY2LjEgNTQ3LjIsMjY2LjEgNTQ4LjYsMjY2LjIgNTQ5LjksMjY2LjMgNTUxLjMsMjY2LjMgNTUyLjYsMjY2LjQgNTUzLjksMjY2LjQgNTU1LjMsMjY2LjUgNTU2LjYsMjY2LjYgNTU4LjAsMjY2LjYgNTU5LjMsMjY2LjcgNTYwLjYsMjY2LjcgNTYyLjAsMjY2LjggNTYzLjMsMjY2LjggNTY0LjcsMjY2LjkgNTY2LjAsMjY3LjAgNTY3LjQsMjY3LjAgNTY4LjcsMjY3LjEgNTcwLjAsMjY3LjEgNTcxLjQsMjY3LjIgNTcyLjcsMjY3LjIgNTc0LjEsMjY3LjMgNTc1LjQsMjY3LjMgNTc2LjgsMjY3LjQgNTc4LjEsMjY3LjUgNTc5LjQsMjY3LjUgNTgwLjgsMjY3LjYgNTgyLjEsMjY3LjYgNTgzLjUsMjY3LjcgNTg0LjgsMjY3LjcgNTg2LjIsMjY3LjggNTg3LjUsMjY3LjggNTg4LjgsMjY3LjkgNTkwLjIsMjY3LjkgNTkxLjUsMjY4LjAgNTkyLjksMjY4LjAgNTk0LjIsMjY4LjEgNTk1LjUsMjY4LjEgNTk2LjksMjY4LjIgNTk4LjIsMjY4LjMgNTk5LjYsMjY4LjMgNjAwLjksMjY4LjQgNjAyLjMsMjY4LjQgNjAzLjYsMjY4LjUgNjA0LjksMjY4LjUgNjA2LjMsMjY4LjYgNjA3LjYsMjY4LjYgNjA5LjAsMjY4LjcgNjEwLjMsMjY4LjcgNjExLjcsMjY4LjggNjEzLjAsMjY4LjggNjE0LjMsMjY4LjkgNjE1LjcsMjY4LjkgNjE3LjAsMjY5LjAgNjE4LjQsMjY5LjAgNjE5LjcsMjY5LjAgNjIxLjAsMjY5LjEgNjIyLjQsMjY5LjEgNjIzLjcsMjY5LjIgNjI1LjEsMjY5LjIgNjI2LjQsMjY5LjMgNjI3LjgsMjY5LjMgNjI5LjEsMjY5LjQgNjMwLjQsMjY5LjQgNjMxLjgsMjY5LjUgNjMzLjEsMjY5LjUgNjM0LjUsMjY5LjYgNjM1LjgsMjY5LjYgNjM3LjIsMjY5LjcgNjM4LjUsMjY5LjcgNjM5LjgsMjY5LjggNjQxLjIsMjY5LjggNjQyLjUsMjY5LjggNjQzLjksMjY5LjkgNjQ1LjIsMjY5LjkgNjQ2LjYsMjcwLjAgNjQ3LjksMjcwLjAgNjQ5LjIsMjcwLjEgNjUwLjYsMjcwLjEgNjUxLjksMjcwLjIgNjUzLjMsMjcwLjIgNjU0LjYsMjcwLjIgNjU1LjksMjcwLjMgNjU3LjMsMjcwLjMgNjU4LjYsMjcwLjQgNjYwLjAsMjcwLjQgNjYxLjMsMjcwLjUgNjYyLjcsMjcwLjUgNjY0LjAsMjcwLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzFmNzdiNCIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxsaW5lIHgxPSIzMjAuMjAwMDAwMDAwMDAwMDUiIHkxPSIyMCIgeDI9IjMzOC4yMDAwMDAwMDAwMDAwNSIgeTI9IjIwIiBzdHJva2U9IiMxZjc3YjQiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIzNDIuMjAwMDAwMDAwMDAwMDUiIHk9IjI0Ij5ncmFpbiBib3VnaHQ8L3RleHQ+Cjx0ZXh0IHg9IjM2Mi4wIiB5PSIzMzQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPnByaWNlIG9mIGdyYWluLCBpbiBzaWx2ZXIgKGxhYm9yIGNvc3RzIDEpPC90ZXh0Pgo8dGV4dCB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxNCAxNjUuMCkgcm90YXRlKC05MCkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPmFtb3VudCBwZXIgcGVhc2FudDwvdGV4dD4KPC9zdmc+"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f6b8d0e2">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h4 id="How-a-POP's-size-changes">How a POP's size changes<a class="anchor-link" href="#How-a-POP's-size-changes">¶</a></h4><p>After trading and consuming, each POP's size is multiplied by one plus its growth rate (the rule and the type's parameters are under <a href="#How-POPs-grow">How POPs grow</a>). In the sample a peasant on a market hex has 240 silver to spare against a subsistence cost of 360, so its index is 2/3 and its rate about +2.67% a turn; the center artisan has an index of 1 and grows 3%; and the north-east peasant, which cannot get grain at all, has an index of −1 and shrinks 10% a turn: 12 people become 10.8 at turn 0, 9.72 after one step and 8.748 after two. The rate depends only on prices and the type, not on size, so the sample's sizes compound at the same rate every turn, and the next turn's endowment, trade and consumption grow or shrink with them. The chart shows twenty turns of this, each POP relative to the size written in the setting (turn 0 already includes turn 0's growth).</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=a7c9e1f3">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2ODAiIGhlaWdodD0iMzQwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMSI+CjxsaW5lIHgxPSI2MC4wIiB5MT0iMzYiIHgyPSI2MC4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNjAuMCIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4wPC90ZXh0Pgo8bGluZSB4MT0iMjExLjAiIHkxPSIzNiIgeDI9IjIxMS4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iMjExLjAiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+NTwvdGV4dD4KPGxpbmUgeDE9IjM2Mi4wIiB5MT0iMzYiIHgyPSIzNjIuMCIgeTI9IjI5NCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjM2Mi4wIiB5PSIzMDgiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEwPC90ZXh0Pgo8bGluZSB4MT0iNTEzLjAiIHkxPSIzNiIgeDI9IjUxMy4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNTEzLjAiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTU8L3RleHQ+CjxsaW5lIHgxPSI2NjQuMCIgeTE9IjM2IiB4Mj0iNjY0LjAiIHkyPSIyOTQiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI2NjQuMCIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yMDwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iMjk0LjAiIHgyPSI2NjQiIHkyPSIyOTQuMCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0IiB5PSIyOTguMCIgdGV4dC1hbmNob3I9ImVuZCI+MDwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iMjI5LjUiIHgyPSI2NjQiIHkyPSIyMjkuNSIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0IiB5PSIyMzMuNSIgdGV4dC1hbmNob3I9ImVuZCI+MC41PC90ZXh0Pgo8bGluZSB4MT0iNjAiIHkxPSIxNjUuMCIgeDI9IjY2NCIgeTI9IjE2NS4wIiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNTQiIHk9IjE2OS4wIiB0ZXh0LWFuY2hvcj0iZW5kIj4xPC90ZXh0Pgo8bGluZSB4MT0iNjAiIHkxPSIxMDAuNSIgeDI9IjY2NCIgeTI9IjEwMC41IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNTQiIHk9IjEwNC41IiB0ZXh0LWFuY2hvcj0iZW5kIj4xLjU8L3RleHQ+CjxsaW5lIHgxPSI2MCIgeTE9IjM2LjAiIHgyPSI2NjQiIHkyPSIzNi4wIiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNTQiIHk9IjQwLjAiIHRleHQtYW5jaG9yPSJlbmQiPjI8L3RleHQ+CjxyZWN0IHg9IjYwIiB5PSIzNiIgd2lkdGg9IjYwNCIgaGVpZ2h0PSIyNTgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzk5OSIvPgo8cG9seWxpbmUgcG9pbnRzPSI2MC4wLDE2MS42IDkwLjIsMTU4LjAgMTIwLjQsMTU0LjQgMTUwLjYsMTUwLjcgMTgwLjgsMTQ2LjkgMjExLjAsMTQyLjkgMjQxLjIsMTM4LjkgMjcxLjQsMTM0LjggMzAxLjYsMTMwLjUgMzMxLjgsMTI2LjIgMzYyLjAsMTIxLjcgMzkyLjIsMTE3LjEgNDIyLjQsMTEyLjQgNDUyLjYsMTA3LjUgNDgyLjgsMTAyLjYgNTEzLjAsOTcuNSA1NDMuMiw5Mi4yIDU3My40LDg2LjggNjAzLjYsODEuMyA2MzMuOCw3NS42IDY2NC4wLDY5LjgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJjYTAyYyIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxsaW5lIHgxPSI2MCIgeTE9IjIwIiB4Mj0iNzgiIHkyPSIyMCIgc3Ryb2tlPSIjMmNhMDJjIiBzdHJva2Utd2lkdGg9IjIiLz4KPHRleHQgeD0iODIiIHk9IjI0Ij5tYXJrZXQtaGV4IHBlYXNhbnQgKCsyLjY3JSk8L3RleHQ+Cjxwb2x5bGluZSBwb2ludHM9IjYwLjAsMTYxLjEgOTAuMiwxNTcuMSAxMjAuNCwxNTMuMCAxNTAuNiwxNDguOCAxODAuOCwxNDQuNSAyMTEuMCwxNDAuMCAyNDEuMiwxMzUuMyAyNzEuNCwxMzAuNiAzMDEuNiwxMjUuNyAzMzEuOCwxMjAuNiAzNjIuMCwxMTUuNCAzOTIuMiwxMTAuMSA0MjIuNCwxMDQuNiA0NTIuNiw5OC45IDQ4Mi44LDkzLjAgNTEzLjAsODcuMCA1NDMuMiw4MC44IDU3My40LDc0LjQgNjAzLjYsNjcuOCA2MzMuOCw2MS4wIDY2NC4wLDU0LjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzFmNzdiNCIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxsaW5lIHgxPSIyNjEuNCIgeTE9IjIwIiB4Mj0iMjc5LjQiIHkyPSIyMCIgc3Ryb2tlPSIjMWY3N2I0IiBzdHJva2Utd2lkdGg9IjIiLz4KPHRleHQgeD0iMjgzLjQiIHk9IjI0Ij5hcnRpc2FuICgrMyUpPC90ZXh0Pgo8cG9seWxpbmUgcG9pbnRzPSI2MC4wLDE3Ny45IDkwLjIsMTg5LjUgMTIwLjQsMjAwLjAgMTUwLjYsMjA5LjQgMTgwLjgsMjE3LjggMjExLjAsMjI1LjQgMjQxLjIsMjMyLjMgMjcxLjQsMjM4LjUgMzAxLjYsMjQ0LjAgMzMxLjgsMjQ5LjAgMzYyLjAsMjUzLjUgMzkyLjIsMjU3LjYgNDIyLjQsMjYxLjIgNDUyLjYsMjY0LjUgNDgyLjgsMjY3LjQgNTEzLjAsMjcwLjEgNTQzLjIsMjcyLjUgNTczLjQsMjc0LjYgNjAzLjYsMjc2LjYgNjMzLjgsMjc4LjMgNjY0LjAsMjc5LjkiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Q2MjcyOCIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxsaW5lIHgxPSIzNzYuMCIgeTE9IjIwIiB4Mj0iMzk0LjAiIHkyPSIyMCIgc3Ryb2tlPSIjZDYyNzI4IiBzdHJva2Utd2lkdGg9IjIiLz4KPHRleHQgeD0iMzk4LjAiIHk9IjI0Ij5uby1tYXJrZXQgcGVhc2FudCAo4oiSMTAlKTwvdGV4dD4KPHRleHQgeD0iMzYyLjAiIHk9IjMzNCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+dHVybiAoZWFjaCBQT1AgZ3Jvd3Mgb3Igc2hyaW5rcyBieSB0aGUgc2FtZSByYXRlIGV2ZXJ5IHR1cm4pPC90ZXh0Pgo8dGV4dCB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxNCAxNjUuMCkgcm90YXRlKC05MCkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPnNpemUsIGFzIGEgbXVsdGlwbGUgb2YgdGhlIHNldHRpbmcnczwvdGV4dD4KPC9zdmc+"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b8d0f2a4">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h4 id="Turn-reports">Turn reports<a class="anchor-link" href="#Turn-reports">¶</a></h4><p>Each turn produces a report with totals over the whole map: per good, what <code>perished</code> when the previous turn ended, what deposits <code>emitted</code>, what POPs were <code>endowed</code>, and what POPs <code>sold</code>, <code>bought</code> and <code>consumed</code>; then the total <code>population</code> after growth. Each list is in the order the goods are defined (so the sample's <code>unskilled_labor</code> comes first and <code>copper</code> before <code>grain</code>), lists only goods with an amount, and prints <code>nothing</code> when empty. The sample over turns 0 to 2, as the checker prints it (the next section gives the command):</p>
 </div>
 </div>
 </div>
@@ -8229,9 +8677,10 @@ a.anchor-link {
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain
-Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain
-Turn 2: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain
+<pre>Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops
+Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666
+Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4194.466666666667 unskilled_labor; sold 2955.6459999999997 unskilled_labor; bought 5.15 copper, 1464.9479999999999 grain; consumed 1238.8206666666667 unskilled_labor, 5.15 copper, 1464.9479999999999 grain; population 429.2982444444444
+Turn 2: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4292.982444444444 unskilled_labor; sold 3034.7550599999995 unskilled_labor; bought 5.304500000000001 copper, 1504.1162799999997 grain; consumed 1258.2273844444444 unskilled_labor, 5.304500000000001 copper, 1504.1162799999997 grain; population 439.55036096296294
 </pre>
 </div>
 </div>
@@ -8243,24 +8692,29 @@ Turn 2: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimprove
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>The four copper deposits give 4 x 2.5 = 10 and the six grain deposits give 6 x 4 = 24 each turn. Both goods last one turn, so each turn's output is gone before the next turn's arrives.</p>
-<p>More detail: <a href="docs/world.md">docs/world.md</a>.</p>
+<p>Where the numbers come from: the setting's 410 people receive 10 labor each, 4100 in all. Each of the 388 peasants on a market hex sells 7.2 labor and buys 3.6 grain, the 10 artisans sell 8.5 labor each and buy grain and copper, and the 4100 − 2878.6 = 1221.4 labor not sold is consumed as leisure (the no-market peasant's 120 included). Labor never appears in <code>perished</code>, because it is all sold or consumed during the turn; only the deposit output perishes. The population at turn 0 is already about 419.4, not 410, because turn 0's growth has run, and each later turn's <code>endowed</code> is 10 labor times the previous turn's population. Amounts print in full, with nothing rounded, which is why they grow long tails of digits after turn 0.</p>
+<p>More detail: <a href="docs/world.md">docs/world.md</a> for the turn and the report, <a href="docs/trade.md">docs/trade.md</a> for the trade round, <a href="docs/demand.md">docs/demand.md</a> for how what a POP wants is worked out, and <a href="docs/growth.md">docs/growth.md</a> for growth.</p>
 <h3 id="Checking-a-setting">Checking a setting<a class="anchor-link" href="#Checking-a-setting">¶</a></h3><p>The checker loads a setting and reports every problem in one go, with file, line and column. It never produces a half-loaded setting.</p>
 <pre><code>dev-ui check &lt;folder&gt; [--turns N]
 </code></pre>
 <p>From the project root, that is <code>cargo run -p policyspace-dev-ui -- check settings/sample</code>. On success it prints one line:</p>
-<pre><code>Loaded setting 'Sample Setting' (format version 1): 5 goods, 19 hexes, 2 resources, 10 deposits
+<pre><code>Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops
 </code></pre>
-<p>(Counts use singular wording where it applies: <code>1 hex</code>, <code>1 resource</code>, <code>1 deposit</code>.) With <code>--turns N</code> (N from 0 to 10,000) it then prints one report line per turn, from turn 0 through turn N; <code>--turns 0</code> prints only turn 0.</p>
+<p>(Counts use singular wording where it applies: <code>1 hex</code>, <code>1 resource</code>, <code>1 deposit</code>, <code>1 market</code>, <code>1 pop type</code>, <code>1 pop</code>. Currencies are not counted, since every hex has exactly one.) With <code>--turns N</code> (N from 0 to 10,000) it then prints one report line per turn, from turn 0 through turn N, as shown in <a href="#Turn-reports">Turn reports</a>; <code>--turns 0</code> prints only turn 0.</p>
 <p>Problems look like this:</p>
 <pre><code>rules/a.toml:3:18: key 'perishes_after' in good must be at least 1
 rules/a.toml:6:6: duplicate good name 'copper' (first defined at rules/a.toml:2:6)
 rules/a.toml:10:10: unknown good 'gold'
+rules/p.toml:14:1: utility of pop_type needs at least one good with a positive share
+rules/p.toml:20:11: key 'decline' in growth of pop_type must be a finite number of at least 0 and less than 1
+start/k.toml:5:3: 'coin' is the currency at (0, 0), so it can't have a price
 start/m.toml:4:1: unknown key 'terrain' in hex
 start/m.toml:6:1: duplicate hex at (0, 0) (first defined at start/m.toml:1:1)
-5 error(s) found in my_setting
+start/m.toml:9:1: missing required key 'currency' in hex
+start/p.toml:7:1: duplicate pop of 'peasant' at (0, 0) (first defined at start/p.toml:1:1)
+10 error(s) found in my_setting
 </code></pre>
-<p>If part of the setting could not be read (a missing folder, or a broken or unreadable file), reference errors such as <code>unknown good</code> are not shown; fix the structural problem first.</p>
+<p>If part of the setting could not be read (a missing folder, or a broken or unreadable file), errors that refer to names or hexes, such as <code>unknown good</code>, are not shown; fix the structural problem first.</p>
 <table>
 <thead>
 <tr>
@@ -8284,13 +8738,13 @@ start/m.toml:6:1: duplicate hex at (0, 0) (first defined at start/m.toml:1:1)
 </tbody>
 </table>
 <p>The checker never opens a window, so it is the form to use in scripts. <code>dev-ui --version</code> prints the engine's name and version. More detail: <a href="docs/setting-loader.md">docs/setting-loader.md</a>, and <a href="docs/world.md">docs/world.md</a> for <code>--turns</code>.</p>
-<h3 id="The-developer-UI">The developer UI<a class="anchor-link" href="#The-developer-UI">¶</a></h3><p>The developer UI is a window that shows a setting's map and lets you step through turns and inspect the world.</p>
+<h3 id="The-developer-UI">The developer UI<a class="anchor-link" href="#The-developer-UI">¶</a></h3><p>The developer UI is a window that shows a setting's map and lets you step through turns and inspect the world: each hex's goods, prices and POPs, and what every POP did this turn.</p>
 <ul>
 <li><code>dev-ui &lt;folder&gt;</code> opens the window with a setting loaded.</li>
 <li><code>dev-ui</code> alone opens it with an <strong>Open setting...</strong> button (a system folder picker; cancelling changes nothing).</li>
 </ul>
 <p>For example: <code>cargo run -p policyspace-dev-ui -- settings/sample</code>.</p>
-<h4 id="Reading-the-map">Reading the map<a class="anchor-link" href="#Reading-the-map">¶</a></h4><p>Each hex is a pointy-top hexagon, rows run east-west, <code>q</code> increases eastward and <code>r</code> increases southward, exactly as in <a href="#The-map">The map</a>. The sample setting shows as a hexagon of 19 hexes. Hexes with at least one deposit show a small mark when drawn as hexagons, so you can see where to click.</p>
+<h4 id="Reading-the-map">Reading the map<a class="anchor-link" href="#Reading-the-map">¶</a></h4><p>Each hex is a pointy-top hexagon, rows run east-west, <code>q</code> increases eastward and <code>r</code> increases southward, exactly as in <a href="#The-map">The map</a>. The sample setting shows as a hexagon of 19 hexes. When hexes are drawn as hexagons, a hex with at least one deposit shows a small filled circle below its label and a hex with at least one POP a small hollow circle above it, so you can see where to click. A hex can have both marks, either, or neither; the sample's center has both.</p>
 <p><strong>Controls</strong></p>
 <ul>
 <li>Drag to pan; scroll to zoom toward the cursor; <strong>Fit</strong> shows the whole map again.</li>
@@ -8298,31 +8752,57 @@ start/m.toml:6:1: duplicate hex at (0, 0) (first defined at start/m.toml:1:1)
 <li>Hovering highlights a hex and shows its coordinates in the status bar.</li>
 <li>The status bar also shows the setting name, the hex count and the current turn.</li>
 </ul>
-<p>Unusual maps are handled: an empty map shows "This setting has no hexes."; holes, islands and negative coordinates draw correctly; for maps spanning huge distances, hexes too small to see are drawn as dots, and zooming in turns them back into hexagons.</p>
+<p>Unusual maps are handled: an empty map shows "This setting has no hexes."; holes, islands and negative coordinates draw correctly; for maps spanning huge distances, hexes too small to see are drawn as dots (with no marks), and zooming in turns them back into hexagons.</p>
 <h4 id="Inspecting-a-hex">Inspecting a hex<a class="anchor-link" href="#Inspecting-a-hex">¶</a></h4><p>Click a hex to select it (a thick accent-colored outline, distinct from the hover highlight). When hexes are drawn as dots, a click near a dot selects it. Click empty space or press Esc to clear. Dragging to pan never changes the selection.</p>
 <p>The <strong>hex panel</strong> on the right shows, for the selected hex:</p>
 <ul>
 <li>its coordinates;</li>
 <li>its deposits grouped by type, for example <code>arable_land x 3: 4 unimproved_grain each, 12 total</code>;</li>
-<li>its stockpile: each good's total, and the parts of it with a countdown to when they perish: <code>perishes this turn</code>, <code>perishes in N turns</code>, or <code>never perishes</code>.</li>
+<li>its stockpile of unowned goods: each good's total, and the parts of it with a countdown to when they perish: <code>perishes this turn</code>, <code>perishes in N turns</code>, or <code>never perishes</code>;</li>
+<li>its <strong>market</strong>: the hex's currency (<code>Currency: silver</code>), then each posted price as the amount of currency one unit costs (<code>grain: 2 silver</code>), in the order the goods are defined. A hex with a market but no prices says <code>No prices posted.</code>, and a hex with no market says <code>No market.</code>;</li>
+<li>its <strong>POPs</strong>: one collapsible section per POP, open at first, headed by its type and current size (<code>peasant × 61.6</code>), or <code>No POPs.</code></li>
 </ul>
 <p>Reading the countdown: suppose hex <code>(0, 0)</code> holds 15 of a good that lasts 3 turns, at turn 2, with 5 produced each turn. The panel lists 5 that perish this turn, 5 that perish in 1 turn and 5 that perish in 2 turns: the oldest batch is about to go, the newest has two more turns to live.</p>
-<p>Other messages: "Click a hex to inspect it.", "No deposits.", "Empty." and "This setting has no hexes."</p>
-<h4 id="Stepping-turns">Stepping turns<a class="anchor-link" href="#Stepping-turns">¶</a></h4><p>The <strong>Step</strong> and <strong>Step x10</strong> buttons in the top bar advance the world one or ten turns (shortcuts: Space and Shift+Space). They work whenever the setting loaded without errors, even one with no hexes. The status bar's turn follows. The world starts at turn 0 on every load.</p>
-<h4 id="The-world-panel">The world panel<a class="anchor-link" href="#The-world-panel">¶</a></h4><p>The <strong>world panel</strong> on the left has three sections, which collapse; the panels can be resized.</p>
+<p><strong>What "this turn" means.</strong> Between steps the world has just been endowed, traded, consumed and grown, and nothing has perished yet (see <a href="#Running-a-setting">Running a setting</a>). So the panel shows the outcome of the turn in the status bar: each POP's size after that turn's growth and its stockpile after consumption. Each step replaces it all with the next turn's figures. A POP section you have collapsed stays collapsed when you step.</p>
+<p><strong>A POP section</strong>, for the sample's center peasant at turn 0, looks like this:</p>
+<pre><code>peasant × 61.6
+  Started at 60; index 0.6667; rate +2.67%
+  Income 600 silver; subsistence cost 360 silver; supernumerary 240 silver
+
+  Good              Held   Demanded   Subsistence   Sold   Bought   Consumed
+  unskilled_labor    600        168           120    432        0        168
+  grain                0        216           120      0      216        216
+
+  Carried over: 0 silver
+  Stockpile: Empty.
+</code></pre>
 <ul>
-<li><strong>Turn log:</strong> every turn report since the load, turn 0 included, newest first, in the same wording as <code>check --turns</code> (see <a href="#Running-a-setting">Running a setting</a>).</li>
-<li><strong>Goods:</strong> each good's name, how long it lasts, whether it is movable or fixed, and the amount held in the whole world.</li>
+<li>The <strong>heading</strong> is the type and the size after this turn's growth.</li>
+<li>The <strong>growth line</strong> gives the size the turn began with, the subsistence index and the growth rate (see <a href="#How-POPs-grow">How POPs grow</a>). 60 peasants with 240 silver to spare against a subsistence cost of 360 have an index of 240 / 360 = 0.6667, a rate of +2.67%, and so become 61.6. Hovering the line shows the index and rate unrounded.</li>
+<li>The <strong>demand line</strong> is the POP's income, what its subsistence bundle costs at the hex's prices, and the difference, all in the hex's currency: 600 labor at 1 silver, against 120 labor at 1 and 120 grain at 2.</li>
+<li>The <strong>goods table</strong> has one row per good involved: what the POP held when it came to market, what it wanted to end up with, what it needs to subsist (its type's amount times its starting size), and what it sold, bought and consumed. Here the 240 spare silver went 0.2 to labor and 0.8 to grain, so the POP kept 168 labor and bought 216 grain. <strong>A row in red means the POP wanted less of that good than it needs to subsist</strong>, so a struggling POP and the good it lacks stand out.</li>
+<li><strong>Carried over</strong> is the currency left after consumption: usually 0 or a tiny rounding sliver.</li>
+<li>The <strong>stockpile</strong> is the POP's own, written exactly like the hex's.</li>
+</ul>
+<p>The north-east peasant on <code>(2, -2)</code>, whose hex shows <code>No market.</code>, makes the contrast: its section reads <code>peasant × 10.8</code>, <code>Started at 12; index -1.0000; rate -10.00%</code>, an income of 0, and its grain row in red (demanded 0 against a subsistence need of 24), while all 120 of its labor is held, demanded and consumed as leisure.</p>
+<p>Sizes and amounts are written in full, with long decimals after a few turns, as in the turn log. Only the index (4 decimals), the rate (a percentage to 2 decimals) and the utility shares (up to 4 decimals) are rounded, and hovering shows the full values.</p>
+<p>Other messages: "Click a hex to inspect it.", "No deposits.", "Empty.", "No market.", "No prices posted.", "No POPs." and "This setting has no hexes."</p>
+<h4 id="Stepping-turns">Stepping turns<a class="anchor-link" href="#Stepping-turns">¶</a></h4><p>The <strong>Step</strong> and <strong>Step x10</strong> buttons in the top bar advance the world one or ten turns (shortcuts: Space and Shift+Space). They work whenever the setting loaded without errors, even one with no hexes. The status bar's turn follows. The world starts at turn 0 on every load.</p>
+<h4 id="The-world-panel">The world panel<a class="anchor-link" href="#The-world-panel">¶</a></h4><p>The <strong>world panel</strong> on the left has four sections, which collapse; the panels can be resized.</p>
+<ul>
+<li><strong>Turn log:</strong> every turn report since the load, turn 0 included, newest first, in the same wording as <code>check --turns</code> (see <a href="#Turn-reports">Turn reports</a>).</li>
+<li><strong>Goods:</strong> each good's name, how long it lasts, whether it is movable or fixed, and two amounts: <strong>In hexes</strong>, the unowned deposit output held in hex stockpiles, and <strong>In POPs</strong>, what the POPs own. In the sample the raw goods appear only under In hexes and silver only under In POPs.</li>
 <li><strong>Resource types:</strong> each type's name, the good it produces, its output per deposit and its deposit count.</li>
+<li><strong>POP types:</strong> each type's name, its endowment (or <code>nothing</code>), its utility goods with their subsistence amounts and shares as the engine uses them (hover for the full value), its growth parameters, the number of POPs of the type and their total size. The total sizes add up to the turn log's <code>population</code>.</li>
 </ul>
 <h4 id="The-author's-loop">The author's loop<a class="anchor-link" href="#The-author's-loop">¶</a></h4><ol>
-<li>Edit a setting file (for example, change some deposits or goods).</li>
+<li>Edit a setting file (for example, change some prices, deposits or POPs).</li>
 <li>Click <strong>Reload</strong>. The world returns to turn 0, with a log of one line. Your pan and zoom stay, and so does your selection if the reloaded map still has a hex at those coordinates.</li>
-<li>Step a few turns and check the stockpiles.</li>
+<li>Step a few turns and check the stockpiles, prices and POPs.</li>
 </ol>
 <p>If the setting has errors, the window shows the full error list (the same lines the checker prints) and no map or side panels, and the Step buttons are disabled. Fix the files and Reload again. A failed Reload doesn't lose the selection. A broken folder given on the command line opens the window showing its errors. Opening a different folder clears the selection and the log.</p>
-<h4 id="Not-available-yet">Not available yet<a class="anchor-link" href="#Not-available-yet">¶</a></h4><p>Auto-run, stepping by another number, coloring hexes by data, editing the world, and selecting several hexes.</p>
-<p>More detail: <a href="docs/dev-ui.md">docs/dev-ui.md</a>, with <a href="docs/world.md">docs/world.md</a> for turns and stockpiles.</p>
+<h4 id="Not-available-yet">Not available yet<a class="anchor-link" href="#Not-available-yet">¶</a></h4><p>Auto-run, stepping by another number, coloring hexes by data (population included), a POP's history over turns or charts of it, editing the world, and selecting several hexes.</p>
+<p>More detail: <a href="docs/dev-ui.md">docs/dev-ui.md</a> for the panels and marks, with <a href="docs/world.md">docs/world.md</a> for turns and stockpiles, <a href="docs/market.md">docs/market.md</a> and <a href="docs/currency.md">docs/currency.md</a> for the Market section, and <a href="docs/demand.md">docs/demand.md</a>, <a href="docs/trade.md">docs/trade.md</a> and <a href="docs/growth.md">docs/growth.md</a> for the numbers in a POP section.</p>
 </div>
 </div>
 </div>

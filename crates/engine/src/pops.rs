@@ -346,22 +346,7 @@ impl Pops {
 mod tests {
     use super::*;
     use crate::id::NameRegistry;
-
-    fn good(index: u32) -> GoodId {
-        GoodId::from_index(index)
-    }
-
-    fn q(value: f64) -> Quantity {
-        Quantity::new(value).unwrap()
-    }
-
-    fn close(a: f64, b: f64) -> bool {
-        (a - b).abs() < 1e-9
-    }
-
-    fn no_growth() -> GrowthParams {
-        GrowthParams::new(vec![0.0], 0.0, 0.0)
-    }
+    use crate::test_support::{close, good, no_growth, q};
 
     #[test]
     fn shares_are_normalized_and_sorted_by_good() {

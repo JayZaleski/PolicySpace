@@ -272,23 +272,11 @@ mod tests {
 
     use super::*;
     use crate::map::{HexCoord, HexId};
-    use crate::pops::GrowthParams;
     use crate::setting::load_setting;
     use crate::stockpile::PerishesAt;
+    use crate::test_support::{close, no_growth, q};
     use crate::turn::Turn;
     use crate::world::World;
-
-    fn no_growth() -> GrowthParams {
-        GrowthParams::new(vec![0.0], 0.0, 0.0)
-    }
-
-    fn q(value: f64) -> Quantity {
-        Quantity::new(value).unwrap()
-    }
-
-    fn close(a: f64, b: f64) -> bool {
-        (a - b).abs() < 1e-9
-    }
 
     fn trade_world() -> World {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/settings/pops_trade");

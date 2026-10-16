@@ -67,6 +67,8 @@ pub mod turn;
 pub use turn::Turn;
 pub mod world;
 pub use world::{StepError, TurnReport, World};
+#[cfg(test)]
+pub(crate) mod test_support;
 
 /// Human-readable name of the engine.
 pub const ENGINE_NAME: &str = "PolicySpace Engine";

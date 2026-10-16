@@ -11,6 +11,7 @@ use toml::de::{DeTable, DeValue};
 
 use super::error::{ErrorSink, Located, Location};
 use super::source::SourceFile;
+use crate::quantity::Quantity;
 
 /// True if `name` is a valid text name: an ASCII lowercase letter first, then only ASCII
 /// lowercase letters, digits, and `_`.
@@ -285,6 +286,32 @@ impl<'a, 'i> EntryReader<'a, 'i> {
     /// reported); use [`has`](Self::has) to tell them apart.
     pub fn optional_number(&mut self, key: &str) -> Option<Located<f64>> {
         self.number(key, false)
+    }
+
+    /// Checks that `value` is a finite number greater than 0 and returns it as a
+    /// [`Quantity`]; otherwise reports `<prefix> must be a finite number greater than 0` at
+    /// the value and returns None. `prefix` is the same text `number_value` uses: `key
+    /// 'output' in resource`, `key 'grain' in prices of market`.
+    pub fn positive_quantity(&mut self, prefix: &str, value: Located<f64>) -> Option<Quantity> {
+        let quantity = Quantity::new(value.value).filter(|q| q.get() > 0.0);
+        if quantity.is_none() {
+            let message = format!("{prefix} must be a finite number greater than 0");
+            self.sink.at(&value.at, message);
+        }
+        quantity
+    }
+
+    /// Checks that `value` is a finite number of at least 0 and returns it; otherwise
+    /// reports `<prefix> must be a finite number of at least 0` at the value and returns
+    /// None. `prefix` is as for [`positive_quantity`](Self::positive_quantity).
+    pub fn non_negative_number(&mut self, prefix: &str, value: Located<f64>) -> Option<f64> {
+        if value.value.is_finite() && value.value >= 0.0 {
+            Some(value.value)
+        } else {
+            let message = format!("{prefix} must be a finite number of at least 0");
+            self.sink.at(&value.at, message);
+            None
+        }
     }
 
     /// True if the table has `key`. Doesn't mark the key as read.
@@ -611,6 +638,68 @@ i = -inf
                 "rules/t.toml:1:1: missing required key 'missing' in thing",
                 "rules/t.toml:7:5: key 'g' in thing must be a number, found string",
                 "rules/t.toml:8:5: key 'h' in thing is out of range",
+            ]
+        );
+    }
+
+    #[test]
+    fn positive_quantity_accepts_positive_and_reports_the_rest() {
+        let errors = run(
+            "a = 2.5
+b = -1
+c = 0
+d = inf
+e = nan
+",
+            |r| {
+                let read = |r: &mut EntryReader<'_, '_>, key: &str| {
+                    let value = r.required_number(key).unwrap();
+                    r.positive_quantity(&format!("key '{key}' in thing"), value)
+                };
+                assert_eq!(read(r, "a"), Some(Quantity::new(2.5).unwrap()));
+                for key in ["b", "c", "d", "e"] {
+                    assert!(read(r, key).is_none(), "{key}");
+                }
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:2:5: key 'b' in thing must be a finite number greater than 0",
+                "rules/t.toml:3:5: key 'c' in thing must be a finite number greater than 0",
+                "rules/t.toml:4:5: key 'd' in thing must be a finite number greater than 0",
+                "rules/t.toml:5:5: key 'e' in thing must be a finite number greater than 0",
+            ]
+        );
+    }
+
+    #[test]
+    fn non_negative_number_accepts_zero_and_up_and_reports_the_rest() {
+        let errors = run(
+            "a = 2.5
+b = -1
+c = 0
+d = inf
+e = nan
+",
+            |r| {
+                let read = |r: &mut EntryReader<'_, '_>, key: &str| {
+                    let value = r.required_number(key).unwrap();
+                    r.non_negative_number(&format!("key '{key}' in thing"), value)
+                };
+                assert_eq!(read(r, "a"), Some(2.5));
+                assert_eq!(read(r, "c"), Some(0.0));
+                for key in ["b", "d", "e"] {
+                    assert!(read(r, key).is_none(), "{key}");
+                }
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:2:5: key 'b' in thing must be a finite number of at least 0",
+                "rules/t.toml:4:5: key 'd' in thing must be a finite number of at least 0",
+                "rules/t.toml:5:5: key 'e' in thing must be a finite number of at least 0",
             ]
         );
     }

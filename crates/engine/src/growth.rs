@@ -71,88 +71,15 @@ pub fn grown_size(size: Quantity, rate: f64) -> Quantity {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use super::*;
-    use crate::demand::{PriceList, demand};
-    use crate::goods::GoodId;
+    use crate::demand::demand;
     use crate::pops::PopType;
-
-    const LABOR: u32 = 0;
-    const GRAIN: u32 = 1;
-    const COPPER: u32 = 2;
-    const SILVER: u32 = 3;
-
-    fn good(index: u32) -> GoodId {
-        GoodId::from_index(index)
-    }
-
-    fn q(value: f64) -> Quantity {
-        Quantity::new(value).unwrap()
-    }
-
-    fn close(a: f64, b: f64) -> bool {
-        (a - b).abs() < 1e-9
-    }
+    use crate::test_support::{
+        COPPER, GRAIN, LABOR, Prices, close, held, no_growth, peasant, prices, q, type_of, typical,
+    };
 
     fn g() -> GrowthParams {
         GrowthParams::new(vec![0.06, -0.03], 0.1, 0.05)
-    }
-
-    fn no_growth() -> GrowthParams {
-        GrowthParams::new(vec![0.0], 0.0, 0.0)
-    }
-
-    /// Hand-written prices: a currency good and a table of the other prices.
-    struct Prices {
-        currency: GoodId,
-        table: BTreeMap<GoodId, Quantity>,
-    }
-
-    impl PriceList for Prices {
-        fn currency(&self) -> GoodId {
-            self.currency
-        }
-
-        fn price(&self, good: GoodId) -> Option<Quantity> {
-            if good == self.currency {
-                Some(Quantity::ONE)
-            } else {
-                self.table.get(&good).copied()
-            }
-        }
-    }
-
-    fn prices(list: &[(u32, f64)]) -> Prices {
-        Prices {
-            currency: good(SILVER),
-            table: list.iter().map(|&(g, p)| (good(g), q(p))).collect(),
-        }
-    }
-
-    /// Labor 1, grain 2, copper 5.
-    fn typical() -> Prices {
-        prices(&[(LABOR, 1.0), (GRAIN, 2.0), (COPPER, 5.0)])
-    }
-
-    /// Labor subsistence 2 weight 0.2, grain subsistence 2 weight 0.8.
-    fn peasant() -> PopType {
-        type_of(&[(LABOR, 2.0, 0.2), (GRAIN, 2.0, 0.8)])
-    }
-
-    fn type_of(utility: &[(u32, f64, f64)]) -> PopType {
-        PopType::new(
-            vec![],
-            utility
-                .iter()
-                .map(|&(g, s, w)| (good(g), q(s), w))
-                .collect(),
-            no_growth(),
-        )
-    }
-
-    fn held(list: &[(u32, f64)]) -> Vec<(GoodId, Quantity)> {
-        list.iter().map(|&(g, a)| (good(g), q(a))).collect()
     }
 
     fn index_of(pop_type: &PopType, size: f64, holdings: &[(u32, f64)], prices: &Prices) -> f64 {

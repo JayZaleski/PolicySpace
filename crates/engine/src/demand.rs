@@ -243,84 +243,10 @@ pub fn demand(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pops::GrowthParams;
-
-    const LABOR: u32 = 0;
-    const GRAIN: u32 = 1;
-    const COPPER: u32 = 2;
-    const SILVER: u32 = 3;
-
-    fn good(index: u32) -> GoodId {
-        GoodId::from_index(index)
-    }
-
-    fn no_growth() -> GrowthParams {
-        GrowthParams::new(vec![0.0], 0.0, 0.0)
-    }
-
-    fn q(value: f64) -> Quantity {
-        Quantity::new(value).unwrap()
-    }
-
-    fn close(a: f64, b: f64) -> bool {
-        (a - b).abs() < 1e-9
-    }
-
-    /// Hand-written prices: a currency good and a table of the other prices.
-    struct Prices {
-        currency: GoodId,
-        table: BTreeMap<GoodId, Quantity>,
-    }
-
-    impl PriceList for Prices {
-        fn currency(&self) -> GoodId {
-            self.currency
-        }
-
-        fn price(&self, good: GoodId) -> Option<Quantity> {
-            if good == self.currency {
-                Some(Quantity::ONE)
-            } else {
-                self.table.get(&good).copied()
-            }
-        }
-    }
-
-    fn prices(list: &[(u32, f64)]) -> Prices {
-        Prices {
-            currency: good(SILVER),
-            table: list.iter().map(|&(g, p)| (good(g), q(p))).collect(),
-        }
-    }
-
-    /// Labor 1, grain 2, copper 5.
-    fn typical() -> Prices {
-        prices(&[(LABOR, 1.0), (GRAIN, 2.0), (COPPER, 5.0)])
-    }
-
-    /// Labor subsistence 2 weight 0.2, grain subsistence 2 weight 0.8.
-    fn peasant() -> PopType {
-        PopType::new(
-            vec![(good(LABOR), q(10.0))],
-            vec![(good(LABOR), q(2.0), 0.2), (good(GRAIN), q(2.0), 0.8)],
-            no_growth(),
-        )
-    }
-
-    fn type_of(utility: &[(u32, f64, f64)]) -> PopType {
-        PopType::new(
-            vec![],
-            utility
-                .iter()
-                .map(|&(g, s, w)| (good(g), q(s), w))
-                .collect(),
-            no_growth(),
-        )
-    }
-
-    fn held(list: &[(u32, f64)]) -> Vec<(GoodId, Quantity)> {
-        list.iter().map(|&(g, a)| (good(g), q(a))).collect()
-    }
+    use crate::test_support::{
+        COPPER, GRAIN, LABOR, Prices, SILVER, close, good, held, peasant, prices, q, type_of,
+        typical,
+    };
 
     /// Asserts the demanded goods are exactly `expected` (good index, quantity), in order.
     fn assert_quantities(d: &Demand, expected: &[(u32, f64)]) {
