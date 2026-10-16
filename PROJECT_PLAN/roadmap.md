@@ -99,33 +99,43 @@
 
 ### Step 02: businesses
 - Status: planned
-- Tags: #businesses #natural-resources #setting-data #turn-loop
-- Description: Define minimal businesses in the starting state: starting cash and the deposits the business owns. Each business gets an ID and one stockpile that holds its goods and cash. Rework emission so an owned deposit emits into its owner's stockpile while unowned deposits keep emitting into the hex stockpile; this replaces the ownership seam Stage 01 left in emission. Design question: whether a business is tied to one hex and may own only assets on it (expected yes, until trade exists). Add businesses to the sample setting.
+- Tags: #businesses #natural-resources #setting-data #turn-loop #deciders
+- Description: Define minimal businesses in the starting state: starting cash, the deposits the business owns, and the name of the decider that controls it (a name only; Step 07 resolves it). Each business gets an ID and one stockpile that holds its goods and cash. Rework emission so an owned deposit emits into its owner's stockpile while unowned deposits keep emitting into the hex stockpile; this replaces the ownership seam Stage 01 left in emission. Design question: whether a business is tied to one hex and may own only assets on it (expected yes, until trade exists). Add businesses to the sample setting.
 
 ### Step 03: factories
 - Status: planned
 - Tags: #factories #businesses #setting-data #hex-map
 - Description: Place factories in the starting state: hex, technology, owner business, and the current capital bundle. Each factory gets an ID, points at one technology (state, so it can change later), and has exactly one owner. Validate the references and the bundle. Add the chain's factories to the sample setting.
 
-### Step 04: production
+### Step 04: factory-mechanics
 - Status: planned
-- Tags: #factories #production #engine
-- Description: Pure functions with their own tests, not yet wired into the turn: the run level of a factory (the smaller of its technology's capacity and cash divided by the per-unit input cost at posted prices), and running a factory at that level (inputs leave the business's stockpile, output enters it). Fixed proportions make both closed form.
+- Tags: #factories #production #capital #engine
+- Description: Pure functions with their own tests, not yet wired into the turn. Running a factory at a given level: the level is clamped to the technology's capacity and to the inputs the business has on hand, inputs leave the business's stockpile and output enters it. Depreciation: each turn a factory consumes its capital bundle divided by its technology's lifetime, in the bundle's proportions, whether or not it ran, and shuts down when the bundle is exhausted. Maintenance: replenishing a share of the bundle costs that share of the capital and construction bundles, capped at one construction slice per turn. The choice of run level and maintenance share is not made here: it belongs to the business's decider (Step 06).
 
-### Step 05: depreciation-and-maintenance
+### Step 05: business-view-and-decisions
 - Status: planned
-- Tags: #factories #capital #production #engine
-- Description: Each turn a factory consumes its capital bundle divided by its technology's lifetime, in the bundle's proportions, whether or not it ran, and shuts down when the bundle is exhausted. Maintenance is the depreciated slice plus labor, added back each turn. The business's arithmetic rule: run at capacity and maintain when the margin at posted prices covers inputs and maintenance; otherwise leave the factory to run down. Pure functions with their own tests; Step 06 wires them into the turn.
+- Tags: #deciders #businesses #engine
+- Description: The decider protocol as engine data, sized to the minimal business. The view a business is served each turn: its hex's posted prices, its stockpile and cash, its factories with their technology's numbers and bundle state, and its deposits; nothing outside its circumstances. The action vocabulary: per-factory run level and maintenance share, offers, and bids, each with the bounds the engine enforces, and an optional trace. Validation of a decision against the view it answers. Lossless serialization of both, with no references into the engine, and a recording format for a turn's batch of views and decisions. No Python yet; everything has its own tests.
 
-### Step 06: business-trade
+### Step 06: business-script
 - Status: planned
-- Tags: #businesses #factories #market #turn-loop
-- Description: The business's turn, through the same hex round as POPs. Each business submits fixed quantities: offers of last turn's output and its surplus unimproved goods, and bids for this turn's inputs and maintenance at the run level it chose. Sales settle before purchases, purchases are capped by cash on hand after sales, and when cash is short the run level is scaled down. Then its factories run, depreciate, and are maintained, and the output goes to inventory for next turn. Labor is bought and used in the same turn. A per-business outcome is recorded and the turn report gains business totals. The cash cap is the seam for operating budgets; maintenance is the seam for expansion.
+- Tags: #deciders #businesses #python
+- Description: The project's Python package: a client that reads a batch of views and writes a batch of decisions in Step 05's format, and the first business decider, the arithmetic rule: a factory runs at capacity and is maintained when the margin at posted prices covers inputs and maintenance, and is otherwise left to run down; offers of last turn's output and surplus unimproved goods, bids for the inputs and maintenance that implies. The rule works over whole batches, not one business at a time. Python tests against recorded views, run from the project's virtual environment.
 
-### Step 07: dev-ui-businesses
+### Step 07: decider-host
 - Status: planned
-- Tags: #dev-ui #businesses #factories
-- Description: Inspect a hex's businesses in the dev UI: cash, stockpile, owned deposits, and last turn's offers, bids and trade outcome. Inspect its factories: technology, capital bundle and remaining life, run level, and whether it has shut down. Show the business totals in the turn log.
+- Tags: #deciders #turn-loop #engine #python
+- Description: The decision point in the engine: once per turn, every business's view is served and every decision collected in one batched exchange. A Decider abstraction with two implementations: the external-process decider, which starts the Python script once, keeps it alive across turns, and exchanges one batch per turn; and the replay decider, which answers from a recording so engine tests that don't test strategy don't need Python. Failure semantics: what the engine does when a decider errors, answers late, or sends a decision it can't resolve. Resolving the decider names businesses give in the setting, and the test setup that finds the project's Python environment. The engine never depends on a decider's memory.
+
+### Step 08: business-trade
+- Status: planned
+- Tags: #businesses #factories #market #turn-loop #deciders
+- Description: The business's turn. After the decision point, each business's offers and bids go through the same hex round as POPs: sales settle before purchases, purchases are capped by cash on hand after sales, and when cash is short the run level is scaled down. Then its factories run at the resolved levels, depreciate, and are maintained by the chosen shares, and the output goes to inventory for next turn. Labor is bought and used in the same turn. A per-business outcome records the decision, its trace, and what was traded, and the turn report gains business totals. The cash cap is the seam for operating budgets; maintenance is the seam for expansion; the decider is the seam for richer strategy.
+
+### Step 09: dev-ui-businesses
+- Status: planned
+- Tags: #dev-ui #businesses #factories #deciders
+- Description: Inspect a hex's businesses in the dev UI: cash, stockpile, owned deposits, decider, last turn's decision with its trace, and the trade outcome. Inspect its factories: technology, capital bundle and remaining life, run level, and whether it has shut down. Show the business totals in the turn log. Taking over a business and submitting its decisions by hand waits for Stage 05.
 
 ## Stage 04: market
 - Status: outline
@@ -133,12 +143,12 @@
 
 ## Stage 05: dev-ui
 - Status: outline
-- Goal: Once the market makes the numbers worth looking at, the developer UI gets a Stage of its own. It decides what the dev UI should be good for from now on (an inspector of any object in the world, a way to watch the economy move over turns, or both), how UI back-and-forths run inside the development loop when the developer sees something wrong and the agent fixes it, and how the agent itself can see and test the UI so UI work can be built and reviewed like everything else.
+- Goal: Once the market makes the numbers worth looking at, the developer UI gets a Stage of its own. It decides what the dev UI should be good for from now on (an inspector of any object in the world, a way to watch the economy move over turns, or both), how UI back-and-forths run inside the development loop when the developer sees something wrong and the agent fixes it, and how the agent itself can see and test the UI so UI work can be built and reviewed like everything else. The dev UI becomes a decider: it can take over any discretionary actor and submit its decisions by hand, the first proof of the player path.
 
 ## Stage 06: businesses
 - Status: outline
-- Goal: Ownership arrives in full. POPs own businesses; businesses already own deposits and factories. Businesses collect their factories' and deposits' earnings, set operating budgets, and pay dividends. Expansion decisions wait for Stage 07.
+- Goal: Ownership arrives in full. POPs own businesses; businesses already own deposits and factories. Businesses collect their factories' and deposits' earnings, set operating budgets, and pay dividends. Budgets and dividends are new verbs in the decider vocabulary, resolved by engine rules, not new engine decisions. Expansion decisions wait for Stage 07.
 
 ## Stage 07: saving-and-investment
 - Status: outline
-- Goal: POPs own shares of businesses and receive dividends, deposit at banks for interest, and buy and sell stock. Businesses make vertical and horizontal expansion decisions: constructing factories, retooling them to other technologies, scrapping them, and buying and selling them. POPs make human capital decisions that exchange unskilled labor for skilled labor. Completing this Stage reaches the closed-market milestone.
+- Goal: POPs own shares of businesses and receive dividends, deposit at banks for interest, and buy and sell stock. Businesses make vertical and horizontal expansion decisions through their deciders: constructing factories, retooling them to other technologies, scrapping them, and buying and selling them. POPs make human capital decisions that exchange unskilled labor for skilled labor. Completing this Stage reaches the closed-market milestone.
