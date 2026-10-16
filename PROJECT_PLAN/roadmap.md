@@ -89,11 +89,11 @@
 - Description: Inspect a hex's currency, its posted prices, and its POPs in the dev UI: each POP's type, size, inventory, last turn's submission and trade outcome (endowment sold, goods bought and consumed, currency carried over), utility, and growth. Show the POP totals in the turn log.
 
 ## Stage 03: factories
-- Status: planned
+- Status: in-progress
 - Goal: Technologies, factories, depreciation, and the minimal business. Factories exist in the starting state with a technology and a capital bundle, consume a slice of it each turn and shut down when it's gone. Minimal businesses own sets of factories and deposits, start with cash, trade fixed quantities with the dummy market on a one-turn lag, and maintain the factories that pay for it. Owned deposits emit into their business's stockpile; unowned ones keep emitting into hex stockpiles. The sample setting gets a real production chain on one hex. No POP ownership, budgets, dividends, construction, scrapping, or retooling yet.
 
 ### Step 01: technologies
-- Status: planned
+- Status: specified
 - Tags: #technologies #factories #setting-data #goods
 - Description: Define technologies in the rules: a fixed-proportion recipe (so many units of each input per unit of output, no substitution), the output good, capacity per turn, the capital bundle of goods a factory of this technology holds, its lifetime in turns, and the labor maintenance takes. Validate the numbers and check the references to goods. Add a production chain to the sample setting (farm, mine, toolmaker) with a capital good for the bundles. Transitions between technologies and construction parameters wait for Stage 07.
 
