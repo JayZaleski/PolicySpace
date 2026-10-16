@@ -88,18 +88,57 @@
 - Tags: #dev-ui #pops #currency #market
 - Description: Inspect a hex's currency, its posted prices, and its POPs in the dev UI: each POP's type, size, inventory, last turn's submission and trade outcome (endowment sold, goods bought and consumed, currency carried over), utility, and growth. Show the POP totals in the turn log.
 
-## Stage 03: industries
-- Status: outline
-- Goal: Add industries that combine goods, including labor and unimproved resource output, into other goods according to production functions, with technology and depreciation. Industries buy inputs from and sell output to the dummy market through the same submission seam as POPs, submitting their production parameters and capacity. They have no owners, budgets, or dividends yet.
+## Stage 03: factories
+- Status: planned
+- Goal: Technologies, factories, depreciation, and the minimal business. Factories exist in the starting state with a technology and a capital bundle, consume a slice of it each turn and shut down when it's gone. Minimal businesses own sets of factories and deposits, start with cash, trade fixed quantities with the dummy market on a one-turn lag, and maintain the factories that pay for it. Owned deposits emit into their business's stockpile; unowned ones keep emitting into hex stockpiles. The sample setting gets a real production chain on one hex. No POP ownership, budgets, dividends, construction, scrapping, or retooling yet.
 
-## Stage 04: businesses
-- Status: outline
-- Goal: Ownership arrives. Businesses own deposits and industries, and POPs own businesses. Businesses collect their industries' and deposits' earnings, set operating budgets, and pay dividends. Expansion decisions wait for Stage 06.
+### Step 01: technologies
+- Status: planned
+- Tags: #technologies #factories #setting-data #goods
+- Description: Define technologies in the rules: a fixed-proportion recipe (so many units of each input per unit of output, no substitution), the output good, capacity per turn, the capital bundle of goods a factory of this technology holds, its lifetime in turns, and the labor maintenance takes. Validate the numbers and check the references to goods. Add a production chain to the sample setting (farm, mine, toolmaker) with a capital good for the bundles. Transitions between technologies and construction parameters wait for Stage 07.
 
-## Stage 05: market
-- Status: outline
-- Goal: The live market of the vision's Markets section, in a single closed economy with no external trade. The dummy market's infinite counterparty is removed: bids and offers are settled against each other with proportional rationing, sales before purchases, and prices adjust between turns toward clearing using the aggregate curves at a speed set in the setting. Inventory, unemployment, and shortages become visible quantities. The test of correctness is that, with constant fundamentals, prices converge over turns to the known equilibrium. Market power is not part of this Stage.
+### Step 02: businesses
+- Status: planned
+- Tags: #businesses #natural-resources #setting-data #turn-loop
+- Description: Define minimal businesses in the starting state: starting cash and the deposits the business owns. Each business gets an ID and one stockpile that holds its goods and cash. Rework emission so an owned deposit emits into its owner's stockpile while unowned deposits keep emitting into the hex stockpile; this replaces the ownership seam Stage 01 left in emission. Design question: whether a business is tied to one hex and may own only assets on it (expected yes, until trade exists). Add businesses to the sample setting.
 
-## Stage 06: saving-and-investment
+### Step 03: factories
+- Status: planned
+- Tags: #factories #businesses #setting-data #hex-map
+- Description: Place factories in the starting state: hex, technology, owner business, and the current capital bundle. Each factory gets an ID, points at one technology (state, so it can change later), and has exactly one owner. Validate the references and the bundle. Add the chain's factories to the sample setting.
+
+### Step 04: production
+- Status: planned
+- Tags: #factories #production #engine
+- Description: Pure functions with their own tests, not yet wired into the turn: the run level of a factory (the smaller of its technology's capacity and cash divided by the per-unit input cost at posted prices), and running a factory at that level (inputs leave the business's stockpile, output enters it). Fixed proportions make both closed form.
+
+### Step 05: depreciation-and-maintenance
+- Status: planned
+- Tags: #factories #capital #production #engine
+- Description: Each turn a factory consumes its capital bundle divided by its technology's lifetime, in the bundle's proportions, whether or not it ran, and shuts down when the bundle is exhausted. Maintenance is the depreciated slice plus labor, added back each turn. The business's arithmetic rule: run at capacity and maintain when the margin at posted prices covers inputs and maintenance; otherwise leave the factory to run down. Pure functions with their own tests; Step 06 wires them into the turn.
+
+### Step 06: business-trade
+- Status: planned
+- Tags: #businesses #factories #market #turn-loop
+- Description: The business's turn, through the same hex round as POPs. Each business submits fixed quantities: offers of last turn's output and its surplus unimproved goods, and bids for this turn's inputs and maintenance at the run level it chose. Sales settle before purchases, purchases are capped by cash on hand after sales, and when cash is short the run level is scaled down. Then its factories run, depreciate, and are maintained, and the output goes to inventory for next turn. Labor is bought and used in the same turn. A per-business outcome is recorded and the turn report gains business totals. The cash cap is the seam for operating budgets; maintenance is the seam for expansion.
+
+### Step 07: dev-ui-businesses
+- Status: planned
+- Tags: #dev-ui #businesses #factories
+- Description: Inspect a hex's businesses in the dev UI: cash, stockpile, owned deposits, and last turn's offers, bids and trade outcome. Inspect its factories: technology, capital bundle and remaining life, run level, and whether it has shut down. Show the business totals in the turn log.
+
+## Stage 04: market
 - Status: outline
-- Goal: POPs own shares of businesses and receive dividends, deposit at banks for interest, and buy and sell stock. Businesses make vertical and horizontal expansion decisions. POPs make human capital decisions that exchange unskilled labor for skilled labor. Completing this Stage reaches the closed-market milestone.
+- Goal: The live market of the vision's Markets section, in a single closed economy with no external trade. It brings POPs, factories, and minimal businesses together: the dummy market's infinite counterparty is removed, bids and offers are settled against each other with proportional rationing, sales before purchases, and prices adjust between turns toward clearing using the aggregate curves at a speed set in the setting. Inventory, unemployment, and shortages become visible quantities. The test of correctness is that, with constant fundamentals, prices converge over turns to the known equilibrium. Market power is not part of this Stage.
+
+## Stage 05: dev-ui
+- Status: outline
+- Goal: Once the market makes the numbers worth looking at, the developer UI gets a Stage of its own. It decides what the dev UI should be good for from now on (an inspector of any object in the world, a way to watch the economy move over turns, or both), how UI back-and-forths run inside the development loop when the developer sees something wrong and the agent fixes it, and how the agent itself can see and test the UI so UI work can be built and reviewed like everything else.
+
+## Stage 06: businesses
+- Status: outline
+- Goal: Ownership arrives in full. POPs own businesses; businesses already own deposits and factories. Businesses collect their factories' and deposits' earnings, set operating budgets, and pay dividends. Expansion decisions wait for Stage 07.
+
+## Stage 07: saving-and-investment
+- Status: outline
+- Goal: POPs own shares of businesses and receive dividends, deposit at banks for interest, and buy and sell stock. Businesses make vertical and horizontal expansion decisions: constructing factories, retooling them to other technologies, scrapping them, and buying and selling them. POPs make human capital decisions that exchange unskilled labor for skilled labor. Completing this Stage reaches the closed-market milestone.
