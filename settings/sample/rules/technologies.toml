@@ -1,0 +1,82 @@
+# Technologies: the recipes that factories run. Every technology comes from a
+# [[technology]] section here, shared by every factory that uses it, as a POP type is shared
+# by POPs. A technology needs eight keys:
+#
+#   name                The technology's name (lowercase snake_case).
+#   inputs              The goods one unit of output takes: a table of good name = amount,
+#                       each amount a number greater than 0. The proportions are fixed
+#                       (no substitution). May be empty ({}). The output good may not be
+#                       among the inputs.
+#   output              The name of the one good the factory makes.
+#   capacity            The most output a factory makes in one turn: a number greater
+#                       than 0.
+#   capital             The goods a finished factory holds: a table like `inputs`, with at
+#                       least one good.
+#   construction        The goods spent to build a factory (consumed, not kept): a table
+#                       like `inputs`. May be empty ({}).
+#   construction_turns  How many turns building a factory takes (t): a whole number from 1
+#                       up to 4294967295.
+#   lifetime            How many turns a factory's capital lasts (t1): a whole number from
+#                       1 up to 4294967295.
+#
+# Tables may be written inline, as below, or as sub-tables ([technology.inputs],
+# [technology.capital], [technology.construction]). Any other key is an error. The goods
+# named in the tables and in `output` must exist (see goods.toml).
+#
+# What the numbers mean:
+#   - Depreciation: every turn a factory loses 1/t1 of its capital bundle, whether or not
+#     it ran. When the capital is used up, the factory shuts down.
+#   - Construction: building a factory pays 1/t of both the capital bundle and the
+#     construction bundle each turn, for t turns. The construction bundle is consumed; the
+#     capital bundle becomes the factory's capital.
+#   - Maintenance is the construction project run for a fraction of its time: replenishing
+#     a share f of the capital costs f of both bundles, and at most 1/t of both can be paid
+#     per turn. So steady maintenance can keep up with depreciation (1/t1 per turn) only
+#     when construction_turns <= lifetime. A technology with construction_turns > lifetime
+#     is allowed, but its factories wear out faster than they can be maintained.
+#
+# Nothing runs factories yet: technologies are only loaded and checked. Later Steps build
+# and run factories from them.
+#
+# The numbers below are chosen against the center's prices (unskilled_labor 1, grain 2,
+# copper 5, unimproved_grain 0.5, unimproved_copper 1, tools 12). Per turn at capacity,
+# revenue minus inputs minus one lifetime's share of capital plus construction leaves:
+#   - the farm 5, on revenue 24;
+#   - the mine 4, on revenue 12.5;
+#   - the toolmaker 0.25, on revenue 48.
+# The capacities match what the center's deposits emit each turn: 12 unimproved_grain and
+# 2.5 unimproved_copper.
+
+# A farm turns the grain deposits' output into grain.
+[[technology]]
+name = "farm"
+inputs = { unimproved_grain = 1, unskilled_labor = 0.5 }
+output = "grain"
+capacity = 12
+capital = { tools = 4 }
+construction = { unskilled_labor = 8 }
+construction_turns = 2
+lifetime = 8
+
+# A mine turns the copper deposit's output into copper.
+[[technology]]
+name = "mine"
+inputs = { unimproved_copper = 1, unskilled_labor = 1 }
+output = "copper"
+capacity = 2.5
+capital = { tools = 2 }
+construction = { unskilled_labor = 4 }
+construction_turns = 2
+lifetime = 8
+
+# A toolmaker turns copper into tools, the capital good every factory here is made of.
+# Its margin is thin: it covers inputs and maintenance with little to spare.
+[[technology]]
+name = "toolmaker"
+inputs = { copper = 2, unskilled_labor = 1.5 }
+output = "tools"
+capacity = 4
+capital = { tools = 3 }
+construction = { unskilled_labor = 6 }
+construction_turns = 3
+lifetime = 24

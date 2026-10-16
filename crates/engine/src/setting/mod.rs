@@ -52,7 +52,9 @@
 //!   market check needs the resolved currencies. POP types (`[[pop_type]]`, the third
 //!   `rules/` kind) name goods in their endowment and utility, which are resolved here too.
 //!   POPs (`[[pop]]`, the fourth `start/` kind) name a POP type and a hex's coordinates,
-//!   resolved here after the POP types are known.
+//!   resolved here after the POP types are known. Technologies (`[[technology]]`, the
+//!   fourth `rules/` kind) name goods in their `inputs`, `output`, `capital` and
+//!   `construction`, which are resolved here too.
 //!   A reader's `finish` that depends on phase 2 (such as `ResourcesReader::finish`) is
 //!   only called after a successful load.
 //!
@@ -71,7 +73,9 @@
 //!    another named kind, in [`crate::pops`] and `setting/pops.rs`; their reader keeps
 //!    every entry for phase 2, so the goods of an entry with a bad name are still checked.
 //!    POPs (`StartState::pops`) follow deposits as a placed thing in `start/` identified by
-//!    type and coordinates, in [`crate::pops`] and `setting/pops.rs`.
+//!    type and coordinates, in [`crate::pops`] and `setting/pops.rs`. Technologies
+//!    (`Rules::technologies`) are another named kind that keeps every entry for phase 2, in
+//!    [`crate::technologies`] (with [`crate::bundle`]) and `setting/technologies.rs`.
 //! 2. Add a `SectionType` to `WorldContent::section_types`, naming its header, the one
 //!    folder it belongs in, and a `read` function.
 //! 3. Check references in `WorldContent::resolve`. Resources and deposits are the worked
@@ -92,6 +96,7 @@ mod pops;
 mod reader;
 mod resources;
 mod source;
+mod technologies;
 #[cfg(test)]
 mod test_content;
 
@@ -107,6 +112,7 @@ use crate::map::HexMap;
 use crate::market::HexPrices;
 use crate::pops::{PopTypes, Pops};
 use crate::resources::{Deposits, ResourceTypes};
+use crate::technologies::Technologies;
 use error::{ErrorSink, Location};
 use goods::GoodsReader;
 use map::MapReader;
@@ -115,6 +121,7 @@ use pops::{PopTypesReader, PopsReader};
 use reader::EntryReader;
 use resources::{DepositsReader, ResourcesReader};
 use source::{SourceFile, read_toml};
+use technologies::TechnologiesReader;
 
 /// The only setting format version this engine reads.
 pub const SUPPORTED_FORMAT_VERSION: i64 = 1;
@@ -150,6 +157,8 @@ pub struct Rules {
     pub resources: ResourceTypes,
     /// Every POP type the setting defines, in load order; see [`crate::pops`].
     pub pop_types: PopTypes,
+    /// Every technology the setting defines, in load order; see [`crate::technologies`].
+    pub technologies: Technologies,
 }
 
 /// Starting state (turn 0). Later Steps add more fields.
@@ -182,6 +191,7 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
             goods: content.goods.finish(),
             resources: content.resources.finish(),
             pop_types: content.pop_types.finish(),
+            technologies: content.technologies.finish(),
         },
         start: StartState {
             map,
@@ -257,6 +267,7 @@ pub(crate) struct WorldContent {
     pub markets: MarketsReader,
     pub pop_types: PopTypesReader,
     pub pops: PopsReader,
+    pub technologies: TechnologiesReader,
 }
 
 impl SettingContent for WorldContent {
@@ -297,13 +308,19 @@ impl SettingContent for WorldContent {
                 folder: Folder::Start,
                 read: |content, reader| content.pops.read(reader),
             },
+            SectionType {
+                header: "technology",
+                folder: Folder::Rules,
+                read: |content, reader| content.technologies.read(reader),
+            },
         ]
     }
 
     // Goods refer to nothing. Hexes refer to goods (their currency), resource types refer
     // to goods, deposits refer to resource types and hexes, and markets refer to hexes and
     // goods (and need the hexes' resolved currencies, so the map resolves first). POP types
-    // refer to goods in their endowment and utility, and POPs refer to POP types and hexes.
+    // refer to goods in their endowment and utility, POPs refer to POP types and hexes, and
+    // technologies refer to goods in their inputs, output, capital and construction.
     fn resolve(&mut self, sink: &mut ErrorSink) {
         self.map.resolve(self.goods.defs(), sink);
         self.resources.resolve(self.goods.defs(), sink);
@@ -312,6 +329,7 @@ impl SettingContent for WorldContent {
         self.markets.resolve(self.goods.defs(), &self.map, sink);
         self.pop_types.resolve(self.goods.defs(), sink);
         self.pops.resolve(self.pop_types.defs(), &self.map, sink);
+        self.technologies.resolve(self.goods.defs(), sink);
     }
 }
 

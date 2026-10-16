@@ -26,7 +26,15 @@ fn the_sample_setting_posts_its_prices() {
     let copper = good(&world, "copper");
     let unimproved_grain = good(&world, "unimproved_grain");
     let unimproved_copper = good(&world, "unimproved_copper");
-    let non_currency = [labor, grain, copper, unimproved_grain, unimproved_copper];
+    let tools = good(&world, "tools");
+    let non_currency = [
+        labor,
+        grain,
+        copper,
+        unimproved_grain,
+        unimproved_copper,
+        tools,
+    ];
 
     let center = world.market(hex(&world, 0, 0));
     assert!(center.has_market());
@@ -35,7 +43,8 @@ fn the_sample_setting_posts_its_prices() {
     assert_eq!(center.price(copper), Some(q(5.0)));
     assert_eq!(center.price(unimproved_grain), Some(q(0.5)));
     assert_eq!(center.price(unimproved_copper), Some(q(1.0)));
-    assert_eq!(center.prices().count(), 5);
+    assert_eq!(center.price(tools), Some(q(12.0)));
+    assert_eq!(center.prices().count(), 6);
 
     let east = world.market(hex(&world, 1, 0));
     assert!(east.has_market());
@@ -44,6 +53,7 @@ fn the_sample_setting_posts_its_prices() {
     assert_eq!(east.price(copper), Some(q(5.0)));
     assert_eq!(east.price(unimproved_grain), None);
     assert_eq!(east.price(unimproved_copper), None);
+    assert_eq!(east.price(tools), None);
 
     let corner = world.market(hex(&world, 2, -2));
     assert!(!corner.has_market());

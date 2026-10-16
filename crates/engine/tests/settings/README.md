@@ -45,6 +45,18 @@ Valid settings:
   `farmer` `[0.06, -0.03]`, decline 0.1, max_growth 0.05 (inline); `fisher` `[0.03]`,
   decline 0, max_growth 1 (the `[pop_type.growth]` table); `idle` `[0.02, 0.01, -0.005]`,
   decline 0.5, max_growth 0.2 (inline).
+- `technologies_valid`: technologies across several files and a nested folder
+  (`rules/a.toml`, `rules/a/z.toml`, `rules/b.toml`), in the inline form and the sub-table
+  form (`[technology.inputs]`, `[technology.capital]`, `[technology.construction]`, some
+  empty), with the goods in `rules/goods.toml`, read after every technology file. Goods
+  (IDs 0-4): `labor`, `ore`, `iron`, `tools`, `bread`. Technologies: `smelter` (inputs 2
+  `ore` and 1 `labor` written out of ID order, output `iron`, capacity 10, capital 5 `tools`,
+  construction 20 `labor`, 2 turns, lifetime 10), `well` (no inputs, output `bread`, capacity
+  0.5, capital 1.5 `tools` and 3 `labor` written out of ID order, no construction, 1, 1),
+  `toolmaker` (input 1 `iron`, output `tools`, capacity 3, capital 2 `tools` and 4 `iron`,
+  empty inline construction, 3 turns, lifetime 3).
+- `technologies_one`: one good, `bread`, and one technology, `oven` (for the setting
+  checker's `1 technology`).
 - `pops_one`: one good, one POP type, one hex and one POP (for the setting checker's
   `1 pop type`, `1 hex` and `1 pop`). Its type has zero growth parameters.
 - `pops_placed`: POPs across several files and a nested folder (`start/a.toml`, then
@@ -136,11 +148,18 @@ File-content errors:
   no hex, a size that is zero, negative or infinite, an unknown POP type, an unknown key, one
   entry with four problems, a duplicate across files, and a `[[pop]]` in `rules/`. Its goods
   are `coin` and `labor`.
+- `technologies_errors`: every kind of `[[technology]]` error, including a missing `name`,
+  `inputs`, `output`, `capacity`, `capital`, `construction`, `construction_turns` or
+  `lifetime`, a bad or duplicate name, wrongly typed values, amounts that are a string,
+  zero, negative, `inf` or `nan`, turns and lifetimes below 1 or beyond `u32` (and a
+  non-integer), an empty `capital`, the output good among the inputs, unknown goods, unknown
+  keys, one entry (`Several`) with many problems, a duplicate across files, and a
+  `[[technology]]` in `start/`. Its goods are `coin`, `grain` and `labor`.
 - `resources_broken_file`: a broken TOML file next to resources that refer to a good and a
   hex that don't exist, plus a hex whose currency is an unknown good, a market that prices
   goods that don't exist, a POP type whose endowment and utility name goods that don't
-  exist, and a POP of an unknown type at a coordinate with no hex: only the syntax error is
-  reported.
+  exist, a technology whose goods don't exist, and a POP of an unknown type at a coordinate
+  with no hex: only the syntax error is reported.
 - `resources_missing_start`: no `start/` folder, and a resource that refers to a good that
   doesn't exist: only the missing folder is reported.
 - `many_errors`: several kinds of problem at once, to check that all are reported in order.

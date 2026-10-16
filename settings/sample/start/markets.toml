@@ -59,8 +59,9 @@ prices = { unskilled_labor = 1, grain = 2, copper = 5 }
 [[market]]
 q = 0
 r = 0
-# The center is the only hex that trades resource output (the unimproved goods).
-prices = { unskilled_labor = 1, grain = 2, copper = 5, unimproved_grain = 0.5, unimproved_copper = 1 }
+# The center is the only hex that trades resource output (the unimproved goods), and the
+# only hex that trades tools.
+prices = { unskilled_labor = 1, grain = 2, copper = 5, unimproved_grain = 0.5, unimproved_copper = 1, tools = 12 }
 
 [[market]]
 q = 1

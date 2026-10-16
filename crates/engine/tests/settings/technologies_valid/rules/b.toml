@@ -1,0 +1,9 @@
+[[technology]]
+name = "toolmaker"
+inputs = { iron = 1 }
+output = "tools"
+capacity = 3
+capital = { tools = 2, iron = 4 }
+construction = {}
+construction_turns = 3
+lifetime = 3

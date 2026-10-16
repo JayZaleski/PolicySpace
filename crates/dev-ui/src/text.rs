@@ -616,11 +616,12 @@ mod tests {
                     "unimproved_grain",
                     "copper",
                     "grain",
-                    "silver"
+                    "silver",
+                    "tools"
                 ]
             );
             let in_hexes: Vec<&str> = rows.iter().map(|row| row.in_hexes.as_str()).collect();
-            assert_eq!(in_hexes, ["0", "10", "24", "0", "0", "0"]);
+            assert_eq!(in_hexes, ["0", "10", "24", "0", "0", "0", "0"]);
             // Only silver is held by POPs: it is what they sell their labor for.
             let silver = world.rules().goods.id("silver").unwrap();
             let pop_silver = world
@@ -633,6 +634,7 @@ mod tests {
             let in_pops: Vec<&str> = rows.iter().map(|row| row.in_pops.as_str()).collect();
             assert_eq!(&in_pops[..5], ["0", "0", "0", "0", "0"]);
             assert_eq!(in_pops[5], pop_silver);
+            assert_eq!(in_pops[6], "0");
             assert_eq!(rows[4].lasts, "perishes after 3 turns");
             assert_eq!(rows[4].movable, "movable");
             assert_eq!(rows[0].movable, "fixed");
@@ -740,6 +742,7 @@ mod tests {
                 "unimproved_grain: 0.5 silver",
                 "copper: 5 silver",
                 "grain: 2 silver",
+                "tools: 12 silver",
             ])
         );
         assert_eq!(

@@ -262,8 +262,8 @@ fn every_deposit_error_is_reported_at_its_place() {
 fn references_are_not_checked_after_a_broken_file_or_incomplete_discovery() {
     // `resources_broken_file` also holds a hex whose currency is an unknown good, and a
     // market that prices goods that don't exist, a POP type whose endowment and utility
-    // name goods that don't exist, and a POP of an unknown type at a coordinate with no
-    // hex; those references aren't checked either.
+    // name goods that don't exist, a technology whose goods don't exist, and a POP of an
+    // unknown type at a coordinate with no hex; those references aren't checked either.
     assert_eq!(
         failures_of("resources_broken_file"),
         vec!["rules/broken.toml:1:11: invalid TOML: unclosed array table, expected `]]`"]

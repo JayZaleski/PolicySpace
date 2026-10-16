@@ -1,1 +1,1 @@
-Persistent rules go here: `.toml` files (in this folder or any subfolder) that define kinds of things. Goods are defined in `goods.toml`, resource types in `resources.toml`, and POP types in `pops.toml`.
+Persistent rules go here: `.toml` files (in this folder or any subfolder) that define kinds of things. Goods are defined in `goods.toml`, resource types in `resources.toml`, POP types in `pops.toml`, and technologies in `technologies.toml`.

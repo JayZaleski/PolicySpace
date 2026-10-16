@@ -1,0 +1,9 @@
+[[technology]]
+name = "misplaced"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1

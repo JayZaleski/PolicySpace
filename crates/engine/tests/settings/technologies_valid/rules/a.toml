@@ -1,0 +1,9 @@
+[[technology]]
+name = "smelter"
+inputs = { ore = 2, labor = 1 }
+output = "iron"
+capacity = 10
+capital = { tools = 5 }
+construction = { labor = 20 }
+construction_turns = 2
+lifetime = 10

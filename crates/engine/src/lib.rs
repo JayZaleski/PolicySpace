@@ -23,11 +23,17 @@
 //! consumes; each POP's outcome is recorded. The [`growth`] module turns a POP's demand into
 //! a subsistence index and a growth rate from its type's parameters, and the world applies
 //! the rate to the POP's size after every hex has traded.
+//! Technologies (the fixed-proportion recipes factories run, with their capital and
+//! construction bundles, construction time and lifetime) are rules in the [`technologies`]
+//! module, and a [`Bundle`] (the [`bundle`] module) is a list of goods with amounts; nothing
+//! runs technologies yet.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
 //! and turn numbers are [`Turn`] values (see the [`turn`] module).
 
+pub mod bundle;
+pub use bundle::Bundle;
 pub mod currency;
 pub use currency::HexCurrencies;
 pub mod demand;
@@ -61,6 +67,8 @@ pub use setting::{
 };
 pub mod stockpile;
 pub use stockpile::{PerishesAt, Stockpile};
+pub mod technologies;
+pub use technologies::{Technologies, Technology, TechnologyId, TechnologyKind};
 pub mod trade;
 pub use trade::PopOutcome;
 pub mod turn;

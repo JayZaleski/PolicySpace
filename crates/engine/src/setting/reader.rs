@@ -352,6 +352,30 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         Some(pairs)
     }
 
+    /// Reads `key` as a table whose values are quantities: `required_number_table` with
+    /// `positive_quantity` applied to every value, using the same prefix (`key '<k>' in
+    /// <key> of <label>`). A value that isn't a number, is out of range, or isn't a finite
+    /// number greater than 0 is reported and returned as None, so the caller still sees the
+    /// key. Missing and non-table `key` are handled as for `required_number_table` (None).
+    #[allow(clippy::type_complexity)]
+    pub fn required_quantity_table(
+        &mut self,
+        key: &str,
+    ) -> Option<Vec<(Located<String>, Option<Quantity>)>> {
+        let label = self.label.clone();
+        let pairs = self.required_number_table(key)?;
+        Some(
+            pairs
+                .into_iter()
+                .map(|(name, number)| {
+                    let prefix = format!("key '{}' in {key} of {label}", name.value);
+                    let quantity = number.and_then(|v| self.positive_quantity(&prefix, v));
+                    (name, quantity)
+                })
+                .collect(),
+        )
+    }
+
     /// Reads `key` as a table whose values are tables. Returns every (name, table) pair in
     /// the table's order, each name with its location. A value that isn't a table is
     /// reported (`key '<k>' in <key> of <label> must be a table, found <type>`) and returned
@@ -751,6 +775,37 @@ x = 3
             },
         );
         assert_eq!(errors, Vec::<String>::new());
+    }
+
+    #[test]
+    fn quantity_tables_give_quantities_and_report_the_rest() {
+        let errors = run(
+            "p = { a = 1, b = 2.5, c = \"x\", d = 0, e = inf }
+q = 7
+",
+            |r| {
+                let pairs = r.required_quantity_table("p").unwrap();
+                let keys: Vec<&str> = pairs.iter().map(|(k, _)| k.value.as_str()).collect();
+                assert_eq!(keys, vec!["a", "b", "c", "d", "e"]);
+                assert_eq!(pairs[0].1, Quantity::new(1.0));
+                assert_eq!(pairs[1].1, Quantity::new(2.5));
+                assert!(pairs[2].1.is_none());
+                assert!(pairs[3].1.is_none());
+                assert!(pairs[4].1.is_none());
+                assert!(r.required_quantity_table("q").is_none());
+                assert!(r.required_quantity_table("missing").is_none());
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:1:1: missing required key 'missing' in thing",
+                "rules/t.toml:1:27: key 'c' in p of thing must be a number, found string",
+                "rules/t.toml:1:36: key 'd' in p of thing must be a finite number greater than 0",
+                "rules/t.toml:1:43: key 'e' in p of thing must be a finite number greater than 0",
+                "rules/t.toml:2:5: key 'q' in thing must be a table, found integer",
+            ]
+        );
     }
 
     #[test]

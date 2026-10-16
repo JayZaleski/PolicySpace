@@ -1,0 +1,194 @@
+[[technology]]
+name = "ok"
+inputs = { grain = 1, labor = 0.5 }
+output = "coin"
+capacity = 2
+capital = { labor = 1 }
+construction = { labor = 2 }
+construction_turns = 1
+lifetime = 4
+
+[[technology]]
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "no_inputs"
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "no_output"
+inputs = {}
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "no_capacity"
+inputs = {}
+output = "grain"
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "no_capital"
+inputs = {}
+output = "grain"
+capacity = 1
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "no_construction"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "no_turns"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+lifetime = 1
+
+[[technology]]
+name = "no_lifetime"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+
+[[technology]]
+name = "Bad Name"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "ok"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "wrong_types"
+inputs = 5
+output = 3
+capacity = "x"
+capital = "tools"
+construction = 7
+construction_turns = 2.5
+lifetime = "y"
+
+[[technology]]
+name = "bad_amounts"
+inputs = { grain = "2", labor = 0 }
+output = "coin"
+capacity = 0
+capital = { labor = -1, coin = inf }
+construction = { grain = nan }
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "bad_turns"
+inputs = {}
+output = "grain"
+capacity = inf
+capital = { labor = 1 }
+construction = {}
+construction_turns = 0
+lifetime = -1
+
+[[technology]]
+name = "huge_turns"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 4294967296
+lifetime = 99999999999999999999
+
+[[technology]]
+name = "empty_capital"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = {}
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "self_input"
+inputs = { grain = 1, labor = 2 }
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "unknown_goods"
+inputs = { tin = 1 }
+output = "bronze"
+capacity = 1
+capital = { tin = 2 }
+construction = { tin = 3 }
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "unknown_keys"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { labor = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+colour = "red"
+speed = 3
+
+[[technology]]
+name = "Several"
+inputs = { tin = 1, grain = 0 }
+output = "grain"
+capacity = 0
+capital = {}
+construction = { tin = -1 }
+construction_turns = 0
+lifetime = 1.5
+colour = "red"

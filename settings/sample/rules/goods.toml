@@ -40,3 +40,8 @@ perishes_after = 3
 # designates (see start/map.toml).
 [[good]]
 name = "silver"
+
+# The capital good factories are made of (see technologies.toml): durable and movable,
+# so only a name is needed.
+[[good]]
+name = "tools"

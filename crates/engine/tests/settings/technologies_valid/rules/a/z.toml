@@ -1,0 +1,14 @@
+[[technology]]
+name = "well"
+output = "bread"
+capacity = 0.5
+construction_turns = 1
+lifetime = 1
+
+[technology.inputs]
+
+[technology.capital]
+tools = 1.5
+labor = 3
+
+[technology.construction]

@@ -8,3 +8,13 @@ name = "ghost"
 endowment = { tin = 1 }
 utility = { nothing = { share = 1 } }
 growth = { growth = [0.03], decline = 0.1, max_growth = 0.05 }
+
+[[technology]]
+name = "ghost"
+inputs = { tin = 1 }
+output = "nothing"
+capacity = 1
+capital = { tin = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
