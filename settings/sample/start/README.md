@@ -1,2 +1,2 @@
 Starting state goes here: `.toml` files (in this folder or any subfolder) that describe turn 0 and refer to the rules by name.
-The map is defined in `map.toml`, the deposits of resources on it in `deposits.toml`, the markets (the prices each hex posts) in `markets.toml`, and the POPs (groups of individuals of a POP type) in `pops.toml`.
+The map is defined in `map.toml`, the deposits of resources on it in `deposits.toml`, the markets (the prices each hex posts) in `markets.toml`, and the POPs (groups of individuals of a POP type) in `pops.toml`, and the businesses (named actors, each with an inventory and the deposits it owns) in `businesses.toml`.

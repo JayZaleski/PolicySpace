@@ -1,0 +1,30 @@
+[[hex]]
+q = 0
+r = 0
+currency = "coin"
+
+[[hex]]
+q = 1
+r = 0
+currency = "coin"
+
+[[deposit]]
+resource = "field"
+q = 0
+r = 0
+count = 3
+
+[[deposit]]
+resource = "vein"
+q = 0
+r = 0
+
+[[deposit]]
+resource = "field"
+q = 1
+r = 0
+
+[[market]]
+q = 0
+r = 0
+prices = { grain = 2, ore = 3 }

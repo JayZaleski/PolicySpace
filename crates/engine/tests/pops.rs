@@ -424,12 +424,11 @@ fn a_fresh_sample_world_endows_every_pop() {
         assert_eq!(stockpile.total(labor), Quantity::ZERO, "POP {}", id.index());
         assert!(stockpile.total(silver).get() < 1e-9, "POP {}", id.index());
     }
+    // Two of the center's three arable land deposits and its copper deposit belong to
+    // businesses, so the center hex holds only the third deposit's grain.
     assert_eq!(
         hex_totals(&world, 0, 0),
-        vec![
-            pair("unimproved_copper", 2.5),
-            pair("unimproved_grain", 12.0)
-        ]
+        vec![pair("unimproved_grain", 4.0)]
     );
     assert!(report.perished.is_empty());
     assert_eq!(

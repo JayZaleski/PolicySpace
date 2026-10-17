@@ -1,0 +1,4 @@
+[[resource]]
+name = "field"
+produces = "grain"
+output = 2

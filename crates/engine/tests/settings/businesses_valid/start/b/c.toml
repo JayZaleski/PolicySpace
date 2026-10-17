@@ -1,0 +1,7 @@
+[[business]]
+name = "idle"
+q = 1
+r = 0
+inventory = {}
+deposits = {}
+decider = "other_rule"

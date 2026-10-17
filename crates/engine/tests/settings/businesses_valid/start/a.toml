@@ -1,0 +1,20 @@
+[[business]]
+name = "farm_a"
+q = 0
+r = 0
+inventory = { labor = 4, coin = 10 }
+deposits = { field = 2 }
+decider = "rule"
+
+[[business]]
+name = "farm_b"
+q = 0
+r = 0
+decider = "rule"
+
+[business.inventory]
+coin = 5
+
+[business.deposits]
+vein = 1
+field = 1

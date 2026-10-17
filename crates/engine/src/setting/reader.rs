@@ -167,22 +167,35 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         let Found::Value(value) = self.find(key, required) else {
             return None;
         };
+        let prefix = format!("key '{key}' in {}", self.label);
+        self.integer_value(&prefix, value)
+    }
+
+    /// Parses `value` as an integer (`i64`). `prefix` starts the message of any problem, as
+    /// for `number_value`: a non-integer is `<prefix> must be an integer, found <type>`, an
+    /// integer beyond `i64` is `<prefix> is out of range`.
+    fn integer_value(
+        &mut self,
+        prefix: &str,
+        value: &Spanned<DeValue<'i>>,
+    ) -> Option<Located<i64>> {
+        let at = self.file.location_of(value.span());
         match value.get_ref().as_integer() {
-            Some(int) => {
-                let at = self.file.location_of(value.span());
-                match i64::from_str_radix(int.as_str(), int.radix()) {
-                    Ok(n) => Some(Located { value: n, at }),
-                    Err(_) => {
-                        self.sink.at(
-                            &at,
-                            format!("key '{key}' in {} is out of range", self.label),
-                        );
-                        None
-                    }
+            Some(int) => match i64::from_str_radix(int.as_str(), int.radix()) {
+                Ok(n) => Some(Located { value: n, at }),
+                Err(_) => {
+                    self.sink.at(&at, format!("{prefix} is out of range"));
+                    None
                 }
-            }
+            },
             None => {
-                self.wrong_type(key, "an integer", value);
+                self.sink.at(
+                    &at,
+                    format!(
+                        "{prefix} must be an integer, found {}",
+                        value.get_ref().type_str()
+                    ),
+                );
                 None
             }
         }
@@ -348,6 +361,38 @@ impl<'a, 'i> EntryReader<'a, 'i> {
             let prefix = format!("key '{}' in {key} of {}", name.value, self.label);
             let number = self.number_value(&prefix, v);
             pairs.push((name, number));
+        }
+        Some(pairs)
+    }
+
+    /// Reads `key` as a table whose values are integers: like `required_number_table`, but
+    /// each value is parsed as `required_integer` parses one. Returns every key with its
+    /// location, in the table's order, and `None` where the value isn't an integer or is out
+    /// of range (reported as `key '<k>' in <key> of <label> must be an integer, found <type>`
+    /// or `... is out of range`). A missing key gives the usual missing-key error and a
+    /// non-table value `key '<key>' in <label> must be a table, found <type>`; both return
+    /// None. The table's keys are data: not name-checked, not tracked as read or unknown.
+    #[allow(clippy::type_complexity)]
+    pub fn required_integer_table(
+        &mut self,
+        key: &str,
+    ) -> Option<Vec<(Located<String>, Option<Located<i64>>)>> {
+        let Found::Value(value) = self.find(key, true) else {
+            return None;
+        };
+        let Some(table) = value.get_ref().as_table() else {
+            self.wrong_type(key, "a table", value);
+            return None;
+        };
+        let mut pairs = Vec::new();
+        for (k, v) in table.iter() {
+            let name = Located {
+                value: k.get_ref().to_string(),
+                at: self.file.location_of(k.span()),
+            };
+            let prefix = format!("key '{}' in {key} of {}", name.value, self.label);
+            let integer = self.integer_value(&prefix, v);
+            pairs.push((name, integer));
         }
         Some(pairs)
     }
@@ -754,6 +799,38 @@ q = 7
                 "rules/t.toml:1:1: missing required key 'missing' in thing",
                 "rules/t.toml:1:27: key 'c' in p of thing must be a number, found string",
                 "rules/t.toml:1:36: key 'd' in p of thing is out of range",
+                "rules/t.toml:2:5: key 'q' in thing must be a table, found integer",
+            ]
+        );
+    }
+
+    #[test]
+    fn integer_tables_give_every_key_and_report_bad_values() {
+        let errors = run(
+            "p = { a = 1, b = -2, c = 2.5, d = \"x\", e = 99999999999999999999 }
+q = 7
+",
+            |r| {
+                let pairs = r.required_integer_table("p").unwrap();
+                let keys: Vec<&str> = pairs.iter().map(|(k, _)| k.value.as_str()).collect();
+                assert_eq!(keys, vec!["a", "b", "c", "d", "e"]);
+                assert_eq!(pairs[0].1.as_ref().unwrap().value, 1);
+                assert_eq!(pairs[1].1.as_ref().unwrap().value, -2);
+                assert!(pairs[2].1.is_none());
+                assert!(pairs[3].1.is_none());
+                assert!(pairs[4].1.is_none());
+                assert_eq!((pairs[0].0.at.line, pairs[0].0.at.column), (1, 7));
+                assert!(r.required_integer_table("q").is_none());
+                assert!(r.required_integer_table("missing").is_none());
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:1:1: missing required key 'missing' in thing",
+                "rules/t.toml:1:26: key 'c' in p of thing must be an integer, found float",
+                "rules/t.toml:1:35: key 'd' in p of thing must be an integer, found string",
+                "rules/t.toml:1:44: key 'e' in p of thing is out of range",
                 "rules/t.toml:2:5: key 'q' in thing must be a table, found integer",
             ]
         );

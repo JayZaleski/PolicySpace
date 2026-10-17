@@ -1,0 +1,164 @@
+[[business]]
+name = "ok"
+q = 0
+r = 0
+inventory = { coin = 10 }
+deposits = { field = 1 }
+decider = "rule"
+
+[[business]]
+q = 0
+r = 0
+inventory = {}
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "no_q"
+r = 0
+inventory = {}
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "no_r"
+q = 0
+inventory = {}
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "no_inventory"
+q = 0
+r = 0
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "no_deposits"
+q = 0
+r = 0
+inventory = {}
+decider = "rule"
+
+[[business]]
+name = "no_decider"
+q = 0
+r = 0
+inventory = {}
+deposits = {}
+
+[[business]]
+name = "Bad Name"
+q = 0
+r = 0
+inventory = {}
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "ok"
+q = 0
+r = 0
+inventory = {}
+deposits = { field = 0 }
+decider = "rule"
+
+[[business]]
+name = "wrong_types"
+q = 1.5
+r = "0"
+inventory = 5
+deposits = "field"
+decider = 7
+
+[[business]]
+name = "out_of_range"
+q = 2147483648
+r = -2147483649
+inventory = {}
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "no_hex"
+q = 9
+r = 9
+inventory = {}
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "bad_amounts"
+q = 0
+r = 0
+inventory = { coin = "2", grain = 0, tin = -1 }
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "bad_amounts_more"
+q = 0
+r = 0
+inventory = { coin = inf, grain = nan }
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "bad_counts"
+q = 0
+r = 0
+inventory = {}
+deposits = { field = 0, meadow = -1 }
+decider = "rule"
+
+[[business]]
+name = "bad_counts_more"
+q = 0
+r = 0
+inventory = {}
+deposits = { field = 1.5, meadow = "2", bog = 4294967296 }
+decider = "rule"
+
+[[business]]
+name = "unknown_refs"
+q = 0
+r = 0
+inventory = { tin = 1 }
+deposits = { gold_vein = 1 }
+decider = "rule"
+
+[[business]]
+name = "too_many"
+q = 0
+r = 0
+inventory = {}
+deposits = { field = 3 }
+decider = "rule"
+
+[[business]]
+name = "bad_decider"
+q = 0
+r = 0
+inventory = {}
+deposits = {}
+decider = "Rule One"
+
+[[business]]
+name = "unknown_keys"
+q = 0
+r = 0
+inventory = {}
+deposits = {}
+decider = "rule"
+colour = "red"
+cash = 5
+
+[[business]]
+name = "Several"
+q = 0
+r = 10
+inventory = { tin = 0 }
+deposits = { gold_vein = 0, field = 1 }
+decider = "Bad"
+colour = "red"

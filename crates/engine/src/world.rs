@@ -2,19 +2,21 @@
 //!
 //! - A [`World`] is a running world, built from a [`LoadedSetting`]. The rules (goods,
 //!   resource types, POP types) never change. The world holds what does: the clock, the
-//!   hexes, the deposits, the POPs (each with its current size, grown every turn), each
-//!   hex's currency, each hex's posted prices, one
-//!   stockpile of unowned goods per hex, and one stockpile per POP (empty when the world
-//!   is created; a POP's first endowment arrives at the start of turn 0), and each POP's
-//!   latest trade outcome (what it demanded, sold, bought and consumed). Hexes,
-//!   currencies and deposits don't change yet, but they are world state because later
-//!   Stages change them (deposit ownership in Stage 04); a POP's size changes every turn as
-//!   it grows. The posted prices don't change yet either; [`World::market`] hands out each
+//!   hexes, the deposits (each with its owner, if any), the POPs (each with its current
+//!   size, grown every turn), the businesses, each hex's currency, each hex's posted
+//!   prices, one stockpile of unowned goods per hex, one stockpile per POP (empty when the
+//!   world is created; a POP's first endowment arrives at the start of turn 0), one
+//!   stockpile per business (filled from its starting inventory when the world is
+//!   created), and each POP's latest trade outcome (what it demanded, sold, bought and
+//!   consumed). Hexes, currencies, deposits and businesses don't change yet, but they are
+//!   world state because later Stages change them; a POP's size changes every turn as it
+//!   grows. The posted prices don't change yet either; [`World::market`] hands out each
 //!   hex's market view, the seam Stage 05 replaces.
 //! - A turn has three parts:
-//!   1. start of turn: every deposit emits its type's `output` of its good into its hex's
-//!      stockpile, then every POP receives its type's endowment times its size into its
-//!      own stockpile;
+//!   1. start of turn: every deposit emits its type's `output` of its good into its
+//!      owner's stockpile if it has an owner and its hex's stockpile otherwise (the hex
+//!      stockpile stays the home of unowned goods), then every POP receives its type's
+//!      endowment times its size into its own stockpile;
 //!   2. actors act: the trade round and consumption, then growth. On every hex each POP
 //!      submits its parameters and holdings, the market computes demand and settles sales
 //!      before purchases, and each POP consumes (see the [`trade`](crate::trade) module);
@@ -22,25 +24,27 @@
 //!      records (see the [`growth`](crate::growth) module). Later Stages add industries and
 //!      the live market here;
 //!   3. end of turn: whatever perishes at the end of this turn is removed, from the hex
-//!      stockpiles and then the POP stockpiles.
-//! - [`World::new`] puts the world at turn 0 and runs turn 0's start, turn 0's trade round
-//!   and turn 0's growth. [`World::step`] ends the current turn, advances the clock, and
-//!   starts the next one, trade round and growth included. The world keeps each POP's
-//!   outcome of the current turn's round ([`World::pop_outcome`]). Between calls the world
+//!      stockpiles, then the POP stockpiles and then the business stockpiles.
+//! - [`World::new`] puts the world at turn 0, fills every business's stockpile from its
+//!   starting inventory (each good perishing as if added in turn 0), and runs turn 0's
+//!   start, turn 0's trade round and turn 0's growth. [`World::step`] ends the current
+//!   turn, advances the clock, and starts the next one, trade round and growth included.
+//!   The world keeps each POP's outcome of the current turn's round
+//!   ([`World::pop_outcome`]). Between calls the world
 //!   is always after part 2, where every POP has traded, consumed and grown this turn and
 //!   nothing has perished yet.
 //! - Deposits emit in deposit ID order, POPs are endowed in POP ID order, trade runs on
 //!   hexes in hex ID order, POPs in ID order within a hex and goods in ID order within a
 //!   POP, with every sale before every purchase and then consumption, POPs grow in ID
-//!   order, and stockpiles iterate in a fixed order, so the same setting stepped the same
-//!   number of times always gives the same world and reports.
-//! - Stage 04 (businesses) will send an owned deposit's output to its owner instead of the
-//!   hex stockpile.
+//!   order, perishing goes through hexes, then POPs, then businesses in business ID order,
+//!   and stockpiles iterate in a fixed order, so the same setting stepped the same number
+//!   of times always gives the same world and reports.
 
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
+use crate::businesses::{BusinessId, BusinessKind, Businesses};
 use crate::currency::HexCurrencies;
 use crate::goods::GoodId;
 use crate::growth::grown_size;
@@ -60,11 +64,11 @@ use crate::turn::Turn;
 pub struct TurnReport {
     /// The turn that started.
     pub turn: Turn,
-    /// Total removed per good at the end of the previous turn from every hex and POP
-    /// stockpile, in good ID order, only amounts > 0. Always empty for turn 0.
+    /// Total removed per good at the end of the previous turn from every hex, POP and
+    /// business stockpile, in good ID order, only amounts > 0. Always empty for turn 0.
     pub perished: Vec<(GoodId, Quantity)>,
-    /// Total emitted by deposits per good at the start of `turn`, in good ID order, only
-    /// amounts > 0.
+    /// Total emitted by deposits per good at the start of `turn` (into hex or business
+    /// stockpiles), in good ID order, only amounts > 0.
     pub emitted: Vec<(GoodId, Quantity)>,
     /// Total received by POPs as endowment per good at the start of `turn`, in good ID
     /// order, only amounts > 0.
@@ -122,6 +126,11 @@ pub struct World {
     /// One per POP, by `PopId`: the outcome of the current turn's trade round. Rebuilt
     /// every turn.
     pop_outcomes: IdVec<PopKind, PopOutcome>,
+    /// The businesses. Nothing changes them yet.
+    businesses: Businesses,
+    /// One per business, by `BusinessId`. Holds the starting inventory when the world is
+    /// created.
+    business_stockpiles: IdVec<BusinessKind, Stockpile>,
 }
 
 /// The trade round's totals per good, each in good ID order.
@@ -143,6 +152,20 @@ impl World {
         } = setting;
         let hex_stockpiles = IdVec::from_vec(vec![Stockpile::new(); start.map.len()]);
         let pop_stockpiles = IdVec::from_vec(vec![Stockpile::new(); start.pops.len()]);
+        let business_stockpiles = IdVec::from_vec(
+            start
+                .businesses
+                .iter()
+                .map(|(_, _, business)| {
+                    let mut stockpile = Stockpile::new();
+                    for (good, amount) in business.starting_inventory.iter() {
+                        let at = PerishesAt::for_good(rules.goods.get(good).perishes, Turn::ZERO);
+                        stockpile.add(good, amount, at);
+                    }
+                    stockpile
+                })
+                .collect(),
+        );
         let mut world = World {
             manifest,
             rules,
@@ -155,6 +178,8 @@ impl World {
             pops: start.pops,
             pop_stockpiles,
             pop_outcomes: IdVec::from_vec(Vec::new()),
+            businesses: start.businesses,
+            business_stockpiles,
         };
         let report = world.run_turn(Vec::new());
         (world, report)
@@ -248,6 +273,19 @@ impl World {
         self.pop_stockpiles.get(pop)
     }
 
+    /// The businesses.
+    pub fn businesses(&self) -> &Businesses {
+        &self.businesses
+    }
+
+    /// The stockpile of `business`: the goods it owns.
+    ///
+    /// # Panics
+    /// Panics if `business` isn't from this world's businesses.
+    pub fn business_stockpile(&self, business: BusinessId) -> &Stockpile {
+        self.business_stockpiles.get(business)
+    }
+
     /// The outcome of the current turn's trade round for `pop`: its demand, what it sold,
     /// bought and consumed, the currency it carried over, its subsistence index, its
     /// growth rate and its starting size.
@@ -282,17 +320,20 @@ impl World {
         }
     }
 
-    /// Start of turn: every deposit, in ID order, adds its type's output to its hex's
-    /// stockpile. Returns the total emitted per good, in good ID order.
+    /// Start of turn: every deposit, in ID order, adds its type's output to its owner's
+    /// stockpile, or to its hex's if it has no owner. Returns the total emitted per good,
+    /// in good ID order.
     fn emit(&mut self) -> Vec<(GoodId, Quantity)> {
         let mut emitted = Vec::new();
         for (_, deposit) in self.deposits.iter() {
             let resource = self.rules.resources.get(deposit.resource);
             let good = resource.produces;
             let at = PerishesAt::for_good(self.rules.goods.get(good).perishes, self.turn);
-            self.hex_stockpiles
-                .get_mut(deposit.hex)
-                .add(good, resource.output, at);
+            let stockpile = match deposit.owner {
+                Some(business) => self.business_stockpiles.get_mut(business),
+                None => self.hex_stockpiles.get_mut(deposit.hex),
+            };
+            stockpile.add(good, resource.output, at);
             emitted.push((good, resource.output));
         }
         totals_by_good(emitted)
@@ -389,14 +430,15 @@ impl World {
     }
 
     /// End of turn: removes whatever perishes at the end of the current turn from every
-    /// hex's stockpile and then every POP's. Returns the total removed per good, in good ID
-    /// order.
+    /// hex's stockpile, then every POP's, then every business's. Returns the total removed
+    /// per good, in good ID order.
     fn perish(&mut self) -> Vec<(GoodId, Quantity)> {
         let turn = self.turn;
         totals_by_good(
             self.hex_stockpiles
                 .values_mut()
                 .chain(self.pop_stockpiles.values_mut())
+                .chain(self.business_stockpiles.values_mut())
                 .flat_map(|stockpile| stockpile.remove_perishing(turn)),
         )
     }
@@ -447,17 +489,24 @@ mod tests {
 
     #[test]
     fn a_world_at_the_clock_maximum_refuses_to_step_and_is_unchanged() {
-        for mut world in [turns_valid_world(), world_of("pops_placed")] {
+        for mut world in [
+            turns_valid_world(),
+            world_of("pops_placed"),
+            world_of("businesses_valid"),
+        ] {
             world.step().unwrap();
             world.turn = Turn::MAX;
             let before: IdVec<HexKind, Stockpile> = world.hex_stockpiles.clone();
             let pops_before: IdVec<PopKind, Stockpile> = world.pop_stockpiles.clone();
+            let businesses_before: IdVec<BusinessKind, Stockpile> =
+                world.business_stockpiles.clone();
             let sizes_before: Vec<Quantity> = world.pops.iter().map(|(_, p)| p.size).collect();
             let outcomes_before: IdVec<PopKind, PopOutcome> = world.pop_outcomes.clone();
             assert_eq!(world.step(), Err(StepError::ClockAtMaximum));
             assert_eq!(world.turn(), Turn::MAX);
             assert_eq!(world.hex_stockpiles, before);
             assert_eq!(world.pop_stockpiles, pops_before);
+            assert_eq!(world.business_stockpiles, businesses_before);
             assert_eq!(world.pop_outcomes, outcomes_before);
             let sizes_after: Vec<Quantity> = world.pops.iter().map(|(_, p)| p.size).collect();
             assert_eq!(sizes_after, sizes_before);

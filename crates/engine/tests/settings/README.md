@@ -57,6 +57,19 @@ Valid settings:
   empty inline construction, 3 turns, lifetime 3).
 - `technologies_one`: one good, `bread`, and one technology, `oven` (for the setting
   checker's `1 technology`).
+- `businesses_valid`: businesses across several files and a nested folder (`start/a.toml`,
+  `start/b/c.toml`, then `start/z.toml` with the hexes, deposits and market they refer to),
+  in the inline form and the sub-table form (`[business.inventory]`, `[business.deposits]`),
+  for the businesses tests (`crates/engine/tests/businesses.rs`). Goods (IDs 0-3): `coin`,
+  `labor` (perishes after 1, unmovable), `grain` (perishes after 3), `ore`. Resource types:
+  `field` (2 `grain`), `vein` (1.5 `ore`). Hexes (0, 0) and (1, 0), both with currency
+  `coin`; deposits 0-2 `field` and 3 `vein` at (0, 0), 4 `field` at (1, 0); a market at
+  (0, 0) only. Businesses: 0 `farm_a` at (0, 0) (inventory 4 `labor` and 10 `coin` written
+  out of ID order; owns 2 `field`), 1 `farm_b` at (0, 0) (5 `coin`; owns 1 `vein` and 1
+  `field`, written out of resource ID order), 2 `idle` at (1, 0) (empty inventory, no
+  deposits, a hex with no market). Deposit owners: `[0, 0, 1, 1, none]`.
+- `businesses_one`: one good, one hex and one business (for the setting checker's
+  `1 business`).
 - `pops_one`: one good, one POP type, one hex and one POP (for the setting checker's
   `1 pop type`, `1 hex` and `1 pop`). Its type has zero growth parameters.
 - `pops_placed`: POPs across several files and a nested folder (`start/a.toml`, then
@@ -155,11 +168,20 @@ File-content errors:
   non-integer), an empty `capital`, the output good among the inputs, unknown goods, unknown
   keys, one entry (`Several`) with many problems, a duplicate across files, and a
   `[[technology]]` in `start/`. Its goods are `coin`, `grain` and `labor`.
+- `businesses_errors`: every kind of `[[business]]` error, including a missing `name`, `q`,
+  `r`, `inventory`, `deposits` or `decider`, a bad or duplicate name, wrongly typed and
+  out-of-range values, inventory amounts that are a string, zero, negative, `inf` or `nan`,
+  deposit counts below 1, beyond `u32` and non-integer, a bad decider name, unknown goods and
+  resource types, a coordinate with no hex, more deposits claimed than the hex has unowned
+  (in the same file and in a later one), unknown keys, one entry (`Several`) with many
+  problems, a duplicate across files, and a `[[business]]` in `rules/`. Its goods are `coin`
+  and `grain`, with one `field` resource type and two `field` deposits at (0, 0).
 - `resources_broken_file`: a broken TOML file next to resources that refer to a good and a
   hex that don't exist, plus a hex whose currency is an unknown good, a market that prices
   goods that don't exist, a POP type whose endowment and utility name goods that don't
-  exist, a technology whose goods don't exist, and a POP of an unknown type at a coordinate
-  with no hex: only the syntax error is reported.
+  exist, a technology whose goods don't exist, a POP of an unknown type at a coordinate
+  with no hex, and a business whose good and resource type don't exist on a hex that
+  doesn't exist: only the syntax error is reported.
 - `resources_missing_start`: no `start/` folder, and a resource that refers to a good that
   doesn't exist: only the missing folder is reported.
 - `many_errors`: several kinds of problem at once, to check that all are reported in order.

@@ -4,14 +4,17 @@
 //! Resource types are a named kind, so they go through `Definitions` like goods. Deposits
 //! have no names: they are identified by resource type and hex, so their reader checks its
 //! own duplicates (like hexes). Both refer to other things by name or coordinates, and those
-//! references are resolved in phase 2 (`WorldContent::resolve`).
+//! references are resolved in phase 2 (`WorldContent::resolve`). Deposits are created
+//! unowned; the businesses reader then hands them out with [`DepositsReader::claim`], also
+//! in phase 2.
 
 use std::collections::HashMap;
 
+use crate::businesses::BusinessId;
 use crate::goods::{GoodId, GoodKind};
-use crate::map::HexCoord;
+use crate::map::{HexCoord, HexId};
 use crate::quantity::Quantity;
-use crate::resources::{Deposit, Deposits, ResourceKind, ResourceType, ResourceTypes};
+use crate::resources::{Deposit, Deposits, ResourceId, ResourceKind, ResourceType, ResourceTypes};
 
 use super::defs::Definitions;
 use super::error::{ErrorSink, Located, Location};
@@ -204,9 +207,42 @@ impl DepositsReader {
                 continue;
             }
             for _ in 0..entry.count {
-                self.deposits.push(Deposit { resource, hex });
+                self.deposits.push(Deposit {
+                    resource,
+                    hex,
+                    owner: None,
+                });
             }
         }
+    }
+
+    /// Phase 2, after `resolve`: gives the first `count` unowned deposits of `resource` on
+    /// `hex`, in ID order, to `owner`. If fewer than `count` are unowned, assigns none and
+    /// returns `Err(available)`.
+    pub fn claim(
+        &mut self,
+        hex: HexId,
+        resource: ResourceId,
+        count: u32,
+        owner: BusinessId,
+    ) -> Result<(), u32> {
+        let matches = |deposit: &Deposit| {
+            deposit.hex == hex && deposit.resource == resource && deposit.owner.is_none()
+        };
+        // The deposit total fits a `u32` (checked in `resolve`), so the count does too.
+        let available = self.deposits.iter().filter(|d| matches(d)).count() as u32;
+        if available < count {
+            return Err(available);
+        }
+        for deposit in self
+            .deposits
+            .iter_mut()
+            .filter(|d| matches(d))
+            .take(count as usize)
+        {
+            deposit.owner = Some(owner);
+        }
+        Ok(())
     }
 
     /// The finished list. Only call this after a successful load.
@@ -219,6 +255,7 @@ impl DepositsReader {
 mod tests {
     use super::super::source::SourceFile;
     use super::*;
+    use crate::id::{IdKind, NameRegistry};
     use toml::de::DeTable;
 
     /// Parses `text`, runs `deposit_count` on it as a "deposit" entry, and returns the
@@ -277,5 +314,47 @@ mod tests {
                 "{text}"
             );
         }
+    }
+
+    fn ids<K: IdKind>(count: usize) -> Vec<crate::id::Id<K>> {
+        let mut names: NameRegistry<K> = NameRegistry::new();
+        (0..count)
+            .map(|i| names.register(&format!("n{i}")).unwrap())
+            .collect()
+    }
+
+    fn owners(reader: &DepositsReader) -> Vec<Option<usize>> {
+        reader
+            .deposits
+            .iter()
+            .map(|d| d.owner.map(|b| b.index()))
+            .collect()
+    }
+
+    #[test]
+    fn claim_hands_out_the_first_unowned_deposits_in_id_order() {
+        let r = ids::<ResourceKind>(2);
+        let h = ids::<crate::map::HexKind>(2);
+        let b = ids::<crate::businesses::BusinessKind>(2);
+        let deposit = |resource: ResourceId| Deposit {
+            resource,
+            hex: h[0],
+            owner: None,
+        };
+        // Deposits: 0 r0 on h0, 1 r1 on h0, 2 r0 on h0.
+        let mut reader = DepositsReader {
+            deposits: vec![deposit(r[0]), deposit(r[1]), deposit(r[0])],
+            ..Default::default()
+        };
+        assert_eq!(reader.claim(h[0], r[0], 1, b[0]), Ok(()));
+        assert_eq!(owners(&reader), vec![Some(0), None, None]);
+        // Too many: nothing changes.
+        assert_eq!(reader.claim(h[0], r[0], 2, b[1]), Err(1));
+        assert_eq!(owners(&reader), vec![Some(0), None, None]);
+        assert_eq!(reader.claim(h[0], r[0], 1, b[1]), Ok(()));
+        assert_eq!(owners(&reader), vec![Some(0), None, Some(1)]);
+        // No deposits of that type on that hex.
+        assert_eq!(reader.claim(h[1], r[0], 1, b[1]), Err(0));
+        assert_eq!(owners(&reader), vec![Some(0), None, Some(1)]);
     }
 }

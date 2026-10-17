@@ -26,7 +26,10 @@
 //! Technologies (the fixed-proportion recipes factories run, with their capital and
 //! construction bundles, construction time and lifetime) are rules in the [`technologies`]
 //! module, and a [`Bundle`] (the [`bundle`] module) is a list of goods with amounts; nothing
-//! runs technologies yet.
+//! runs technologies yet. Businesses (the [`businesses`] module) are named actors in the
+//! starting state, each on one hex with a decider name, a starting inventory and the
+//! deposits it owns, each with its own stockpile in the world; an owned deposit emits into
+//! its owner's stockpile; nothing decides or trades for them yet.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -34,6 +37,8 @@
 
 pub mod bundle;
 pub use bundle::Bundle;
+pub mod businesses;
+pub use businesses::{Business, BusinessId, BusinessKind, Businesses};
 pub mod currency;
 pub use currency::HexCurrencies;
 pub mod demand;

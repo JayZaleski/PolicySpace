@@ -18,3 +18,11 @@ type = "nobody"
 q = 9
 r = 9
 size = 1
+
+[[business]]
+name = "nobody"
+q = 9
+r = 9
+inventory = { tin = 1 }
+deposits = { gold_ore = 5 }
+decider = "ghost"

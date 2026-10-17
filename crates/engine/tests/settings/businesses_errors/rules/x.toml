@@ -1,0 +1,7 @@
+[[business]]
+name = "misplaced"
+q = 0
+r = 0
+inventory = {}
+deposits = {}
+decider = "rule"

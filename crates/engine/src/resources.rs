@@ -6,17 +6,21 @@
 //!   or to perish, though settings usually make it so.
 //! - A **deposit** (`[[deposit]]` in `start/`) is one unit of a resource type on a hex. A
 //!   setting entry can place several identical deposits on a hex (`count`); each is its own
-//!   deposit with its own ID, and later its own single owner. A hex may hold deposits of
-//!   several types.
+//!   deposit with its own ID and its own single owner. A hex may hold deposits of several
+//!   types.
 //! - Deposits have no names. They are identified in setting files by hex and resource
 //!   type; [`DepositId`]s are valid only within the [`Deposits`] that produced them.
-//! - Each deposit emits its type's `output` every turn into its hex's stockpile (see the
-//!   [`world`](crate::world) module). There is no ownership (Stage 02), and there is no
-//!   depletion or regeneration (later).
+//! - A deposit has at most one owner, a business ([`BusinessId`]). Ownership is written on
+//!   the business in the setting (`start/`), which claims its deposits when the setting
+//!   loads, and does not change during play yet.
+//! - Each deposit emits its type's `output` every turn (see the [`world`](crate::world)
+//!   module): into its owner's stockpile if it has an owner, otherwise into its hex's
+//!   stockpile. There is no depletion or regeneration (later).
 //!
 //! This module knows nothing about files: the setting loader builds [`ResourceTypes`] and
 //! [`Deposits`] from a checked setting, and everything else only reads them.
 
+use crate::businesses::BusinessId;
 use crate::goods::GoodId;
 use crate::id::{Id, IdKind, IdVec, NamedList};
 use crate::map::{HexId, HexKind};
@@ -61,6 +65,10 @@ pub struct Deposit {
     pub resource: ResourceId,
     /// The hex it sits on.
     pub hex: HexId,
+    /// The business that owns it, if any. Set by the loader from the owner's `[[business]]`
+    /// entry; nothing changes it during play yet. An owned deposit emits into its owner's
+    /// stockpile, an unowned one into its hex's.
+    pub owner: Option<BusinessId>,
 }
 
 /// Every deposit in a setting, in load order (which is also ID order).
@@ -129,6 +137,14 @@ impl Deposits {
         self.by_hex.get(hex)
     }
 
+    /// The deposits owned by `business`, in ID order (a filter over every deposit).
+    pub fn owned_by(&self, business: BusinessId) -> impl Iterator<Item = DepositId> + '_ {
+        self.deposits
+            .iter()
+            .filter(move |(_, deposit)| deposit.owner == Some(business))
+            .map(|(id, _)| id)
+    }
+
     /// The deposits of `resource` on `hex`, in ID order.
     ///
     /// # Panics
@@ -173,18 +189,22 @@ mod tests {
                 Deposit {
                     resource: r[0],
                     hex: h[0],
+                    owner: None,
                 },
                 Deposit {
                     resource: r[1],
                     hex: h[0],
+                    owner: None,
                 },
                 Deposit {
                     resource: r[0],
                     hex: h[2],
+                    owner: None,
                 },
                 Deposit {
                     resource: r[0],
                     hex: h[0],
+                    owner: None,
                 },
             ],
             3,
@@ -236,6 +256,39 @@ mod tests {
     }
 
     #[test]
+    fn owned_by_lists_only_that_owners_deposits_in_id_order() {
+        let mut names: NameRegistry<crate::businesses::BusinessKind> = NameRegistry::new();
+        let owners = [
+            names.register("b0").unwrap(),
+            names.register("b1").unwrap(),
+            names.register("b2").unwrap(),
+        ];
+        let r = resource_ids(2);
+        let h = hex_ids(1);
+        let deposit = |resource: ResourceId, owner: Option<BusinessId>| Deposit {
+            resource,
+            hex: h[0],
+            owner,
+        };
+        let deposits = Deposits::from_deposits(
+            vec![
+                deposit(r[0], Some(owners[1])),
+                deposit(r[0], None),
+                deposit(r[1], Some(owners[0])),
+                deposit(r[1], Some(owners[1])),
+            ],
+            1,
+        );
+        let owned =
+            |b: BusinessId| -> Vec<usize> { deposits.owned_by(b).map(|id| id.index()).collect() };
+        assert_eq!(owned(owners[0]), vec![2]);
+        assert_eq!(owned(owners[1]), vec![0, 3]);
+        assert!(owned(owners[2]).is_empty());
+        // A fixture deposit starts with no owner.
+        assert!(sample_deposits().iter().all(|(_, d)| d.owner.is_none()));
+    }
+
+    #[test]
     fn the_default_deposit_list_is_empty() {
         let deposits = Deposits::default();
         assert_eq!(deposits.len(), 0);
@@ -273,6 +326,7 @@ mod tests {
             vec![Deposit {
                 resource: r[0],
                 hex: h[2],
+                owner: None,
             }],
             2,
         );

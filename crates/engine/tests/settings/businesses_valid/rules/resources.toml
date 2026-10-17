@@ -1,0 +1,9 @@
+[[resource]]
+name = "field"
+produces = "grain"
+output = 2
+
+[[resource]]
+name = "vein"
+produces = "ore"
+output = 1.5

@@ -5,9 +5,10 @@
 #   count     Optional: a whole number from 1 to 1000000 (default 1). The entry places
 #             that many identical deposits on the hex.
 #
-# Each deposit is a separate unit: it has its own ID now, and will have its own single
-# owner later. A hex may hold deposits of several types. Use one entry per resource type
-# per hex: two entries with the same resource and coordinates are an error.
+# Each deposit is a separate unit with its own ID and at most one owner. Ownership is not
+# written here: a business claims its deposits in start/businesses.toml. A hex may hold
+# deposits of several types. Use one entry per resource type per hex: two entries with the
+# same resource and coordinates are an error.
 
 # Three units of arable land at the center.
 [[deposit]]

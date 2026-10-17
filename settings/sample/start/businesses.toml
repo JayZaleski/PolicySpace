@@ -1,0 +1,62 @@
+# Businesses: named actors placed on the map. Every [[business]] needs six keys:
+#
+#   name       The business's name (lowercase snake_case, unique among businesses; its own
+#              namespace, separate from goods, resource types, POP types and technologies).
+#   q, r       The axial coordinates of the hex the business sits on, which must exist in
+#              the map, as for deposits and POPs.
+#   inventory  The goods the business holds when the world is created: a table of good
+#              name = amount, each amount a number greater than 0. May be empty ({}) but
+#              must be written. The business's cash is the hex's currency listed here.
+#   deposits   The deposits the business owns: a table of resource type name = count, each
+#              count a whole number of at least 1. May be empty ({}) but must be written.
+#              The business gets that many not-yet-owned deposits of that type on its hex.
+#   decider    The name of the decider that will control the business (a valid name). Only
+#              stored for now: Step 07 of Stage 03 resolves it. `arithmetic` is the name
+#              Step 06's rule will be registered as.
+#
+# Tables may be written inline, as below, or as sub-tables ([business.inventory],
+# [business.deposits]). Any other key is an error.
+#
+# A business sits on one hex and may own only deposits on that hex. Deposits are handed out
+# in deposit ID order, with the businesses taken in load order (the order of the files, then
+# of the entries), so the same folder always gives the same owners; asking for more deposits
+# than the hex has left unowned is an error. A deposit that no business owns keeps emitting
+# into its hex's stockpile of unowned goods, as before; an owned deposit emits into its
+# owner's stockpile instead. Goods perish as everywhere else, from the business's stockpile.
+#
+# Nothing decides or trades for a business yet: it only holds its inventory and receives
+# the output of its deposits.
+#
+# The numbers: one business per technology in the chain. The farm owns two of the center's
+# three arable land deposits (the third stays unowned, so the center hex keeps 4 unimproved
+# grain a turn), the mine owns the center's copper deposit, and the toolmaker owns no
+# deposit: it will buy its copper. The starting silver (100, 50 and 200) is a few turns of
+# inputs at the center's prices (about 18, 5 and 46 silver a turn at capacity), so each can
+# run until its first sales come in, once a later Step lets businesses trade.
+
+# The farm owns two of the center's three arable land deposits.
+[[business]]
+name = "center_farm"
+q = 0
+r = 0
+inventory = { silver = 100 }
+deposits = { arable_land = 2 }
+decider = "arithmetic"
+
+# The mine owns the center's copper deposit.
+[[business]]
+name = "center_mine"
+q = 0
+r = 0
+inventory = { silver = 50 }
+deposits = { copper_ore = 1 }
+decider = "arithmetic"
+
+# The toolmaker owns no deposit: it buys its copper.
+[[business]]
+name = "center_toolmaker"
+q = 0
+r = 0
+inventory = { silver = 200 }
+deposits = {}
+decider = "arithmetic"

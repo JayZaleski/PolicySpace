@@ -584,16 +584,10 @@ mod tests {
         let world = sample();
         assert_eq!(
             stockpile_lines(&world, hex(&world, 0, 0)),
-            vec![
-                StockLine {
-                    good: "2.5 unimproved_copper".to_string(),
-                    parts: strings(&["2.5: perishes this turn"]),
-                },
-                StockLine {
-                    good: "12 unimproved_grain".to_string(),
-                    parts: strings(&["12: perishes this turn"]),
-                },
-            ]
+            vec![StockLine {
+                good: "4 unimproved_grain".to_string(),
+                parts: strings(&["4: perishes this turn"]),
+            }]
         );
     }
 
@@ -621,7 +615,7 @@ mod tests {
                 ]
             );
             let in_hexes: Vec<&str> = rows.iter().map(|row| row.in_hexes.as_str()).collect();
-            assert_eq!(in_hexes, ["0", "10", "24", "0", "0", "0", "0"]);
+            assert_eq!(in_hexes, ["0", "7.5", "16", "0", "0", "0", "0"]);
             // Only silver is held by POPs: it is what they sell their labor for.
             let silver = world.rules().goods.id("silver").unwrap();
             let pop_silver = world

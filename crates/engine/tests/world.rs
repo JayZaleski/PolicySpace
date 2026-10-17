@@ -30,20 +30,13 @@ fn total(world: &World, q: i32, r: i32, name: &str) -> f64 {
 fn sample_setting_at_turn_0() {
     let (world, report) = world_of(&sample_setting());
     assert_eq!(world.turn(), Turn::ZERO);
-    assert_eq!(
-        totals(&world, 0, 0),
-        vec![
-            pair("unimproved_copper", 2.5),
-            pair("unimproved_grain", 12.0)
-        ]
-    );
-    assert_eq!(
-        groups_at(&world, 0, 0, "unimproved_copper"),
-        vec![(end(0), 2.5)]
-    );
+    // Two of the center's three arable land deposits and its copper deposit are owned by
+    // businesses, so the center hex holds only the third deposit's grain.
+    assert_eq!(totals(&world, 0, 0), vec![pair("unimproved_grain", 4.0)]);
+    assert!(groups_at(&world, 0, 0, "unimproved_copper").is_empty());
     assert_eq!(
         groups_at(&world, 0, 0, "unimproved_grain"),
-        vec![(end(0), 12.0)]
+        vec![(end(0), 4.0)]
     );
     assert!(world.hex_stockpile(hex(&world, 2, -2)).is_empty());
     assert_eq!(report.turn, Turn::ZERO);
@@ -87,20 +80,11 @@ fn sample_setting_steps() {
             .collect();
         assert_eq!(big, both);
         assert_eq!(named(&world, &report.emitted), both);
-        assert_eq!(
-            totals(&world, 0, 0),
-            vec![
-                pair("unimproved_copper", 2.5),
-                pair("unimproved_grain", 12.0)
-            ]
-        );
-        assert_eq!(
-            groups_at(&world, 0, 0, "unimproved_copper"),
-            vec![(end(t), 2.5)]
-        );
+        assert_eq!(totals(&world, 0, 0), vec![pair("unimproved_grain", 4.0)]);
+        assert!(groups_at(&world, 0, 0, "unimproved_copper").is_empty());
         assert_eq!(
             groups_at(&world, 0, 0, "unimproved_grain"),
-            vec![(end(t), 12.0)]
+            vec![(end(t), 4.0)]
         );
         previous = report;
     }

@@ -32,7 +32,7 @@ fn checks_the_sample_setting() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Sample Setting' (format version 1): 7 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops, 3 technologies"
+        "Loaded setting 'Sample Setting' (format version 1): 7 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops, 3 technologies, 3 businesses"
     );
 }
 
@@ -43,7 +43,7 @@ fn says_1_good_for_one_good_and_0_goods_for_none() {
     let stdout = String::from_utf8(one.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Goods Test' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 0 technologies"
+        "Loaded setting 'Goods Test' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 0 technologies, 0 businesses"
     );
 
     let none = run(&[&repo_path("crates/engine/tests/settings/valid_minimal")]);
@@ -51,7 +51,7 @@ fn says_1_good_for_one_good_and_0_goods_for_none() {
     let stdout = String::from_utf8(none.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Minimal Setting' (format version 1): 0 goods, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 0 technologies"
+        "Loaded setting 'Minimal Setting' (format version 1): 0 goods, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 0 technologies, 0 businesses"
     );
 }
 
@@ -62,7 +62,7 @@ fn says_1_hex_for_one_hex() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Hexes Test' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 0 technologies"
+        "Loaded setting 'Hexes Test' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 0 technologies, 0 businesses"
     );
 }
 
@@ -73,7 +73,7 @@ fn says_1_resource_and_1_deposit_for_one_of_each() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Resources Test' (format version 1): 1 good, 1 hex, 1 resource, 1 deposit, 1 market, 0 pop types, 0 pops, 0 technologies"
+        "Loaded setting 'Resources Test' (format version 1): 1 good, 1 hex, 1 resource, 1 deposit, 1 market, 0 pop types, 0 pops, 0 technologies, 0 businesses"
     );
 }
 
@@ -84,7 +84,7 @@ fn says_1_pop_type_for_one_pop_type() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Pops One' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 1 pop type, 1 pop, 0 technologies"
+        "Loaded setting 'Pops One' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 1 pop type, 1 pop, 0 technologies, 0 businesses"
     );
 }
 
@@ -95,7 +95,18 @@ fn says_1_technology_for_one_technology() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         stdout.trim(),
-        "Loaded setting 'Technologies One' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 1 technology"
+        "Loaded setting 'Technologies One' (format version 1): 1 good, 0 hexes, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 1 technology, 0 businesses"
+    );
+}
+
+#[test]
+fn says_1_business_for_one_business() {
+    let output = run(&[&repo_path("crates/engine/tests/settings/businesses_one")]);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(
+        stdout.trim(),
+        "Loaded setting 'Businesses One' (format version 1): 1 good, 1 hex, 0 resources, 0 deposits, 0 markets, 0 pop types, 0 pops, 0 technologies, 1 business"
     );
 }
 
@@ -110,7 +121,7 @@ fn counts_pops_and_prints_the_endowment_for_a_setting_with_pops() {
     assert_eq!(
         stdout_lines(&output),
         vec![
-            "Loaded setting 'Pops Placed' (format version 1): 3 goods, 3 hexes, 1 resource, 1 deposit, 0 markets, 3 pop types, 4 pops, 0 technologies",
+            "Loaded setting 'Pops Placed' (format version 1): 3 goods, 3 hexes, 1 resource, 1 deposit, 0 markets, 3 pop types, 4 pops, 0 technologies, 0 businesses",
             "Turn 0: perished nothing; emitted 2 grain; endowed 43 labor, 3 gold; sold nothing; bought nothing; consumed 35 labor; population 12.5",
             "Turn 1: perished 8 labor, 2 grain; emitted 2 grain; endowed 43 labor, 3 gold; sold nothing; bought nothing; consumed 35 labor; population 12.5",
         ]
@@ -152,7 +163,7 @@ const USAGE: &str = "usage: dev-ui [SETTING_FOLDER]
        dev-ui check SETTING_FOLDER [--turns N]
        dev-ui --version";
 
-const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 7 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops, 3 technologies";
+const SAMPLE_LINE: &str = "Loaded setting 'Sample Setting' (format version 1): 7 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops, 3 technologies, 3 businesses";
 
 /// Runs with the setting folder (relative to the repository) and then extra arguments.
 fn run_with(folder: &str, extra: &[&str]) -> Output {
