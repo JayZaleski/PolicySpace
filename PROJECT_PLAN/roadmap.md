@@ -98,7 +98,7 @@
 - Description: Define technologies in the rules: a fixed-proportion recipe (so many units of each input per unit of output, no substitution), the output good, capacity per turn, the capital bundle of goods a factory of this technology holds, its lifetime in turns, and the labor maintenance takes. Validate the numbers and check the references to goods. Add a production chain to the sample setting (farm, mine, toolmaker) with a capital good for the bundles. Transitions between technologies and construction parameters wait for Stage 07.
 
 ### Step 02: businesses
-- Status: planned
+- Status: specified
 - Tags: #businesses #natural-resources #setting-data #turn-loop #deciders
 - Description: Define minimal businesses in the starting state: starting cash, the deposits the business owns, and the name of the decider that controls it (a name only; Step 07 resolves it). Each business gets an ID and one stockpile that holds its goods and cash. Rework emission so an owned deposit emits into its owner's stockpile while unowned deposits keep emitting into the hex stockpile; this replaces the ownership seam Stage 01 left in emission. Design question: whether a business is tied to one hex and may own only assets on it (expected yes, until trade exists). Add businesses to the sample setting.
 
