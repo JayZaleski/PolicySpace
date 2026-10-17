@@ -1,0 +1,9 @@
+[[technology]]
+name = "oven"
+inputs = {}
+output = "coin"
+capacity = 1
+capital = { coin = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1

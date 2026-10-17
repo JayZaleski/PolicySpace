@@ -1,0 +1,15 @@
+[[business]]
+name = "farm"
+q = 0
+r = 0
+inventory = {}
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "lost"
+q = 9
+r = 9
+inventory = {}
+deposits = {}
+decider = "rule"

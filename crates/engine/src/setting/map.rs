@@ -2,6 +2,10 @@
 //! hexes) and [`crate::currency`] (each hex's currency); this module only turns setting
 //! entries into them. It reads the `currency` key of each hex too, keeps it unresolved in
 //! phase 1, and resolves it against the goods in phase 2.
+//!
+//! It also holds the helpers shared by every section placed by coordinates: [`coordinate`],
+//! and [`count`] for the placed sections that can have several copies (deposits and
+//! factories).
 
 use std::collections::HashMap;
 
@@ -12,6 +16,9 @@ use crate::map::{HexCoord, HexId, HexMap};
 use super::defs::Definitions;
 use super::error::{ErrorSink, Located, Location};
 use super::reader::EntryReader;
+
+/// The most copies one `[[deposit]]` or `[[factory]]` entry may place.
+pub(crate) const MAX_COUNT: u32 = 1_000_000;
 
 /// Collects hexes during phase 1.
 #[derive(Default)]
@@ -38,6 +45,32 @@ pub(crate) fn coordinate(reader: &mut EntryReader<'_, '_>, key: &str) -> Option<
         Err(_) => {
             let message = format!("key '{key}' in {} is out of range", reader.label());
             reader.errors().at(&value.at, message);
+            None
+        }
+    }
+}
+
+/// Reads the optional `count` key of a placed entry. Absent gives 1. A count outside
+/// `1..=MAX_COUNT` is reported at the value and gives None: `key 'count' in <label> must be
+/// at least 1` or `key 'count' in <label> is out of range (the most is 1000000)`. A count
+/// that is not an integer is reported by the reader and also gives None.
+pub(crate) fn count(reader: &mut EntryReader<'_, '_>) -> Option<u32> {
+    let Some(count) = reader.optional_integer("count") else {
+        // Absent gives 1; a wrong type was reported by the reader and gives None.
+        return if reader.has("count") { None } else { Some(1) };
+    };
+    let label = reader.label().to_string();
+    if count.value < 1 {
+        let message = format!("key 'count' in {label} must be at least 1");
+        reader.errors().at(&count.at, message);
+        return None;
+    }
+    match u32::try_from(count.value) {
+        Ok(n) if n <= MAX_COUNT => Some(n),
+        _ => {
+            let message =
+                format!("key 'count' in {label} is out of range (the most is {MAX_COUNT})");
+            reader.errors().at(&count.at, message);
             None
         }
     }

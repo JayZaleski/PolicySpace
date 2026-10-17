@@ -1,0 +1,19 @@
+[[technology]]
+name = "mill"
+inputs = {}
+output = "grain"
+capacity = 1
+capital = { tools = 1 }
+construction = {}
+construction_turns = 1
+lifetime = 1
+
+[[technology]]
+name = "forge"
+inputs = { grain = 1 }
+output = "tools"
+capacity = 2
+capital = { tools = 2 }
+construction = {}
+construction_turns = 1
+lifetime = 1

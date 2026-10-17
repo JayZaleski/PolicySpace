@@ -29,7 +29,10 @@
 //! runs technologies yet. Businesses (the [`businesses`] module) are named actors in the
 //! starting state, each on one hex with a decider name, a starting inventory and the
 //! deposits it owns, each with its own stockpile in the world; an owned deposit emits into
-//! its owner's stockpile; nothing decides or trades for them yet.
+//! its owner's stockpile; nothing decides or trades for them yet. Factories (the [`factories`]
+//! module) are placed in the starting state, each on its owner's hex, running one
+//! technology and holding a share (its condition) of that technology's capital bundle;
+//! nothing runs them yet.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -43,6 +46,8 @@ pub mod currency;
 pub use currency::HexCurrencies;
 pub mod demand;
 pub use demand::{Demand, DemandedGood, PriceList, demand};
+pub mod factories;
+pub use factories::{Factories, Factory, FactoryId, FactoryKind};
 pub mod goods;
 pub use goods::{Good, GoodId, GoodKind, Goods, Perishes};
 pub mod growth;

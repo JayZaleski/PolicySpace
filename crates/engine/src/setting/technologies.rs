@@ -165,6 +165,11 @@ impl TechnologiesReader {
         }
     }
 
+    /// The definitions, for resolving references to technologies in phase 2.
+    pub fn defs(&self) -> &Definitions<TechnologyKind> {
+        &self.defs
+    }
+
     /// The finished list. Only call this after a successful load, when phase 2 has run and
     /// resolved every good.
     pub fn finish(self) -> Technologies {

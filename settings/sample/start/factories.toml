@@ -1,0 +1,56 @@
+# Factories: assets that run a technology, each owned by one business. Every [[factory]]
+# needs four keys and may have two more:
+#
+#   q, r       The axial coordinates of the hex the factory sits on, which must exist in the
+#              map, as for deposits and POPs.
+#   technology The name of the technology the factory runs (from rules/technologies.toml).
+#   owner      The name of the business that owns the factory. A factory has exactly one
+#              owner, and until trade between hexes exists it must sit on its owner's hex:
+#              the hex written here must be the hex the business is on.
+#   condition  Optional, default 1. The share of the technology's capital bundle the factory
+#              holds: a finite number greater than 0 and at most 1. Capital only ever changes
+#              in the bundle's own proportions (it wears and is maintained as a whole), so
+#              this one number is the factory's whole state: 1 is a factory in full
+#              condition, 0.75 one with three quarters of its capital left. A factory can't
+#              be placed at 0.
+#   count      Optional, default 1. The entry places that many identical factories, each
+#              with its own ID: a whole number from 1 to 1000000.
+#
+# Any other key is an error.
+#
+# Factories have no names. Later Steps and the dev UI address them by ID, which is their
+# order in the load (the order of the files, then of the entries, with `count` copies
+# consecutive). A hex and a business may hold any number of factories. Nothing checks that
+# a factory makes economic sense: whether its owner can supply its inputs or sell its
+# output is the owner's problem once factories run.
+#
+# Nothing runs, wears or maintains factories yet (Steps 04 and 08 of Stage 03): they are
+# only loaded, checked and held in the world.
+#
+# The numbers: one factory per business, each running the technology its business is named
+# for, all on the center hex where the businesses sit. The mine's factory starts worn: a
+# condition of 0.75 means three quarters of its two tools are left, which is six turns of
+# its eight-turn lifetime. The farm and the toolmaker start in full condition. The deposits
+# on other hexes have no factory.
+
+# The farm business runs a farm on the center hex.
+[[factory]]
+q = 0
+r = 0
+technology = "farm"
+owner = "center_farm"
+
+# The mine business runs a worn mine: three quarters of its capital is left.
+[[factory]]
+q = 0
+r = 0
+technology = "mine"
+owner = "center_mine"
+condition = 0.75
+
+# The toolmaker business runs a toolmaker.
+[[factory]]
+q = 0
+r = 0
+technology = "toolmaker"
+owner = "center_toolmaker"

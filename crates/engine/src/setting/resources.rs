@@ -6,7 +6,8 @@
 //! own duplicates (like hexes). Both refer to other things by name or coordinates, and those
 //! references are resolved in phase 2 (`WorldContent::resolve`). Deposits are created
 //! unowned; the businesses reader then hands them out with [`DepositsReader::claim`], also
-//! in phase 2.
+//! in phase 2. The `count` key of a deposit is read by the helper shared with factories,
+//! `count` in `setting/map.rs`.
 
 use std::collections::HashMap;
 
@@ -18,7 +19,7 @@ use crate::resources::{Deposit, Deposits, ResourceId, ResourceKind, ResourceType
 
 use super::defs::Definitions;
 use super::error::{ErrorSink, Located, Location};
-use super::map::{MapReader, coordinate};
+use super::map::{MapReader, coordinate, count};
 use super::reader::EntryReader;
 
 /// Collects resource types during phase 1, and resolves what they produce in phase 2.
@@ -93,9 +94,6 @@ impl ResourcesReader {
     }
 }
 
-/// The most deposits one `[[deposit]]` entry may place.
-pub(crate) const MAX_DEPOSIT_COUNT: u32 = 1_000_000;
-
 /// One `[[deposit]]` entry, waiting for phase 2.
 struct DepositEntry {
     /// The `[[deposit]]` header.
@@ -116,31 +114,6 @@ pub(crate) struct DepositsReader {
     deposits: Vec<Deposit>,
 }
 
-/// Reads the optional `count` key. Absent gives 1. A count outside `1..=MAX_DEPOSIT_COUNT`
-/// is reported at the value and gives None. A count that is not an integer is reported by
-/// the reader and also gives 1 (the load fails anyway).
-fn deposit_count(reader: &mut EntryReader<'_, '_>) -> Option<u32> {
-    let Some(count) = reader.optional_integer("count") else {
-        return Some(1);
-    };
-    if count.value < 1 {
-        reader
-            .errors()
-            .at(&count.at, "key 'count' in deposit must be at least 1");
-        return None;
-    }
-    match u32::try_from(count.value) {
-        Ok(n) if n <= MAX_DEPOSIT_COUNT => Some(n),
-        _ => {
-            reader.errors().at(
-                &count.at,
-                format!("key 'count' in deposit is out of range (the most is {MAX_DEPOSIT_COUNT})"),
-            );
-            None
-        }
-    }
-}
-
 impl DepositsReader {
     /// Reads one `[[deposit]]` entry.
     pub fn read(&mut self, reader: &mut EntryReader<'_, '_>) {
@@ -149,7 +122,7 @@ impl DepositsReader {
         let resource = reader.required_string("resource");
         let q = coordinate(reader, "q");
         let r = coordinate(reader, "r");
-        let count = deposit_count(reader);
+        let count = count(reader);
 
         // An entry with a missing or invalid resource or coordinate is not stored, so it
         // can't produce a duplicate error. The load fails anyway.
@@ -258,7 +231,7 @@ mod tests {
     use crate::id::{IdKind, NameRegistry};
     use toml::de::DeTable;
 
-    /// Parses `text`, runs `deposit_count` on it as a "deposit" entry, and returns the
+    /// Parses `text`, runs `count` on it as a "deposit" entry, and returns the
     /// result with the sorted error lines.
     fn run(text: &str) -> (Option<u32>, Vec<String>) {
         let file = SourceFile::new("start/t.toml", text.to_string());
@@ -268,7 +241,7 @@ mod tests {
         let entry = file.location(0);
         let count = {
             let mut reader = EntryReader::new(&file, table.get_ref(), entry, "deposit", &mut sink);
-            let count = deposit_count(&mut reader);
+            let count = count(&mut reader);
             reader.finish();
             count
         };

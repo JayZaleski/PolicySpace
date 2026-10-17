@@ -263,8 +263,10 @@ fn references_are_not_checked_after_a_broken_file_or_incomplete_discovery() {
     // `resources_broken_file` also holds a hex whose currency is an unknown good, and a
     // market that prices goods that don't exist, a POP type whose endowment and utility
     // name goods that don't exist, a technology whose goods don't exist, and a POP of an
-    // unknown type at a coordinate with no hex, and a business whose good and resource type
-    // don't exist, on a hex that doesn't exist; those references aren't checked either.
+    // unknown type at a coordinate with no hex, a business whose good and resource type
+    // don't exist, on a hex that doesn't exist, and a factory of an unknown technology,
+    // owned by an unknown business, on a hex that doesn't exist; those references aren't
+    // checked either.
     assert_eq!(
         failures_of("resources_broken_file"),
         vec!["rules/broken.toml:1:11: invalid TOML: unclosed array table, expected `]]`"]

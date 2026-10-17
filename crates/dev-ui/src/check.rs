@@ -14,7 +14,7 @@ pub fn run(path: &OsStr, turns: Option<u32>) -> ExitCode {
     match load_setting(path) {
         Ok(setting) => {
             println!(
-                "Loaded setting '{}' (format version {}): {}, {}, {}, {}, {}, {}, {}, {}, {}",
+                "Loaded setting '{}' (format version {}): {}, {}, {}, {}, {}, {}, {}, {}, {}, {}",
                 setting.manifest.name,
                 setting.manifest.format_version,
                 count(setting.rules.goods.len(), "good", "goods"),
@@ -29,7 +29,8 @@ pub fn run(path: &OsStr, turns: Option<u32>) -> ExitCode {
                     "technology",
                     "technologies"
                 ),
-                count(setting.start.businesses.len(), "business", "businesses")
+                count(setting.start.businesses.len(), "business", "businesses"),
+                count(setting.start.factories.len(), "factory", "factories")
             );
             match turns {
                 Some(turns) => run_turns(setting, turns),

@@ -57,7 +57,10 @@
 //!   `construction`, which are resolved here too. Businesses (`[[business]]`, the fifth
 //!   `start/` kind, and a named kind) name goods in their `inventory`, resource types in
 //!   their `deposits` and a hex by coordinates, all resolved here; they also claim their
-//!   deposits here, after the deposits are expanded, in load order.
+//!   deposits here, after the deposits are expanded, in load order. Factories
+//!   (`[[factory]]`, the sixth `start/` kind) are unnamed, with no duplicate check; they
+//!   name a technology and a business, and a hex by coordinates, all resolved here, where
+//!   the loader also checks that the hex is the owner's. They resolve after the businesses.
 //!   A reader's `finish` that depends on phase 2 (such as `ResourcesReader::finish`) is
 //!   only called after a successful load.
 //!
@@ -81,7 +84,10 @@
 //!    [`crate::technologies`] (with [`crate::bundle`]) and `setting/technologies.rs`.
 //!    Businesses (`StartState::businesses`) are the worked example of a named kind in
 //!    `start/` with a per-hex index, in [`crate::businesses`] and `setting/businesses.rs`;
-//!    they also hand out deposits in phase 2 (`DepositsReader::claim`).
+//!    they also hand out deposits in phase 2 (`DepositsReader::claim`). Factories
+//!    (`StartState::factories`) are the worked example of a placed, counted kind that keeps
+//!    every entry for phase 2 and reads another reader's results (`BusinessesReader::hex_of`),
+//!    in [`crate::factories`] and `setting/factories.rs`.
 //! 2. Add a `SectionType` to `WorldContent::section_types`, naming its header, the one
 //!    folder it belongs in, and a `read` function.
 //! 3. Check references in `WorldContent::resolve`. Resources and deposits are the worked
@@ -96,6 +102,7 @@ mod businesses;
 mod defs;
 mod discover;
 mod error;
+mod factories;
 mod goods;
 mod map;
 mod market;
@@ -115,6 +122,7 @@ pub use error::{LoadError, LoadErrors};
 
 use crate::businesses::Businesses;
 use crate::currency::HexCurrencies;
+use crate::factories::Factories;
 use crate::goods::Goods;
 use crate::map::HexMap;
 use crate::market::HexPrices;
@@ -123,6 +131,7 @@ use crate::resources::{Deposits, ResourceTypes};
 use crate::technologies::Technologies;
 use businesses::BusinessesReader;
 use error::{ErrorSink, Location};
+use factories::FactoriesReader;
 use goods::GoodsReader;
 use map::MapReader;
 use market::MarketsReader;
@@ -185,6 +194,8 @@ pub struct StartState {
     pub pops: Pops,
     /// Every business, in load order; see [`crate::businesses`].
     pub businesses: Businesses,
+    /// Every factory, in load order; see [`crate::factories`].
+    pub factories: Factories,
 }
 
 /// Loads the setting folder at `path`. Either every check passes and a [`LoadedSetting`]
@@ -197,6 +208,7 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
     let deposits = content.deposits.finish(map.len());
     let pops = content.pops.finish(map.len());
     let businesses = content.businesses.finish(map.len());
+    let factories = content.factories.finish(map.len());
     Ok(LoadedSetting {
         manifest,
         rules: Rules {
@@ -212,6 +224,7 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
             prices,
             pops,
             businesses,
+            factories,
         },
     })
 }
@@ -282,6 +295,7 @@ pub(crate) struct WorldContent {
     pub pops: PopsReader,
     pub technologies: TechnologiesReader,
     pub businesses: BusinessesReader,
+    pub factories: FactoriesReader,
 }
 
 impl SettingContent for WorldContent {
@@ -332,6 +346,11 @@ impl SettingContent for WorldContent {
                 folder: Folder::Start,
                 read: |content, reader| content.businesses.read(reader),
             },
+            SectionType {
+                header: "factory",
+                folder: Folder::Start,
+                read: |content, reader| content.factories.read(reader),
+            },
         ]
     }
 
@@ -342,7 +361,8 @@ impl SettingContent for WorldContent {
     // technologies refer to goods in their inputs, output, capital and construction.
     // Businesses refer to goods in their inventory, resource types in their deposits and
     // hexes, and claim their deposits from the deposit list, so they resolve after the
-    // deposits are expanded.
+    // deposits are expanded. Factories refer to technologies, businesses and hexes, and
+    // check the hex against the owner's, so they resolve after the businesses.
     fn resolve(&mut self, sink: &mut ErrorSink) {
         self.map.resolve(self.goods.defs(), sink);
         self.resources.resolve(self.goods.defs(), sink);
@@ -359,6 +379,8 @@ impl SettingContent for WorldContent {
             &mut self.deposits,
             sink,
         );
+        self.factories
+            .resolve(self.technologies.defs(), &self.businesses, &self.map, sink);
     }
 }
 

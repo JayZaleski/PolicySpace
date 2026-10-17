@@ -70,6 +70,17 @@ Valid settings:
   deposits, a hex with no market). Deposit owners: `[0, 0, 1, 1, none]`.
 - `businesses_one`: one good, one hex and one business (for the setting checker's
   `1 business`).
+- `factories_valid`: factories across several files and a nested folder (`start/a.toml`,
+  `start/b/c.toml`, then `start/z.toml` with the hexes and businesses they refer to), for
+  the factories tests (`crates/engine/tests/factories.rs`). Goods (IDs 0-2): `coin`, `tools`,
+  `grain`. Technologies: `mill` (output `grain`, capital 1 `tools`) and `forge` (input
+  `grain`, output `tools`, capital 2 `tools`). Hexes (0, 0) and (1, 0), both with currency
+  `coin`; businesses 0 `farm_a` and 1 `farm_b` at (0, 0), 2 `idle` at (1, 0). Factories
+  (index, hex, technology, owner, condition): 0 (0, 0) `mill` `farm_a` 1; 1 and 2 (the
+  `count = 2` entry) (0, 0) `forge` `farm_a` 0.5; 3 (0, 0) `mill` `farm_b` 1 (written);
+  4 (1, 0) `forge` `idle` 0.25.
+- `factories_one`: one good, one technology, one hex, one business and one factory (for the
+  setting checker's `1 factory`).
 - `pops_one`: one good, one POP type, one hex and one POP (for the setting checker's
   `1 pop type`, `1 hex` and `1 pop`). Its type has zero growth parameters.
 - `pops_placed`: POPs across several files and a nested folder (`start/a.toml`, then
@@ -176,11 +187,21 @@ File-content errors:
   (in the same file and in a later one), unknown keys, one entry (`Several`) with many
   problems, a duplicate across files, and a `[[business]]` in `rules/`. Its goods are `coin`
   and `grain`, with one `field` resource type and two `field` deposits at (0, 0).
+- `factories_errors`: every kind of `[[factory]]` error, including a missing `q`, `r`,
+  `technology` or `owner`, wrongly typed and out-of-range values, a condition that is a
+  string, zero, negative, above 1, `inf` or `nan`, counts below 1, above 1,000,000 and
+  non-integer, an unknown technology and business, a coordinate with no hex, a factory not on
+  its owner's hex, a factory whose owner's own hex doesn't exist (no owner's-hex check),
+  unknown keys, one entry with several problems (a bad condition and count do not stop the
+  technology and owner's-hex checks), and a `[[factory]]` in `rules/`. Its goods are `coin`,
+  `grain` and `tools`, with one technology `mill`, hexes (0, 0) and (1, 0), and businesses
+  `farm` at (0, 0) and `lost` at (9, 9) (no hex).
 - `resources_broken_file`: a broken TOML file next to resources that refer to a good and a
   hex that don't exist, plus a hex whose currency is an unknown good, a market that prices
   goods that don't exist, a POP type whose endowment and utility name goods that don't
   exist, a technology whose goods don't exist, a POP of an unknown type at a coordinate
-  with no hex, and a business whose good and resource type don't exist on a hex that
+  with no hex, a business whose good and resource type don't exist on a hex that doesn't
+  exist, and a factory of an unknown technology owned by an unknown business on a hex that
   doesn't exist: only the syntax error is reported.
 - `resources_missing_start`: no `start/` folder, and a resource that refers to a good that
   doesn't exist: only the missing folder is reported.

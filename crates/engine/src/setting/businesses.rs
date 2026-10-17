@@ -4,6 +4,8 @@
 //! each business also claims its deposits from `DepositsReader`. Every entry is kept for
 //! phase 2, even one whose name was bad, so its unknown goods and resource types are still
 //! reported; only entries with an ID reach `finish`, and only they claim deposits.
+//! Factories refer to businesses by name and must sit on their owner's hex, which the
+//! factories reader checks through `BusinessesReader::hex_of`.
 
 use crate::bundle::Bundle;
 use crate::businesses::{Business, BusinessId, BusinessKind, Businesses};
@@ -162,6 +164,20 @@ impl BusinessesReader {
                 }
             }
         }
+    }
+
+    /// The definitions, for resolving references to businesses in phase 2.
+    pub fn defs(&self) -> &Definitions<BusinessKind> {
+        &self.defs
+    }
+
+    /// After `resolve`: the hex of the business `id` and the coordinates it was written with,
+    /// or None if its coordinates were missing or invalid or matched no hex (already
+    /// reported). Factories use it to check that they sit on their owner's hex.
+    pub fn hex_of(&self, id: BusinessId) -> Option<(HexId, HexCoord)> {
+        // Entries without an ID are skipped, so IDs can't index the list directly.
+        let entry = self.entries.iter().find(|entry| entry.id == Some(id))?;
+        entry.hex.zip(entry.coord)
     }
 
     /// The finished list. Only call this after a successful load, when phase 2 has run and

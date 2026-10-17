@@ -1,0 +1,6 @@
+[[factory]]
+q = 1
+r = 0
+technology = "forge"
+owner = "idle"
+condition = 0.25

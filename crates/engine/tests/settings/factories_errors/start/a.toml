@@ -1,0 +1,136 @@
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+
+[[factory]]
+r = 0
+technology = "mill"
+owner = "farm"
+
+[[factory]]
+q = 0
+technology = "mill"
+owner = "farm"
+
+[[factory]]
+q = 0
+r = 0
+owner = "farm"
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+
+[[factory]]
+q = 1.5
+r = "0"
+technology = 3
+owner = true
+condition = "full"
+count = 2.5
+
+[[factory]]
+q = 2147483648
+r = -2147483649
+technology = "mill"
+owner = "farm"
+
+[[factory]]
+q = 9
+r = 9
+technology = "mill"
+owner = "farm"
+
+[[factory]]
+q = 0
+r = 0
+technology = "loom"
+owner = "nobody"
+
+[[factory]]
+q = 1
+r = 0
+technology = "mill"
+owner = "farm"
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+condition = 0
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+condition = -0.5
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+condition = 1.5
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+condition = inf
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+condition = nan
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+count = 0
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+count = -1
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+count = 1000001
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm"
+colour = "red"
+size = 3
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "lost"
+
+[[factory]]
+q = 1
+r = 0
+technology = "loom"
+owner = "farm"
+condition = 2
+count = 0
+colour = "red"

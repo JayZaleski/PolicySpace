@@ -1,0 +1,20 @@
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm_a"
+
+[[factory]]
+q = 0
+r = 0
+technology = "forge"
+owner = "farm_a"
+condition = 0.5
+count = 2
+
+[[factory]]
+q = 0
+r = 0
+technology = "mill"
+owner = "farm_b"
+condition = 1

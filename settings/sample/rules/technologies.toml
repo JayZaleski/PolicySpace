@@ -35,8 +35,8 @@
 #     when construction_turns <= lifetime. A technology with construction_turns > lifetime
 #     is allowed, but its factories wear out faster than they can be maintained.
 #
-# Nothing runs factories yet: technologies are only loaded and checked. Later Steps build
-# and run factories from them.
+# Factories are placed in start/factories.toml, each holding a share of its technology's
+# capital bundle, but nothing runs them yet. Later Steps do.
 #
 # The numbers below are chosen against the center's prices (unskilled_labor 1, grain 2,
 # copper 5, unimproved_grain 0.5, unimproved_copper 1, tools 12). Per turn at capacity,

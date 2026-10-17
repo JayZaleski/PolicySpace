@@ -143,7 +143,7 @@ pub(crate) const MAX_COUNT: u32 = 1_000_000;
 pub(crate) fn count(reader: &mut EntryReader<'_, '_>) -> Option<u32>;
 ```
 
-This is `deposit_count` with `reader.label()` in the messages (so for a `deposit` entry every message is unchanged) and `MAX_COUNT` in place of `MAX_DEPOSIT_COUNT`. Note `deposit_count`'s doc said a non-integer "also gives 1"; it gives None (the existing code and tests), and the new doc says so. Update the module docs of `setting/map.rs` (`coordinate` and `count` are shared by every section placed by coordinates, and `count` by every placed section with copies: deposits and factories) and `setting/resources.rs` (the count helper now lives in `setting/map.rs`).
+This is `deposit_count` with `reader.label()` in the messages (so for a `deposit` entry every message is unchanged) and `MAX_COUNT` in place of `MAX_DEPOSIT_COUNT`. Note `deposit_count` gave `Some(1)` for a non-integer `count` (the reader had already reported the type error); the shared `count` gives None instead, and the new doc says so. Nothing observable changes: `DepositsReader::read` stores `count.unwrap_or(1)` and the load fails on the type error either way. Update the module docs of `setting/map.rs` (`coordinate` and `count` are shared by every section placed by coordinates, and `count` by every placed section with copies: deposits and factories) and `setting/resources.rs` (the count helper now lives in `setting/map.rs`).
 
 ### `TechnologiesReader::defs` and `BusinessesReader` additions
 

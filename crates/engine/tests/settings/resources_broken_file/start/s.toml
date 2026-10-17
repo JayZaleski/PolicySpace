@@ -26,3 +26,9 @@ r = 9
 inventory = { tin = 1 }
 deposits = { gold_ore = 5 }
 decider = "ghost"
+
+[[factory]]
+q = 9
+r = 9
+technology = "nothing"
+owner = "nobody"

@@ -12,6 +12,10 @@
 //!   world state because later Stages change them; a POP's size changes every turn as it
 //!   grows. The posted prices don't change yet either; [`World::market`] hands out each
 //!   hex's market view, the seam Stage 05 replaces.
+//! - The world also holds the factories (each on its owner's hex, running one technology
+//!   and holding a share of its capital bundle) as state, because their technology and
+//!   condition change in later Steps. Nothing runs, wears or maintains them yet, so the
+//!   turn and the report are unchanged.
 //! - A turn has three parts:
 //!   1. start of turn: every deposit emits its type's `output` of its good into its
 //!      owner's stockpile if it has an owner and its hex's stockpile otherwise (the hex
@@ -46,6 +50,7 @@ use std::fmt;
 
 use crate::businesses::{BusinessId, BusinessKind, Businesses};
 use crate::currency::HexCurrencies;
+use crate::factories::Factories;
 use crate::goods::GoodId;
 use crate::growth::grown_size;
 use crate::id::IdVec;
@@ -131,6 +136,9 @@ pub struct World {
     /// One per business, by `BusinessId`. Holds the starting inventory when the world is
     /// created.
     business_stockpiles: IdVec<BusinessKind, Stockpile>,
+    /// The factories. Nothing changes them yet; their technology and condition are state
+    /// because later Steps change them.
+    factories: Factories,
 }
 
 /// The trade round's totals per good, each in good ID order.
@@ -180,6 +188,7 @@ impl World {
             pop_outcomes: IdVec::from_vec(Vec::new()),
             businesses: start.businesses,
             business_stockpiles,
+            factories: start.factories,
         };
         let report = world.run_turn(Vec::new());
         (world, report)
@@ -276,6 +285,11 @@ impl World {
     /// The businesses.
     pub fn businesses(&self) -> &Businesses {
         &self.businesses
+    }
+
+    /// The factories.
+    pub fn factories(&self) -> &Factories {
+        &self.factories
     }
 
     /// The stockpile of `business`: the goods it owns.
