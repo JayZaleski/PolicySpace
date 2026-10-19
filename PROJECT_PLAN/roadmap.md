@@ -113,7 +113,7 @@
 - Description: Pure functions with their own tests, not yet wired into the turn. Running a factory at a given level: the level is clamped to the technology's capacity and to the inputs the business has on hand, inputs leave the business's stockpile and output enters it. Depreciation: each turn a factory consumes its capital bundle divided by its technology's lifetime, in the bundle's proportions, whether or not it ran, and shuts down when the bundle is exhausted. Maintenance: replenishing a share of the bundle costs that share of the capital and construction bundles, capped at one construction slice per turn. The choice of run level and maintenance share is not made here: it belongs to the business's decider (Step 06).
 
 ### Step 05: business-view-and-decisions
-- Status: planned
+- Status: specified
 - Tags: #deciders #businesses #engine
 - Description: The decider protocol as engine data, sized to the minimal business. The view a business is served each turn: its hex's posted prices, its stockpile and cash, its factories with their technology's numbers and bundle state, and its deposits; nothing outside its circumstances. The action vocabulary: per-factory run level and maintenance share, offers, and bids, each with the bounds the engine enforces, and an optional trace. Validation of a decision against the view it answers. Lossless serialization of both, with no references into the engine, and a recording format for a turn's batch of views and decisions. No Python yet; everything has its own tests.
 
