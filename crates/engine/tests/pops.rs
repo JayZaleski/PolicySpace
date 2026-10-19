@@ -449,8 +449,8 @@ fn stepping_the_sample_re_endows_by_the_grown_sizes() {
     let (mut world, mut previous) = world_of(&sample_setting());
     let (mut other, _) = world_of(&sample_setting());
     for _ in 1..=3u64 {
-        let report = world.step().unwrap();
-        assert_eq!(report, other.step().unwrap());
+        let report = world.step(&mut common::idle()).unwrap();
+        assert_eq!(report, other.step(&mut common::idle()).unwrap());
         let perished = named(&world, &report.perished);
         assert!(
             perished.iter().all(|(name, amount)| *amount < 1e-9
@@ -589,7 +589,7 @@ fn the_pops_placed_world_endows_durable_and_perishable_goods() {
     assert_eq!(named(&world, &report.consumed), vec![pair("labor", 35.0)]);
     assert_eq!(report.population.get(), 12.5);
     for t in 1..=3u64 {
-        let report = world.step().unwrap();
+        let report = world.step(&mut common::idle()).unwrap();
         check(&world, t);
         assert_eq!(
             named(&world, &report.perished),
@@ -650,7 +650,7 @@ fn a_world_with_no_pops_has_none_and_endows_nothing() {
             "{name}"
         );
         for _ in 0..3 {
-            let report = world.step().unwrap();
+            let report = world.step(&mut common::idle()).unwrap();
             assert!(report.endowed.is_empty(), "{name}");
             assert_eq!(report.population, Quantity::ZERO, "{name}");
             assert!(

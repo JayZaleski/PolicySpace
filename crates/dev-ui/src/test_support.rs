@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use policyspace_engine::{World, load_setting};
+use policyspace_engine::{DeciderHost, World, load_setting};
 
 /// A path in the repository (relative to the repository root).
 pub fn repo_path(relative: &str) -> PathBuf {
@@ -15,5 +15,7 @@ pub fn repo_path(relative: &str) -> PathBuf {
 /// the load errors if the setting doesn't load.
 pub fn world_at(relative: &str) -> World {
     let setting = load_setting(repo_path(relative)).unwrap_or_else(|e| panic!("should load:\n{e}"));
-    World::new(setting).0
+    World::new(setting, &mut DeciderHost::idle())
+        .expect("the idle host holds every name")
+        .0
 }

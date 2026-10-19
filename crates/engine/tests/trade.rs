@@ -112,7 +112,7 @@ fn the_sample_report_totals_pops_in_good_id_order() {
     let size_of = |index: usize| world.pops().get(pop_id(index, &world)).size.get();
     let (a, n) = (size_of(8), size_of(2));
     let s: f64 = (0..16).filter(|i| *i != 2 && *i != 8).map(size_of).sum();
-    let second = world.step().unwrap();
+    let second = world.step(&mut common::idle()).unwrap();
     assert_list(
         &world,
         &second.sold,
@@ -155,7 +155,10 @@ fn stepping_repeats_the_outcomes_per_individual_and_two_worlds_agree() {
         .map(|(id, _)| world.pop_outcome(id).clone())
         .collect();
     for _ in 0..3 {
-        assert_eq!(world.step().unwrap(), other.step().unwrap());
+        assert_eq!(
+            world.step(&mut common::idle()).unwrap(),
+            other.step(&mut common::idle()).unwrap()
+        );
         for (id, _) in world.pops().iter() {
             assert_eq!(world.pop_outcome(id), other.pop_outcome(id));
             assert_eq!(world.pop_stockpile(id), other.pop_stockpile(id));
@@ -336,9 +339,9 @@ fn the_pops_trade_setting_matches_the_table() {
     let (mut world, report) = trade_world();
     assert_eq!(world.pops().len(), 8);
     check_table(&world, &report, 0);
-    let report = world.step().unwrap();
+    let report = world.step(&mut common::idle()).unwrap();
     check_table(&world, &report, 1);
-    let report = world.step().unwrap();
+    let report = world.step(&mut common::idle()).unwrap();
     check_table(&world, &report, 2);
 }
 
@@ -352,7 +355,7 @@ fn currency_carried_over_is_income_next_turn() {
     assert!(close(miser.demand().income().get(), 10.0));
     assert!(close(outcome(&world, 5).demand().income().get(), 15.0));
 
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
     let miser = outcome(&world, 6);
     assert!(close(miser.demand().income().get(), 18.0));
     assert!(close(miser.demand().quantity_of(silver).get(), 16.0));
@@ -387,7 +390,7 @@ fn held_goods_outside_the_utility_stay_or_sell() {
         let miser = outcome(&world, 6);
         assert_eq!(miser.consumed_of(silver), Quantity::ZERO);
         assert_eq!(miser.sold_of(silver), Quantity::ZERO);
-        world.step().unwrap();
+        world.step(&mut common::idle()).unwrap();
     }
 }
 
@@ -399,7 +402,7 @@ fn a_hex_with_a_market_and_no_pops_is_untouched() {
     assert!(world.pops().on_hex(empty).is_empty());
     for _ in 0..2 {
         assert!(world.hex_stockpile(empty).is_empty());
-        world.step().unwrap();
+        world.step(&mut common::idle()).unwrap();
     }
     assert!(world.hex_stockpile(empty).is_empty());
 }
@@ -411,7 +414,7 @@ fn worlds_without_pops_report_nothing_traded() {
         assert!(world.pops().is_empty(), "{name}");
         let mut reports = vec![report];
         for _ in 0..2 {
-            reports.push(world.step().unwrap());
+            reports.push(world.step(&mut common::idle()).unwrap());
         }
         for report in reports {
             assert_eq!(report.population, Quantity::ZERO, "{name}");
@@ -422,8 +425,8 @@ fn worlds_without_pops_report_nothing_traded() {
     }
     // The hex stockpiles are the deposits' output alone.
     let (mut world, _) = world_of(&test_setting("turns_valid"));
-    world.step().unwrap();
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
+    world.step(&mut common::idle()).unwrap();
     let center = hex(&world, 0, 0);
     let daily = good(&world, "daily");
     let stew = good(&world, "stew");

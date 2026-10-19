@@ -30,7 +30,7 @@ fn a_fresh_sample_world_has_grown_at_turn_0() {
         .iter()
         .map(|(_, p)| p.size.get())
         .collect();
-    let (world, report) = World::new(setting);
+    let (world, report) = World::new(setting, &mut common::idle()).unwrap();
     assert_eq!(world.pops().len(), 16);
     for (i, &start) in start_sizes.iter().enumerate() {
         let o = outcome(&world, i);
@@ -80,7 +80,7 @@ fn stepping_the_sample_grows_again() {
     let (mut world, first) = world_of(&sample_setting());
     let per_unit: Vec<_> = (0..16).map(|i| per_individual(&world, i)).collect();
     let start_0 = o_start(&world, 0);
-    let report = world.step().unwrap();
+    let report = world.step(&mut common::idle()).unwrap();
     assert!(close(size(&world, 2), 9.72));
     assert!(close(
         size(&world, 0),
@@ -104,7 +104,7 @@ fn stepping_the_sample_grows_again() {
             }
         }
     }
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
     assert!(close(size(&world, 2), 8.748));
 }
 
@@ -113,7 +113,10 @@ fn two_sample_worlds_grow_identically() {
     let (mut world, _) = world_of(&sample_setting());
     let (mut other, _) = world_of(&sample_setting());
     for _ in 0..3 {
-        assert_eq!(world.step().unwrap(), other.step().unwrap());
+        assert_eq!(
+            world.step(&mut common::idle()).unwrap(),
+            other.step(&mut common::idle()).unwrap()
+        );
         for (id, pop) in world.pops().iter() {
             assert_eq!(pop.size, other.pops().get(id).size);
             assert_eq!(world.pop_outcome(id), other.pop_outcome(id));
@@ -166,7 +169,7 @@ fn the_pops_growth_table_at_turn_0() {
 #[test]
 fn the_pops_growth_table_after_a_step() {
     let (mut world, first) = growth_world();
-    let report = world.step().unwrap();
+    let report = world.step(&mut common::idle()).unwrap();
     let expected = [
         20.0 * (1.0 + PEASANT_RATE) * (1.0 + PEASANT_RATE),
         11.025,
@@ -199,7 +202,7 @@ fn a_pop_at_subsistence_keeps_its_size() {
         assert_eq!(o.subsistence_index(), 0.0, "turn {turn}");
         assert_eq!(o.growth_rate(), 0.0, "turn {turn}");
         assert_eq!(size(&world, 7), 10.0, "turn {turn}");
-        world.step().unwrap();
+        world.step(&mut common::idle()).unwrap();
     }
 }
 
@@ -248,7 +251,7 @@ fn zero_parameters_never_change_size() {
             assert_eq!(o.growth_rate(), 0.0, "POP {i} turn {turn}");
             assert_eq!(size(&world, i), 10.0, "POP {i} turn {turn}");
         }
-        world.step().unwrap();
+        world.step(&mut common::idle()).unwrap();
     }
 }
 
@@ -260,7 +263,11 @@ fn worlds_without_pops_report_zero_population() {
         let (mut world, report) = world_of(&test_setting(name));
         assert_eq!(report.population, Quantity::ZERO, "{name}");
         for _ in 0..2 {
-            assert_eq!(world.step().unwrap().population, Quantity::ZERO, "{name}");
+            assert_eq!(
+                world.step(&mut common::idle()).unwrap().population,
+                Quantity::ZERO,
+                "{name}"
+            );
         }
     }
 }
@@ -272,7 +279,7 @@ fn zero_growth_settings_keep_their_sizes_and_totals() {
         let sizes: Vec<Quantity> = world.pops().iter().map(|(_, p)| p.size).collect();
         assert_eq!(report.population.get(), population, "{name}");
         for _ in 0..3 {
-            let report = world.step().unwrap();
+            let report = world.step(&mut common::idle()).unwrap();
             assert_eq!(report.population.get(), population, "{name}");
             let now: Vec<Quantity> = world.pops().iter().map(|(_, p)| p.size).collect();
             assert_eq!(now, sizes, "{name}");

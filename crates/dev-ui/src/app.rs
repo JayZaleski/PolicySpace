@@ -19,7 +19,7 @@ use policyspace_engine::{ENGINE_NAME, ENGINE_VERSION, HexId, World};
 use crate::geometry::{
     DOT_RADIUS_PX, HexShape, Point, View, Viewport, hex_at, hex_center, hex_corners, is_visible,
 };
-use crate::session::{Loaded, STEP_MANY, Session};
+use crate::session::{Hosting, Loaded, STEP_MANY, Session};
 use crate::text::{
     StockLine, count, deposit_lines, good_rows, market_lines, pop_section, pop_type_rows,
     resource_rows, stockpile_lines,
@@ -91,7 +91,7 @@ struct DevApp {
 impl DevApp {
     /// A window state with `folder` loaded if given.
     fn new(folder: Option<PathBuf>) -> DevApp {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::FromSetting);
         if let Some(folder) = folder {
             session.open(folder);
         }

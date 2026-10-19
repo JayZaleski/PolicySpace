@@ -162,7 +162,7 @@ fn the_sample_businesses_see_their_own_circumstances() {
     assert_eq!((t.construction_turns, t.lifetime), (3, 24));
     assert!(toolmaker.deposits.is_empty());
 
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
     let farm = view(&world, "center_farm");
     assert_eq!(farm.turn, Turn::new(1));
     assert_eq!(groups_of(&farm, "unimproved_grain"), [(8.0, Some(1))]);

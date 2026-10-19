@@ -42,7 +42,10 @@
 //! technologies and its deposits, and nothing outside its circumstances), the decision it
 //! answers with (a run and a maintenance fraction per factory, offers, bids and an optional
 //! trace), the validation of a decision against its view, the request and reply that carry
-//! one turn's batch, and lossless JSON for all of it; no decider runs yet (Steps 06 and 07).
+//! one turn's batch, and lossless JSON for all of it; a [`DeciderHost`] of named deciders (a
+//! Python process the engine starts and keeps alive, a replayed recording, or a closure)
+//! answers every business's view once per turn at the decision point, and the world stores
+//! each business's answer; nothing resolves the decisions yet (Step 08).
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -58,6 +61,9 @@ pub mod decider;
 pub use decider::{
     Answer, BusinessView, Decision, DecisionErrors, FormatError, Recording, Reply, ReplyErrors,
     Request,
+};
+pub use decider::{
+    BusinessAnswer, Decider, DeciderFailure, DeciderHost, ReportedFailure, UnknownDecider,
 };
 pub mod demand;
 pub use demand::{Demand, DemandedGood, PriceList, demand};

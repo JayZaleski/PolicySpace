@@ -192,10 +192,16 @@ fn stdout_lines(output: &Output) -> Vec<String> {
         .collect()
 }
 
+/// The child's error output, to show in an assertion message (a missing Python environment
+/// is explained there).
+fn stderr_text(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
 #[test]
 fn turns_prints_a_line_for_each_turn() {
     let output = run_with("settings/sample", &["--turns", "2"]);
-    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr_text(&output));
     assert!(output.stderr.is_empty());
     assert_eq!(
         stdout_lines(&output),
@@ -212,7 +218,7 @@ fn turns_prints_a_line_for_each_turn() {
 #[test]
 fn turns_zero_only_runs_turn_0() {
     let output = run_with("settings/sample", &["--turns", "0"]);
-    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr_text(&output));
     let lines = stdout_lines(&output);
     assert_eq!(lines.len(), 2);
     assert_eq!(lines[0], SAMPLE_LINE);
@@ -272,7 +278,7 @@ fn bad_turn_arguments_print_usage_and_exit_2() {
 #[test]
 fn leading_zeros_are_fine() {
     let output = run_with("settings/sample", &["--turns", "007"]);
-    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr_text(&output));
     // The success line, then turns 0 to 7.
     assert_eq!(stdout_lines(&output).len(), 9);
 }
@@ -288,4 +294,35 @@ fn a_broken_setting_with_turns_prints_the_same_errors_and_runs_no_turns() {
     assert_eq!(with_turns.status.code(), Some(1));
     assert!(with_turns.stdout.is_empty());
     assert_eq!(with_turns.stderr, plain.stderr);
+}
+
+#[test]
+fn a_decider_that_wont_start_prints_an_error_and_exits_1() {
+    let output = run_with(
+        "crates/engine/tests/settings/production_valid",
+        &["--turns", "1"],
+    );
+    assert_eq!(output.status.code(), Some(1), "{}", stderr_text(&output));
+    let stdout = stdout_lines(&output);
+    assert_eq!(stdout.len(), 1, "{stdout:?}");
+    assert!(stdout[0].starts_with("Loaded setting "), "{stdout:?}");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("unknown decider 'rule'"), "{stderr}");
+    assert!(stderr.contains("1 error(s) found in "), "{stderr}");
+}
+
+#[test]
+fn turns_without_businesses_start_no_python() {
+    let output = Command::new(env!("CARGO_BIN_EXE_dev-ui"))
+        .arg("check")
+        .arg(repo_path("crates/engine/tests/settings/pops_placed"))
+        .args(["--turns", "1"])
+        .env("POLICYSPACE_PYTHON", "no/such/python")
+        .output()
+        .expect("failed to run the dev-ui binary");
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = stdout_lines(&output);
+    assert_eq!(stdout.len(), 3, "{stdout:?}");
+    assert!(stdout.iter().all(|l| !l.contains("failed")), "{stdout:?}");
+    assert!(output.stderr.is_empty());
 }

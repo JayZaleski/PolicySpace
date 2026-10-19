@@ -58,7 +58,7 @@ fn sample_setting_at_turn_0() {
 fn sample_setting_steps() {
     let (mut world, mut previous) = world_of(&sample_setting());
     for t in 1..=3u64 {
-        let report = world.step().unwrap();
+        let report = world.step(&mut common::idle()).unwrap();
         assert_eq!(report.turn, Turn::new(t));
         assert_eq!(world.turn(), Turn::new(t));
         let both = vec![
@@ -96,7 +96,7 @@ fn a_three_turn_good_builds_up_and_levels_off() {
     let mut reports = vec![first];
     for t in 0..=5u64 {
         if t > 0 {
-            reports.push(world.step().unwrap());
+            reports.push(world.step(&mut common::idle()).unwrap());
         }
         let expected: Vec<(PerishesAt, f64)> = match t {
             0 => vec![(end(2), 5.0)],
@@ -134,7 +134,7 @@ fn reports_match_the_expected_numbers() {
     assert_eq!(report.population, Quantity::ZERO);
     assert_eq!(named(&world, &report.emitted), emitted);
     for t in 1..=4u64 {
-        let report = world.step().unwrap();
+        let report = world.step(&mut common::idle()).unwrap();
         let perished = if t < 3 {
             vec![pair("daily", 6.5)]
         } else {
@@ -158,7 +158,7 @@ fn a_durable_good_grows_and_never_perishes() {
     let mut reports = vec![first];
     for t in 0..=5u64 {
         if t > 0 {
-            reports.push(world.step().unwrap());
+            reports.push(world.step(&mut common::idle()).unwrap());
         }
         assert_eq!(
             groups_at(&world, 1, 0, "gold"),
@@ -180,7 +180,7 @@ fn several_deposits_merge_and_do_not_leak_into_other_hexes() {
     let (mut world, _) = world_of(&test_setting("turns_valid"));
     for t in 0..=5u64 {
         if t > 0 {
-            world.step().unwrap();
+            world.step(&mut common::idle()).unwrap();
         }
         assert_eq!(
             groups_at(&world, 0, 0, "daily"),
@@ -217,7 +217,7 @@ fn worlds_without_deposits_stay_empty() {
         );
         assert_eq!(report.population, Quantity::ZERO, "{name}");
         for _ in 0..3 {
-            let report = world.step().unwrap();
+            let report = world.step(&mut common::idle()).unwrap();
             assert!(
                 report.perished.is_empty()
                     && report.emitted.is_empty()
@@ -243,7 +243,10 @@ fn identical_runs_give_identical_results() {
     let (mut b, report_b) = world_of(&test_setting("turns_valid"));
     assert_eq!(report_a, report_b);
     for _ in 0..6 {
-        assert_eq!(a.step().unwrap(), b.step().unwrap());
+        assert_eq!(
+            a.step(&mut common::idle()).unwrap(),
+            b.step(&mut common::idle()).unwrap()
+        );
         for (id, _) in a.map().iter() {
             assert_eq!(a.hex_stockpile(id), b.hex_stockpile(id));
         }
@@ -260,8 +263,8 @@ fn world_accessors() {
     assert_eq!(world.rules().goods.len(), 3);
     assert_eq!(world.map().len(), 3);
     assert_eq!(world.deposits().len(), 6);
-    world.step().unwrap();
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
+    world.step(&mut common::idle()).unwrap();
     assert_eq!(world.turn(), Turn::new(2));
 }
 
@@ -293,7 +296,7 @@ fn hex_currencies_are_readable_and_unchanged_by_stepping() {
     };
     check(&world);
     for _ in 0..3 {
-        world.step().unwrap();
+        world.step(&mut common::idle()).unwrap();
         check(&world);
     }
 }
@@ -302,7 +305,7 @@ fn hex_currencies_are_readable_and_unchanged_by_stepping() {
 fn every_sample_hex_still_has_silver_after_a_step() {
     let (mut world, _) = world_of(&sample_setting());
     let silver = good(&world, "silver");
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
     assert_eq!(world.hex_currencies().len(), 19);
     for (h, _) in world.map().iter() {
         assert_eq!(world.hex_currency(h), silver);

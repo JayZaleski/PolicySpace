@@ -110,7 +110,7 @@ fn the_sample_setting_loads_with_three_factories_that_a_fresh_world_holds_unchan
     let (mut world, _) = world_of(&sample_setting());
     assert_eq!(factory_rows(&world), sample_rows());
     for _ in 0..3 {
-        world.step().unwrap();
+        world.step(&mut common::idle()).unwrap();
         assert_eq!(factory_rows(&world), sample_rows());
     }
 }
@@ -122,7 +122,10 @@ fn identical_sample_runs_give_identical_reports_and_factories() {
     assert_eq!(report_a, report_b);
     assert_eq!(factory_rows(&a), factory_rows(&b));
     for _ in 0..3 {
-        assert_eq!(a.step().unwrap(), b.step().unwrap());
+        assert_eq!(
+            a.step(&mut common::idle()).unwrap(),
+            b.step(&mut common::idle()).unwrap()
+        );
         assert_eq!(factory_rows(&a), factory_rows(&b));
     }
 }

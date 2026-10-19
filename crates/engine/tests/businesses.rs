@@ -256,7 +256,7 @@ fn a_fresh_sample_world_fills_business_stockpiles_and_emits_to_owners() {
         vec![pair("unskilled_labor", 4100.0)]
     );
     for t in 1..=3u64 {
-        let report = world.step().unwrap();
+        let report = world.step(&mut common::idle()).unwrap();
         assert_sample_stockpiles(&world, t);
         assert_eq!(
             big_perished(&world, &report),
@@ -283,7 +283,10 @@ fn identical_sample_runs_give_identical_reports_and_stockpiles() {
     let (mut b, report_b) = world_of(&sample_setting());
     assert_eq!(report_a, report_b);
     for _ in 0..3 {
-        assert_eq!(a.step().unwrap(), b.step().unwrap());
+        assert_eq!(
+            a.step(&mut common::idle()).unwrap(),
+            b.step(&mut common::idle()).unwrap()
+        );
         for (id, _, _) in a.businesses().iter() {
             assert_eq!(a.business_stockpile(id), b.business_stockpile(id));
         }
@@ -358,7 +361,7 @@ fn businesses_valid_world_runs_turns_0_to_3() {
     check_report(&world, &report, 0, &[], 8.0);
 
     // Turn 1.
-    let report = world.step().unwrap();
+    let report = world.step(&mut common::idle()).unwrap();
     assert_eq!(
         business_totals(&world, farm_a),
         vec![pair("coin", 10.0), pair("grain", 8.0)]
@@ -377,7 +380,7 @@ fn businesses_valid_world_runs_turns_0_to_3() {
     check_report(&world, &report, 1, &[pair("labor", 4.0)], 8.0);
 
     // Turn 2.
-    let report = world.step().unwrap();
+    let report = world.step(&mut common::idle()).unwrap();
     assert_eq!(
         business_totals(&world, farm_a),
         vec![pair("coin", 10.0), pair("grain", 12.0)]
@@ -390,7 +393,7 @@ fn businesses_valid_world_runs_turns_0_to_3() {
     check_report(&world, &report, 2, &[], 8.0);
 
     // Turn 3: the first grain perishes, from the businesses and from the hex.
-    let report = world.step().unwrap();
+    let report = world.step(&mut common::idle()).unwrap();
     assert_eq!(
         business_totals(&world, farm_a),
         vec![pair("coin", 10.0), pair("grain", 12.0)]

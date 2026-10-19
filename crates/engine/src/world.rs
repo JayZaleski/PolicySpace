@@ -7,44 +7,51 @@
 //!   prices, one stockpile of unowned goods per hex, one stockpile per POP (empty when the
 //!   world is created; a POP's first endowment arrives at the start of turn 0), one
 //!   stockpile per business (filled from its starting inventory when the world is
-//!   created), and each POP's latest trade outcome (what it demanded, sold, bought and
-//!   consumed). Hexes, currencies, deposits and businesses don't change yet, but they are
-//!   world state because later Stages change them; a POP's size changes every turn as it
-//!   grows. The posted prices don't change yet either; [`World::market`] hands out each
-//!   hex's market view, the seam Stage 05 replaces.
+//!   created), each POP's latest trade outcome (what it demanded, sold, bought and
+//!   consumed), and each business's answer at the current turn's decision point. Hexes,
+//!   currencies, deposits and businesses don't change yet, but they are world state
+//!   because later Stages change them; a POP's size changes every turn as it grows. The
+//!   posted prices don't change yet either; [`World::market`] hands out each hex's
+//!   market view, the seam Stage 05 replaces.
 //! - The world also holds the factories (each on its owner's hex, running one technology
 //!   and holding a share of its capital bundle) as state, because their technology and
 //!   condition change in later Steps. Nothing runs, wears or maintains them yet, so the
 //!   turn and the report are unchanged.
 //! - A business's view of its circumstances at the current turn is taken with
 //!   [`World::business_view`], which reads and changes nothing (the decision point that
-//!   serves it is Step 07's).
+//!   serves it is `decide`).
 //! - A turn has three parts:
 //!   1. start of turn: every deposit emits its type's `output` of its good into its
 //!      owner's stockpile if it has an owner and its hex's stockpile otherwise (the hex
 //!      stockpile stays the home of unowned goods), then every POP receives its type's
 //!      endowment times its size into its own stockpile;
-//!   2. actors act: the trade round and consumption, then growth. On every hex each POP
-//!      submits its parameters and holdings, the market computes demand and settles sales
-//!      before purchases, and each POP consumes (see the [`trade`](crate::trade) module);
+//!   2. actors act: the decision point, then the trade round and consumption, then growth.
+//!      At the decision point every business's view goes to the decider its setting entry
+//!      names, through the host the caller passes to `new` and `step` (see the
+//!      [`decider::host`](crate::decider::host) module), and its answer is stored; nothing
+//!      resolves the answers yet (Step 08). Then on every hex each POP submits its
+//!      parameters and holdings, the market computes demand and settles sales before
+//!      purchases, and each POP consumes (see the [`trade`](crate::trade) module);
 //!      then, once every hex has traded, every POP grows or shrinks by the rate its outcome
 //!      records (see the [`growth`](crate::growth) module). Later Stages add industries and
 //!      the live market here;
 //!   3. end of turn: whatever perishes at the end of this turn is removed, from the hex
 //!      stockpiles, then the POP stockpiles and then the business stockpiles.
-//! - [`World::new`] puts the world at turn 0, fills every business's stockpile from its
-//!   starting inventory (each good perishing as if added in turn 0), and runs turn 0's
-//!   start, turn 0's trade round and turn 0's growth. [`World::step`] ends the current
-//!   turn, advances the clock, and starts the next one, trade round and growth included.
-//!   The world keeps each POP's outcome of the current turn's round
-//!   ([`World::pop_outcome`]). Between calls the world
-//!   is always after part 2, where every POP has traded, consumed and grown this turn and
-//!   nothing has perished yet.
+//! - [`World::new`] takes the host (and fails for a decider name the host doesn't hold),
+//!   puts the world at turn 0, fills every business's stockpile from its starting
+//!   inventory (each good perishing as if added in turn 0), and runs turn 0's start, turn
+//!   0's decision point, turn 0's trade round and turn 0's growth. [`World::step`] ends
+//!   the current turn, advances the clock, and starts the next one, decision point, trade
+//!   round and growth included. The world keeps each POP's outcome of the current turn's
+//!   round ([`World::pop_outcome`]) and each business's answer ([`World::business_answer`]).
+//!   Between calls the world is always after part 2, where every business has answered and
+//!   every POP has traded, consumed and grown this turn, and nothing has perished yet.
 //! - Deposits emit in deposit ID order, POPs are endowed in POP ID order, trade runs on
 //!   hexes in hex ID order, POPs in ID order within a hex and goods in ID order within a
 //!   POP, with every sale before every purchase and then consumption, POPs grow in ID
 //!   order, perishing goes through hexes, then POPs, then businesses in business ID order,
-//!   and stockpiles iterate in a fixed order, so the same setting stepped the same number
+//!   deciders are taken in name order and businesses in ID order within a decider, and
+//!   stockpiles iterate in a fixed order, so the same setting stepped the same number
 //!   of times always gives the same world and reports.
 
 use std::collections::BTreeMap;
@@ -53,7 +60,10 @@ use std::fmt;
 
 use crate::businesses::{BusinessId, BusinessKind, Businesses};
 use crate::currency::HexCurrencies;
-use crate::decider::{BusinessView, view};
+use crate::decider::{
+    BusinessAnswer, BusinessView, DeciderHost, DecisionCounts, ReportedFailure, UnknownDecider,
+    view,
+};
 use crate::factories::Factories;
 use crate::goods::GoodId;
 use crate::growth::grown_size;
@@ -91,6 +101,10 @@ pub struct TurnReport {
     pub consumed: Vec<(GoodId, Quantity)>,
     /// The total size of every POP after growth in `turn`. Zero for a world with no POPs.
     pub population: Quantity,
+    /// How the businesses answered at the decision point of `turn`.
+    pub decisions: DecisionCounts,
+    /// Every decider that failed at the decision point of `turn`, in decider name order.
+    pub decider_failures: Vec<ReportedFailure>,
 }
 
 /// Why a step was refused.
@@ -98,6 +112,8 @@ pub struct TurnReport {
 pub enum StepError {
     /// The clock is at `Turn::MAX` and can't advance. The world is unchanged.
     ClockAtMaximum,
+    /// A business names a decider the host doesn't hold. The world is unchanged.
+    UnknownDecider(UnknownDecider),
 }
 
 impl fmt::Display for StepError {
@@ -108,6 +124,7 @@ impl fmt::Display for StepError {
                 "the clock is at its maximum turn ({}) and can't advance",
                 Turn::MAX
             ),
+            StepError::UnknownDecider(error) => write!(f, "{error}"),
         }
     }
 }
@@ -143,6 +160,9 @@ pub struct World {
     /// The factories. Nothing changes them yet; their technology and condition are state
     /// because later Steps change them.
     factories: Factories,
+    /// One per business, by `BusinessId`: its answer at the current turn's decision point.
+    /// Rebuilt every turn.
+    business_answers: IdVec<BusinessKind, BusinessAnswer>,
 }
 
 /// The trade round's totals per good, each in good ID order.
@@ -153,15 +173,20 @@ struct TradeTotals {
 }
 
 impl World {
-    /// Builds a world from `setting` at turn 0 and runs turn 0's start, turn 0's trade
-    /// round and turn 0's growth.
-    /// Returns the world and turn 0's report.
-    pub fn new(setting: LoadedSetting) -> (World, TurnReport) {
+    /// Builds a world from `setting` at turn 0 and runs turn 0's start, decision point,
+    /// trade round and growth, with `host` answering for the businesses. Fails, building
+    /// nothing, if a business names a decider the host doesn't hold. Returns the world and
+    /// turn 0's report.
+    pub fn new(
+        setting: LoadedSetting,
+        host: &mut DeciderHost,
+    ) -> Result<(World, TurnReport), UnknownDecider> {
         let LoadedSetting {
             manifest,
             rules,
             start,
         } = setting;
+        host.check(&start.businesses)?;
         let hex_stockpiles = IdVec::from_vec(vec![Stockpile::new(); start.map.len()]);
         let pop_stockpiles = IdVec::from_vec(vec![Stockpile::new(); start.pops.len()]);
         let business_stockpiles = IdVec::from_vec(
@@ -193,18 +218,25 @@ impl World {
             businesses: start.businesses,
             business_stockpiles,
             factories: start.factories,
+            business_answers: IdVec::from_vec(Vec::new()),
         };
-        let report = world.run_turn(Vec::new());
-        (world, report)
+        world.business_answers =
+            IdVec::from_vec(vec![BusinessAnswer::Nothing; world.businesses.len()]);
+        let report = world.run_turn(Vec::new(), host);
+        Ok((world, report))
     }
 
-    /// Ends the current turn, advances the clock, starts the next turn.
-    /// At `Turn::MAX` returns `Err(StepError::ClockAtMaximum)` and changes nothing.
-    pub fn step(&mut self) -> Result<TurnReport, StepError> {
+    /// Ends the current turn, advances the clock, starts the next turn with `host`.
+    /// At `Turn::MAX` returns `Err(StepError::ClockAtMaximum)`; if a business names a
+    /// decider `host` doesn't hold, `Err(StepError::UnknownDecider)`. Either way nothing
+    /// changes.
+    pub fn step(&mut self, host: &mut DeciderHost) -> Result<TurnReport, StepError> {
         let next = self.turn.next().ok_or(StepError::ClockAtMaximum)?;
+        host.check(&self.businesses)
+            .map_err(StepError::UnknownDecider)?;
         let perished = self.perish();
         self.turn = next;
-        Ok(self.run_turn(perished))
+        Ok(self.run_turn(perished, host))
     }
 
     /// The current turn.
@@ -314,6 +346,14 @@ impl World {
         view::build(self, business)
     }
 
+    /// `business`'s answer at the current turn's decision point.
+    ///
+    /// # Panics
+    /// Panics if `business` isn't from this world's businesses.
+    pub fn business_answer(&self, business: BusinessId) -> &BusinessAnswer {
+        self.business_answers.get(business)
+    }
+
     /// The outcome of the current turn's trade round for `pop`: its demand, what it sold,
     /// bought and consumed, the currency it carried over, its subsistence index, its
     /// growth rate and its starting size.
@@ -324,12 +364,17 @@ impl World {
         self.pop_outcomes.get(pop)
     }
 
-    /// Runs the current turn's start (emission, endowment) and part 2 (the trade round,
-    /// consumption, growth) and returns its report; `perished` is what the previous turn's
-    /// end removed.
-    fn run_turn(&mut self, perished: Vec<(GoodId, Quantity)>) -> TurnReport {
+    /// Runs the current turn's start (emission, endowment) and part 2 (the decision point,
+    /// the trade round, consumption, growth) and returns its report; `perished` is what
+    /// the previous turn's end removed.
+    fn run_turn(
+        &mut self,
+        perished: Vec<(GoodId, Quantity)>,
+        host: &mut DeciderHost,
+    ) -> TurnReport {
         let emitted = self.emit();
         let endowed = self.endow();
+        let (decisions, decider_failures) = self.decide(host);
         let TradeTotals {
             sold,
             bought,
@@ -345,6 +390,8 @@ impl World {
             bought,
             consumed,
             population,
+            decisions,
+            decider_failures,
         }
     }
 
@@ -385,7 +432,23 @@ impl World {
         totals_by_good(endowed)
     }
 
-    /// Part 2 of the turn, after `endow`: runs the trade round and consumption on every
+    /// Part 2 of the turn, after `endow`: the decision point. Stores every business's
+    /// answer and returns the counts and the failures.
+    fn decide(&mut self, host: &mut DeciderHost) -> (DecisionCounts, Vec<ReportedFailure>) {
+        let point = host.decision_point(self);
+        let mut counts = DecisionCounts::default();
+        for answer in &point.answers {
+            match answer {
+                BusinessAnswer::Nothing => counts.nothing += 1,
+                BusinessAnswer::Valid(_) => counts.valid += 1,
+                BusinessAnswer::Refused { .. } => counts.refused += 1,
+            }
+        }
+        self.business_answers = IdVec::from_vec(point.answers);
+        (counts, point.failures)
+    }
+
+    /// Part 2 of the turn, after `decide`: runs the trade round and consumption on every
     /// hex in hex ID order, records every POP's outcome, and returns the totals
     /// (sold, bought, consumed) per good, each in good ID order.
     fn trade(&mut self) -> TradeTotals {
@@ -500,7 +563,7 @@ mod tests {
             .join("tests/settings")
             .join(setting_name);
         let setting = load_setting(&path).unwrap_or_else(|e| panic!("should load:\n{e}"));
-        World::new(setting).0
+        World::new(setting, &mut DeciderHost::idle()).unwrap().0
     }
 
     fn turns_valid_world() -> World {
@@ -522,7 +585,7 @@ mod tests {
             world_of("pops_placed"),
             world_of("businesses_valid"),
         ] {
-            world.step().unwrap();
+            world.step(&mut DeciderHost::idle()).unwrap();
             world.turn = Turn::MAX;
             let before: IdVec<HexKind, Stockpile> = world.hex_stockpiles.clone();
             let pops_before: IdVec<PopKind, Stockpile> = world.pop_stockpiles.clone();
@@ -530,12 +593,18 @@ mod tests {
                 world.business_stockpiles.clone();
             let sizes_before: Vec<Quantity> = world.pops.iter().map(|(_, p)| p.size).collect();
             let outcomes_before: IdVec<PopKind, PopOutcome> = world.pop_outcomes.clone();
-            assert_eq!(world.step(), Err(StepError::ClockAtMaximum));
+            let answers_before: IdVec<BusinessKind, BusinessAnswer> =
+                world.business_answers.clone();
+            assert_eq!(
+                world.step(&mut DeciderHost::idle()),
+                Err(StepError::ClockAtMaximum)
+            );
             assert_eq!(world.turn(), Turn::MAX);
             assert_eq!(world.hex_stockpiles, before);
             assert_eq!(world.pop_stockpiles, pops_before);
             assert_eq!(world.business_stockpiles, businesses_before);
             assert_eq!(world.pop_outcomes, outcomes_before);
+            assert_eq!(world.business_answers, answers_before);
             let sizes_after: Vec<Quantity> = world.pops.iter().map(|(_, p)| p.size).collect();
             assert_eq!(sizes_after, sizes_before);
         }

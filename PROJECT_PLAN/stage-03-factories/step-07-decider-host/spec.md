@@ -82,6 +82,10 @@ pub trait Decider {
     /// Returns the reply to the request last submitted. Called exactly once after every
     /// successful `submit`, never otherwise.
     fn collect(&mut self) -> Result<Reply, DeciderFailure>;
+    /// Told that the reply just collected was refused as a whole (wrong turn, unknown or
+    /// duplicate business). The default does nothing; the external process stops itself so
+    /// that a process one reply behind is started afresh next turn, as the design asks.
+    fn reject(&mut self) {}
 }
 
 /// Why a decider couldn't answer a turn. Only the process variants carry a stderr tail.
@@ -103,15 +107,16 @@ pub enum DeciderFailure {
     RequestDiffers { turn: Turn },
 }
 impl DeciderFailure {
-    /// The stderr tail, empty for the variants that have none.
+    /// The stderr tail, empty for the variants that have none. For `WontStart` it is the
+    /// `StartError::ExitedAtOnce` tail (empty for `Spawn`).
     pub fn stderr_tail(&self) -> &[String];
 }
-// Display, one line, without the stderr tail: `the process exited ({status}) before
+// Display, always one line, without the stderr tail: `the process exited ({status}) before
 // answering` (`{status}` is ExitStatus's Display); `no reply within the time limit of
 // {secs:.1} s`; `the reply couldn't be read: {error}` (a FormatError::Values joins its lines
-// with "; "); `the process couldn't be started again: {error}`; `the reply was refused: {e1};
-// {e2}` (ReplyErrors joined with "; "); `no recording for turn {turn}`; `the request for
-// turn {turn} differs from the recorded one`.
+// with "; "); `the process couldn't be started again: {StartError::summary()}`; `the reply
+// was refused: {e1}; {e2}` (ReplyErrors joined with "; "); `no recording for turn {turn}`;
+// `the request for turn {turn} differs from the recorded one`.
 
 /// One decider's failure in one turn, as the turn report carries it.
 #[derive(Debug, Clone, PartialEq)]
@@ -182,7 +187,7 @@ impl ClosureDecider { pub fn new(f: impl FnMut(&Request) -> Reply + 'static) -> 
 
 1. `answers = vec![BusinessAnswer::Nothing; businesses.len()]`, `failures = vec![]`.
 2. For each `(name, decider)` in `self.deciders` (name order): `ids` = every business whose `decider == name`, in ID order (empty allowed); `request = Request { turn: world.turn(), views: ids.map(|id| world.business_view(id)) }`; `decider.submit(&request)`; keep `(name, ids, request, Option<DeciderFailure>)` in a `Vec`. A business whose name has no decider (only possible when `accepts_unknown`) is left at `Nothing`.
-3. For each kept entry in the same order, if `submit` succeeded: `decider.collect()`. Then `reply.validate(&request, goods)`: `Err(errors)` → `DeciderFailure::Refused(errors)`. `Ok(answers)` → for each `(id, answer)` zipped with `ids`: `Answer::Nothing` → `Nothing`; `Answer::Valid(d)` → `Valid(d.clone())`; `Answer::Refused(errors)` → `Refused { decision: the one decision in reply.decisions whose business is the view's (exactly one after validation), errors }`.
+3. For each kept entry in the same order, if `submit` succeeded: `decider.collect()`. Then `reply.validate(&request, goods)`: `Err(errors)` → `decider.reject()`, then `DeciderFailure::Refused(errors)`. `Ok(answers)` → for each `(id, answer)` zipped with `ids`: `Answer::Nothing` → `Nothing`; `Answer::Valid(d)` → `Valid(d.clone())`; `Answer::Refused(errors)` → `Refused { decision: the one decision in reply.decisions whose business is the view's (exactly one after validation), errors }`.
 4. Any failure (from `submit`, `collect` or validation) is pushed as `ReportedFailure { decider: name, failure }`, and that decider's businesses stay `Nothing`.
 
 `check(businesses)`: for each business in ID order, if `!self.holds(business.decider)` return `Err(UnknownDecider { business: name, decider, known: self.names().collect() })`.
@@ -233,9 +238,15 @@ pub enum StartError {
     /// It exited within the grace window.
     ExitedAtOnce { command: String, status: std::process::ExitStatus, stderr: Vec<String> },
 }
-// Display: `'{command}' couldn't be started: {error}`; `'{command}' exited ({status}) as
-// soon as it started`, then (if any) a line `its error output ends with:` and each tail
-// line prefixed by two spaces.
+impl StartError {
+    /// The one-line form: `'{command}' couldn't be started: {error}` or `'{command}' exited
+    /// ({status}) as soon as it started`, never the stderr tail.
+    pub fn summary(&self) -> String;
+    /// The stderr tail of `ExitedAtOnce`, empty for `Spawn`.
+    pub fn stderr_tail(&self) -> &[String];
+}
+// Display: `summary()`, then for `ExitedAtOnce` with a non-empty tail a line `its error
+// output ends with:` and each tail line prefixed by two spaces.
 
 /// A running process, or none between a failure and the next submit.
 struct Process {
@@ -264,10 +275,11 @@ impl Drop for ExternalDecider { /* kill and wait the process, ignoring errors; t
 
 `Decider` for `ExternalDecider`:
 
+- `reject`: `stop()` if a process is held (its status and tail are discarded), so the next `submit` starts a fresh process.
 - `submit`: if `self.process` is `None`, `self.process = Some(self.spawn()?)` mapping the error to `WontStart { error }`. Write `request.to_json()` and `\n` to `stdin` and flush; an `io::Error` → `stop()` → `Exited { status, stderr }`.
 - `collect`: `lines.recv_timeout(limit)` (or `recv()` when the limit is `None`): `Ok(Ok(line))` → `Reply::from_json(line.trim_end_matches(['\r', '\n']))`, `Err(error)` → `stop()` → `Unreadable { error, stderr }`; `Ok(Err(_))` or `Err(Disconnected)` → `stop()` → `Exited { status, stderr }`; `Err(Timeout)` → `stop()` → `TimedOut { limit, stderr }`.
 
-Pitfalls: take the pipes out of the `Child` before spawning the pumps; `Child::kill` on an exited process returns `Ok` in current Rust; never block in `Drop` beyond `kill` and `wait`; the sample's request line is a few kilobytes, far below any pipe buffer, so a single write never deadlocks against the reply.
+Pitfalls: take the pipes out of the `Child` before spawning the pumps; `Child::kill` on an exited process returns `Ok` in current Rust; never block in `Drop` beyond `kill` and `wait`. **Known limit:** the write in `submit` has no time limit. A process that has stopped reading its input blocks `submit` once a request is larger than the pipe buffer (measured: about 64 KB on Windows, roughly 100 businesses on one decider at the sample's 600 bytes per view); today's settings are far below that. A later Step can add a writer thread fed by a channel if settings grow; not this one.
 
 ### `crates/engine/src/decider/replay.rs`
 
@@ -449,7 +461,7 @@ impl Session {
 }
 ```
 
-`load(folder)`: `self.host = None` first (ends the old processes). `load_setting` → `Err` → errors as before. `Ok(setting)` → the host from `self.hosting` (`Idle` → `DeciderHost::idle()`; `FromSetting` → `python::host_for(&setting)`; `Custom(f)` → `f(&setting)`): `Err(error)` → `self.loaded = Some(Loaded::Errors(text::load_failure_lines(&error.to_string(), folder)))`, log cleared. `Ok(mut host)` → `World::new(setting, &mut host)`: `Err(error)` → `Loaded::Errors(load_failure_lines(&error.to_string(), folder))` the same way; `Ok((world, report))` → log = turn line then failure lines; `self.host = Some(host)`; `self.loaded = Some(Loaded::World(world))`. `Session` no longer derives `Default` (`Hosting` has no default); `app.rs` calls `Session::new(Hosting::FromSetting)`.
+`load(folder)`: `self.host = None` first (ends the old processes). `load_setting` → `Err` → errors as before. `Ok(setting)` → the host from `self.hosting` (`Idle` → `DeciderHost::idle()`; `FromSetting` → `python::host_for(&setting)`; `Custom(f)` → `f(&setting)`): `Err(error)` → `self.loaded = Some(Loaded::Errors(text::load_failure_lines(&error.to_string(), folder)))`, log cleared. `Ok(mut host)` → `World::new(setting, &mut host)`: `Err(error)` → `Loaded::Errors(load_failure_lines(&error.to_string(), folder))` the same way; `Ok((world, report))` → log = turn line then failure lines; `self.host = Some(host)`; `self.loaded = Some(Loaded::World(world))`. `Session` no longer derives `Default` (`Hosting` has no default); `app.rs` calls `Session::new(Hosting::FromSetting)`. Only `FromSetting` is used outside tests, so `Idle` and `Custom` (and the `HostBuilder` type alias for `Custom`'s boxed closure, which clippy otherwise flags as too complex) carry `#[cfg(test)]` rather than a dead-code allowance; Stage 05 lifts the attribute when the UI becomes a decider.
 
 ### `crates/dev-ui/src/text.rs`
 
@@ -492,7 +504,7 @@ Run everything with `.venv/Scripts/python tools/check.py`. The tests in `externa
 - `the_idle_host_holds_every_name_and_the_empty_host_none`: `DeciderHost::idle().holds("x")`; `!DeciderHost::new().holds("x")`; after `add("x", ..)` both hold it; `names()` lists added names in order.
 - `adding_a_name_twice_panics` (`should_panic(expected = "already in the host")`).
 - `check_names_the_first_business_with_an_unknown_decider`: a hand-built `Businesses` (as `businesses.rs`'s tests do: `a` and `c` name `rule`, `b` names `other`) against a host holding only `rule` → `Err(UnknownDecider { business: "b", decider: "other", known: ["rule"] })`; its Display; the idle host → `Ok`; the empty host → `Err` for `a`, Display ends `(it holds no deciders)`.
-- `failure_and_report_displays`: the Display text of every `DeciderFailure` variant except `Exited` (covered by the integration tests, since it needs a real `ExitStatus`); `ReportedFailure` with a two-line tail prints the `its error output ends with:` line and the two indented lines; `DecisionCounts::default()` is zeros.
+- `failure_and_report_displays`: the Display text of every `DeciderFailure` variant except `Exited` (`WontStart` wrapping an `ExitedAtOnce` with a two-line tail displays as one line and `stderr_tail()` returns the two lines) (covered by the integration tests, since it needs a real `ExitStatus`); `ReportedFailure` with a two-line tail prints the `its error output ends with:` line and the two indented lines; `DecisionCounts::default()` is zeros.
 - `a_closure_decider_answers_its_request`: `ClosureDecider::new(|r| Reply { turn: r.turn, decisions: vec![] })`; `submit` then `collect` gives that reply.
 
 **`decider/replay.rs`** — build two recordings in memory (turns 2 and 3, one view each).
@@ -533,9 +545,10 @@ Helpers: `python() -> PathBuf` (`python::interpreter().unwrap_or_else(|e| panic!
 - **AC 1 (the real decider).** `the_sample_runs_under_the_arithmetic_decider`: `python::host_for(&load(sample))` → `Ok`; `World::new` → each center business's answer is `Valid(d)` with `d` equal to the recording's decision for that business (read `sample_turn0.recording.json`); report `{ valid: 3 }`, no failures. Step 5 times: each report `{ valid: 3 }`, no failures, every answer `Valid`.
 - **AC 5 (exits before answering).** `a_process_that_exits_before_answering_idles_its_businesses_and_is_restarted`: a temp file holding `0`; `script("import sys,pathlib; p=pathlib.Path(sys.argv[1]); p.write_text(str(int(p.read_text())+1)); sys.stdin.readline(); print('boom', file=sys.stderr); sys.exit(3)", [path])` as `arithmetic`; `World::new` from the sample: answers all `Nothing`, one failure `Exited { status, stderr: ["boom"] }` with `status.code() == Some(3)`, Display contains `the process exited`; the file reads `1`. `step` → the same failure again and the file reads `2` (started again). `{ nothing: 3 }` both times.
 - **AC 5 (late).** `a_process_that_answers_late_times_out`: `script("import sys,time; sys.stdin.readline(); time.sleep(30)")` with `config(300)` → failure `TimedOut { limit: 300 ms, .. }`; the whole `World::new` takes under 5 s; `step` → `TimedOut` again (so the process was killed and restarted).
+- **AC 5 (one reply behind).** `a_process_whose_reply_is_refused_is_restarted`: a script that, after each request line, prints two reply lines for that turn (`{"turn": N, "decisions": []}` twice, parsing the turn from the request with `json`), under `arithmetic` on the sample: turn 0 is answered (all `Nothing`, no failure, `{ nothing: 3 }`); `step` → the stale second line answers turn 0 against turn 1, so one failure `Refused` with `TurnMismatch { request: 1, reply: 0 }`; `step` again → the fresh process answers turn 2 correctly: no failure. A start counter file (as in the exits-before-answering test) reads `2` at the end.
 - **AC 5 (garbage).** `a_reply_that_isnt_a_reply_is_a_failure`: `script("import sys; sys.stdin.readline(); print('not json', flush=True); sys.stdin.readline()")` → `Unreadable { error: FormatError::Json(_), .. }`, Display starts `the reply couldn't be read: `.
 - **AC 5 (won't start).** `a_script_that_exits_at_once_fails_host_construction`: `ExternalDecider::start(script("import sys; sys.exit(2)"), default)` → `Err(StartError::ExitedAtOnce { status, .. })` with code 2. `an_unknown_decider_name_is_a_host_error`: `python::host_for(&load(production_valid))` → `Err(HostError::Start { decider: "rule", error: ExitedAtOnce { status, stderr } })` with code 2 and a stderr line containing `unknown decider 'rule'`; the Display contains both.
-- **AC 7 (dropping).** `dropping_a_host_ends_its_processes`: `script("import sys,time,pathlib; p=pathlib.Path(sys.argv[1])\nwhile True:\n p.write_text(str(time.time())); time.sleep(0.05)", [path])` (a heartbeat) started into a host; wait 300 ms, the file's content changes between two reads 200 ms apart; `drop(host)`; wait 300 ms; two reads 300 ms apart are equal.
+- **AC 7 (dropping).** `dropping_a_host_ends_its_processes`: a heartbeat script that appends one `.` to the file at `sys.argv[1]` every 50 ms, forever (append, never rewrite: a rewrite truncates the file first, so a read can see it empty), started into a host; wait 300 ms, the file grows between two reads 200 ms apart; `drop(host)`; wait 300 ms; two reads 300 ms apart are equal.
 - **AC 8.** The `expect` in `python()`: no separate test; `python.rs`'s unit test checks the message.
 
 ### Dev UI
@@ -544,12 +557,12 @@ Helpers: `python() -> PathBuf` (`python::interpreter().unwrap_or_else(|e| panic!
 
 - `a_closure_decider_failure_is_logged_each_turn`: `Hosting::Custom(Box::new(|_| Ok(DeciderHost::new().with("rule", ClosureDecider::new(|r| Reply { turn: r.turn.next().unwrap(), decisions: vec![] })).with("other_rule", ClosureDecider::new(|r| Reply { turn: r.turn, decisions: vec![] })))))` on `businesses_valid`: the log is the turn-0 line then `Turn 0: decider 'rule' failed: the reply was refused: the reply answers turn 1, but the request is for turn 0`; after `step(1)` two more lines, the last being the turn-1 failure line.
 - `a_custom_host_error_is_a_load_error`: `Hosting::Custom(Box::new(|_| Err(HostError::Python(PythonError::BadTimeLimit { value: "x".into() }))))` → `Loaded::Errors(lines)` with `lines[0]` the error's Display and `lines[1]` `1 error(s) found in {folder}`; `world()` is `None`; the log is empty.
-- `the_sample_loads_and_steps_under_its_python_deciders` (Python): `Hosting::FromSetting` on the sample: `log()[0]` is the known turn-0 line; `step(2)` → the log has exactly 3 lines, all starting `Turn ` and none containing `failed`.
+- `the_sample_loads_and_steps_under_its_python_deciders` (Python): `Hosting::FromSetting` on the sample: if `loaded()` is `Loaded::Errors(lines)`, panic with those lines (so a missing Python environment fails with its own message); `log()[0]` is the known turn-0 line; `step(2)` → the log has exactly 3 lines, all starting `Turn ` and none containing `failed`.
 - `a_decider_that_wont_start_is_a_load_error` (Python): `Hosting::FromSetting` on `production_valid` → `Loaded::Errors`, a line containing `decider 'rule'` and one containing `unknown decider 'rule'`; `step(1)` returns 0.
 
 **`text.rs`** — `failure_lines_and_load_failure_lines`: a `ReportedFailure` with `TimedOut { 2.5 s, ["a", "b"] }` at turn 7 gives `["Turn 7: decider 'x' failed: no reply within the time limit of 2.5 s", "    stderr: a", "    stderr: b"]`; `load_failure_lines("one\ntwo", folder)` gives `["one", "two", "1 error(s) found in <folder>"]`.
 
-**`tests/checker.rs`** — `a_decider_that_wont_start_prints_an_error_and_exits_1` (Python): `check production_valid --turns 1` → exit 1, stdout holds only the `Loaded setting` line, stderr contains `unknown decider 'rule'`. `turns_without_businesses_start_no_python`: `check pops_placed --turns 1` passes even with `POLICYSPACE_PYTHON=no/such/python` in the child's environment (set it on the `Command`, not the test process) and prints no failure lines. The existing sample `--turns` tests (Python) must pass unchanged.
+**`tests/checker.rs`** — `a_decider_that_wont_start_prints_an_error_and_exits_1` (Python): `check production_valid --turns 1` → exit 1, stdout holds only the `Loaded setting` line, stderr contains `unknown decider 'rule'`. `turns_without_businesses_start_no_python`: `check pops_placed --turns 1` passes even with `POLICYSPACE_PYTHON=no/such/python` in the child's environment (set it on the `Command`, not the test process) and prints no failure lines. The existing sample `--turns` tests (Python) must pass unchanged, with the child's stderr added to their exit-code assertion messages so a missing Python environment fails with its message rather than a bare exit code.
 
 ## Constraints
 
@@ -559,6 +572,18 @@ Helpers: `python() -> PathBuf` (`python::interpreter().unwrap_or_else(|e| panic!
 - Don't change the protocol types or their JSON, `Reply::validate`, `Answer`, the recordings, the Python package, any setting, `tools/check.py`, `docs/`, or `manual.ipynb` (documentation is drafted later in the loop).
 - The turn line (`text::turn_line`) and every existing checker and session expectation stay byte-for-byte the same.
 - Out of scope: resolving decisions, trading, running factories, the cash cap (Step 08); showing answers and traces beyond the log lines (Step 09); a ready handshake or any protocol change; deciders in other languages beyond what `ExternalCommand` allows; businesses entering or leaving; halting on a failure or a strict mode.
+
+## Notes from the build
+
+Recorded after Code Review, for Step 08, Step 09 and the docs:
+
+- The fix round added `Decider::reject` (a whole-reply refusal restarts an external process, as the design asks), `StartError::summary`/`stderr_tail` (every failure logs as one line plus `stderr:` lines), and better failure messages in the dev UI tests when the Python environment is missing.
+- **Known limit:** the request write in `ExternalDecider::submit` has no time limit; a process that stops reading its input blocks the turn once a request exceeds the pipe buffer (about 64 KB, roughly 100 businesses on one decider). A later Step can add a writer thread.
+- Joining the pump threads after a kill assumes nothing else holds the process's pipes; a decider script that spawns its own child inheriting them, and that outlives it, would delay the join. On Windows the venv's `python.exe` launcher and its real interpreter die together (the timeout and drop tests prove it).
+- `StartError::ExitedAtOnce` shows the interpreter path as built from the engine crate's manifest directory (`...\crates\engine\..\..\.venv\Scripts\python.exe`), not canonicalised.
+- With the Python environment missing, `cargo test -p policyspace-dev-ui` stops at the unit-test target; `--no-fail-fast` reaches the checker tests. The engine's `external_decider` tests fail with the "Python environment wasn't found" message.
+- `Hosting::Idle` and `Hosting::Custom` are `#[cfg(test)]` until Stage 05 makes the UI a decider.
+- `cargo test --workspace` and the sample's `check --turns` now start Python, so the virtual environment (with `pip install -r requirements.txt`) is required for the Rust tests too.
 
 ## Done When
 

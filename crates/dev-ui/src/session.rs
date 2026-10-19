@@ -5,9 +5,10 @@
 
 use std::path::{Path, PathBuf};
 
-use policyspace_engine::{HexCoord, HexId, World, load_setting};
+use policyspace_engine::decider::python::{self, HostError};
+use policyspace_engine::{DeciderHost, HexCoord, HexId, LoadedSetting, World, load_setting};
 
-use crate::text::{error_lines, turn_line};
+use crate::text::{error_lines, failure_lines, load_failure_lines, turn_line};
 
 /// How many steps Step ×10 takes.
 pub const STEP_MANY: u32 = 10;
@@ -23,15 +24,51 @@ pub enum Loaded {
     Errors(Vec<String>),
 }
 
+/// A function that builds the decider host for a setting.
+#[cfg(test)]
+pub type HostBuilder = Box<dyn Fn(&LoadedSetting) -> Result<DeciderHost, HostError>>;
+
+/// How a session builds the decider host when it loads a setting.
+pub enum Hosting {
+    /// The idle host: every business does nothing. For tests and tools that don't care.
+    /// Only the tests build it, so the window's build leaves it out.
+    #[cfg(test)]
+    Idle,
+    /// One Python process per decider name the setting's businesses carry
+    /// (`python::host_for`).
+    FromSetting,
+    /// A caller-supplied builder (tests; Stage 05's UI decider). Only the tests build it, so
+    /// the window's build leaves it out.
+    #[cfg(test)]
+    Custom(HostBuilder),
+}
+
+impl Hosting {
+    /// Builds the host for `setting`.
+    fn build(&self, setting: &LoadedSetting) -> Result<DeciderHost, HostError> {
+        match self {
+            #[cfg(test)]
+            Hosting::Idle => Ok(DeciderHost::idle()),
+            Hosting::FromSetting => python::host_for(setting),
+            #[cfg(test)]
+            Hosting::Custom(build) => build(setting),
+        }
+    }
+}
+
 /// The current folder (if any) and what loading it gave.
-#[derive(Default)]
 pub struct Session {
+    /// How later loads build their decider host.
+    hosting: Hosting,
     /// The current folder, once one was opened.
     folder: Option<PathBuf>,
     /// What loading the current folder gave.
     loaded: Option<Loaded>,
-    /// Every turn line since the last load, oldest first (`text::turn_line`). Empty
-    /// unless a world is loaded.
+    /// The host for the loaded world; None whenever `loaded` isn't a world. Dropping it
+    /// (on reload, open or a failed load) ends its processes.
+    host: Option<DeciderHost>,
+    /// Every turn line since the last load, oldest first (`text::turn_line`), each followed
+    /// by its decider failure lines (`text::failure_lines`). Empty unless a world is loaded.
     log: Vec<String>,
     /// The error from the last refused step, if any, since the last load.
     step_error: Option<String>,
@@ -40,9 +77,17 @@ pub struct Session {
 }
 
 impl Session {
-    /// No folder chosen.
-    pub fn new() -> Session {
-        Session::default()
+    /// No folder chosen; `hosting` says how later loads build their host.
+    pub fn new(hosting: Hosting) -> Session {
+        Session {
+            hosting,
+            folder: None,
+            loaded: None,
+            host: None,
+            log: Vec::new(),
+            step_error: None,
+            selected: None,
+        }
     }
 
     /// Makes `folder` the current folder and loads it (replacing whatever was loaded).
@@ -86,18 +131,22 @@ impl Session {
         }
     }
 
-    /// Steps the world up to `times` times, adding each report's line to the log. Stops at
-    /// the first refused step, storing its error (`StepError`'s `Display`). Does nothing
-    /// without a world. Returns the number of steps taken.
+    /// Steps the world up to `times` times, adding each report's line to the log, followed
+    /// by the lines of each decider failure. Stops at the first refused step, storing its
+    /// error (`StepError`'s `Display`). Does nothing without a world. Returns the number of
+    /// steps taken.
     pub fn step(&mut self, times: u32) -> u32 {
-        let Some(Loaded::World(world)) = &mut self.loaded else {
+        let (Some(Loaded::World(world)), Some(host)) = (&mut self.loaded, &mut self.host) else {
             return 0;
         };
         let mut taken = 0;
         for _ in 0..times {
-            match world.step() {
+            match world.step(host) {
                 Ok(report) => {
                     self.log.push(turn_line(world, &report));
+                    for failure in &report.decider_failures {
+                        self.log.extend(failure_lines(report.turn, failure));
+                    }
                     taken += 1;
                 }
                 Err(error) => {
@@ -138,27 +187,56 @@ impl Session {
         self.world()?.map().id(coord)
     }
 
-    /// Loads the setting in `folder`: a world at turn 0 with a log of turn 0's line, or the
-    /// lines describing its errors with an empty log. Clears the step error either way.
+    /// Loads the setting in `folder`: a world at turn 0 with a log of turn 0's line (and its
+    /// decider failures), or the lines describing its errors with an empty log. A setting
+    /// whose deciders can't start, or whose businesses name a decider the host doesn't
+    /// hold, gives errors too. Ends the old host's processes first, and clears the step
+    /// error either way.
     fn load(&mut self, folder: &Path) {
         self.step_error = None;
-        match load_setting(folder) {
-            Ok(setting) => {
-                let (world, report) = World::new(setting);
-                self.log = vec![turn_line(&world, &report)];
-                self.loaded = Some(Loaded::World(world));
-            }
+        self.host = None;
+        let setting = match load_setting(folder) {
+            Ok(setting) => setting,
             Err(errors) => {
                 self.log.clear();
                 self.loaded = Some(Loaded::Errors(error_lines(&errors, folder)));
+                return;
             }
+        };
+        let mut host = match self.hosting.build(&setting) {
+            Ok(host) => host,
+            Err(error) => {
+                self.fail(&error.to_string(), folder);
+                return;
+            }
+        };
+        match World::new(setting, &mut host) {
+            Ok((world, report)) => {
+                self.log = vec![turn_line(&world, &report)];
+                for failure in &report.decider_failures {
+                    self.log.extend(failure_lines(report.turn, failure));
+                }
+                self.host = Some(host);
+                self.loaded = Some(Loaded::World(world));
+            }
+            Err(error) => self.fail(&error.to_string(), folder),
         }
+    }
+
+    /// Records a load that failed after the setting itself loaded fine.
+    fn fail(&mut self, message: &str, folder: &Path) {
+        self.log.clear();
+        self.loaded = Some(Loaded::Errors(load_failure_lines(message, folder)));
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
+
+    use policyspace_engine::Reply;
+    use policyspace_engine::decider::ClosureDecider;
+    use policyspace_engine::decider::python::PythonError;
 
     use super::*;
     use crate::test_support::repo_path;
@@ -187,7 +265,7 @@ mod tests {
 
     #[test]
     fn world_is_none_without_a_world_and_the_world_otherwise() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         assert!(session.world().is_none());
         session.open(repo_path("crates/engine/tests/settings/many_errors"));
         assert!(session.world().is_none());
@@ -199,7 +277,7 @@ mod tests {
 
     #[test]
     fn a_new_session_has_nothing_and_reload_does_nothing() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         assert!(session.folder().is_none());
         assert!(session.loaded().is_none());
         session.reload();
@@ -209,7 +287,7 @@ mod tests {
 
     #[test]
     fn open_loads_a_world_at_turn_0() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         let folder = repo_path("settings/sample");
         session.open(folder.clone());
         assert_eq!(session.folder(), Some(folder.as_path()));
@@ -220,7 +298,7 @@ mod tests {
 
     #[test]
     fn open_on_a_broken_setting_gives_the_checkers_lines_and_keeps_the_folder() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         let folder = repo_path("crates/engine/tests/settings/many_errors");
         session.open(folder.clone());
         assert_eq!(session.folder(), Some(folder.as_path()));
@@ -242,7 +320,7 @@ mod tests {
         fs::write(root.join("setting.toml"), MANIFEST).unwrap();
         fs::write(root.join("start/map.toml"), ONE_HEX_MAP).unwrap();
 
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(root.to_path_buf());
         assert_eq!(world(&session).map().len(), 1);
 
@@ -262,7 +340,7 @@ mod tests {
 
     #[test]
     fn open_on_a_different_folder_replaces_what_was_loaded() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(repo_path("settings/sample"));
         assert_eq!(world(&session).map().len(), 19);
         session.open(repo_path("crates/engine/tests/settings/hexes_one"));
@@ -276,10 +354,11 @@ mod tests {
     /// A world for the setting at `relative`, built and stepped `steps` times on its own.
     fn separate_world(relative: &str, steps: u32) -> (World, Vec<String>) {
         let setting = load_setting(repo_path(relative)).unwrap();
-        let (mut world, report) = World::new(setting);
+        let mut host = DeciderHost::idle();
+        let (mut world, report) = World::new(setting, &mut host).unwrap();
         let mut lines = vec![turn_line(&world, &report)];
         for _ in 0..steps {
-            let report = world.step().unwrap();
+            let report = world.step(&mut host).unwrap();
             lines.push(turn_line(&world, &report));
         }
         (world, lines)
@@ -305,7 +384,7 @@ mod tests {
 
     #[test]
     fn open_gives_a_log_of_turn_0_and_nothing_selected() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(repo_path("settings/sample"));
         assert_eq!(
             session.log(),
@@ -319,7 +398,7 @@ mod tests {
 
     #[test]
     fn step_adds_one_log_line_per_turn() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(repo_path("settings/sample"));
         assert_eq!(session.step(1), 1);
         assert_eq!(world(&session).turn().get(), 1);
@@ -339,7 +418,7 @@ mod tests {
 
     #[test]
     fn the_log_matches_the_checkers_turn_lines() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(repo_path("crates/engine/tests/settings/turns_valid"));
         assert_eq!(session.step(4), 4);
         let (_, expected) = separate_world("crates/engine/tests/settings/turns_valid", 4);
@@ -348,7 +427,7 @@ mod tests {
 
     #[test]
     fn stepping_without_a_world_does_nothing() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         assert_eq!(session.step(1), 0);
         assert!(session.log().is_empty());
 
@@ -360,7 +439,7 @@ mod tests {
 
     #[test]
     fn reload_after_stepping_starts_a_new_log_at_turn_0() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(repo_path("settings/sample"));
         session.step(STEP_MANY);
         session.reload();
@@ -371,7 +450,7 @@ mod tests {
 
     #[test]
     fn reload_keeps_the_selection_and_select_none_clears_it() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(repo_path("settings/sample"));
         let hex = hex_at(&session, 0, 0);
         session.select(Some(hex));
@@ -384,7 +463,7 @@ mod tests {
 
     #[test]
     fn open_clears_the_selection() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(repo_path("settings/sample"));
         session.select(Some(hex_at(&session, 0, 0)));
         session.open(repo_path("settings/sample"));
@@ -401,7 +480,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         two_hex_setting(root);
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(root.to_path_buf());
         session.select(Some(hex_at(&session, 1, 0)));
         assert!(session.selected().is_some());
@@ -420,7 +499,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         two_hex_setting(root);
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         session.open(root.to_path_buf());
         session.select(Some(hex_at(&session, 0, 0)));
 
@@ -437,9 +516,9 @@ mod tests {
 
     #[test]
     fn select_while_holding_errors_selects_nothing() {
-        let mut session = Session::new();
+        let mut session = Session::new(Hosting::Idle);
         let hex = {
-            let mut other = Session::new();
+            let mut other = Session::new(Hosting::Idle);
             other.open(repo_path("settings/sample"));
             hex_at(&other, 0, 0)
         };
@@ -448,5 +527,112 @@ mod tests {
         session.open(repo_path("crates/engine/tests/settings/many_errors"));
         session.select(Some(hex));
         assert_eq!(session.selected(), None);
+    }
+
+    /// The sample's turn-0 line, as `open_gives_a_log_of_turn_0_and_nothing_selected` has it.
+    const SAMPLE_TURN_0: &str = "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666";
+
+    #[test]
+    fn a_closure_decider_failure_is_logged_each_turn() {
+        let hosting = Hosting::Custom(Box::new(|_| {
+            Ok(DeciderHost::new()
+                .with(
+                    "rule",
+                    ClosureDecider::new(|r| Reply {
+                        turn: r.turn.next().unwrap(),
+                        decisions: vec![],
+                    }),
+                )
+                .with(
+                    "other_rule",
+                    ClosureDecider::new(|r| Reply {
+                        turn: r.turn,
+                        decisions: vec![],
+                    }),
+                ))
+        }));
+        let mut session = Session::new(hosting);
+        session.open(repo_path("crates/engine/tests/settings/businesses_valid"));
+        assert_eq!(session.log().len(), 2);
+        assert!(session.log()[0].starts_with("Turn 0: "));
+        assert_eq!(
+            session.log()[1],
+            "Turn 0: decider 'rule' failed: the reply was refused: the reply answers turn 1, but the request is for turn 0"
+        );
+        assert_eq!(session.step(1), 1);
+        assert_eq!(session.log().len(), 4);
+        assert!(session.log()[2].starts_with("Turn 1: "));
+        assert_eq!(
+            session.log()[3],
+            "Turn 1: decider 'rule' failed: the reply was refused: the reply answers turn 2, but the request is for turn 1"
+        );
+    }
+
+    #[test]
+    fn a_custom_host_error_is_a_load_error() {
+        let hosting = Hosting::Custom(Box::new(|_| {
+            Err(HostError::Python(PythonError::BadTimeLimit {
+                value: "x".to_string(),
+            }))
+        }));
+        let mut session = Session::new(hosting);
+        let folder = repo_path("settings/sample");
+        session.open(folder.clone());
+        match session.loaded() {
+            Some(Loaded::Errors(lines)) => {
+                assert_eq!(lines.len(), 2);
+                assert_eq!(
+                    lines[0],
+                    PythonError::BadTimeLimit {
+                        value: "x".to_string()
+                    }
+                    .to_string()
+                );
+                assert_eq!(
+                    lines[1],
+                    format!("1 error(s) found in {}", folder.display())
+                );
+            }
+            _ => panic!("expected errors"),
+        }
+        assert!(session.world().is_none());
+        assert!(session.log().is_empty());
+        assert_eq!(session.step(1), 0);
+    }
+
+    #[test]
+    fn the_sample_loads_and_steps_under_its_python_deciders() {
+        let mut session = Session::new(Hosting::FromSetting);
+        session.open(repo_path("settings/sample"));
+        if let Some(Loaded::Errors(lines)) = session.loaded() {
+            panic!("the sample didn't load:\n{}", lines.join("\n"));
+        }
+        assert_eq!(session.log()[0], SAMPLE_TURN_0);
+        assert_eq!(session.step(2), 2);
+        assert_eq!(session.log().len(), 3);
+        for line in session.log() {
+            assert!(line.starts_with("Turn "), "{line}");
+            assert!(!line.contains("failed"), "{line}");
+        }
+    }
+
+    #[test]
+    fn a_decider_that_wont_start_is_a_load_error() {
+        let mut session = Session::new(Hosting::FromSetting);
+        session.open(repo_path("crates/engine/tests/settings/production_valid"));
+        match session.loaded() {
+            Some(Loaded::Errors(lines)) => {
+                assert!(
+                    lines.iter().any(|l| l.contains("decider 'rule'")),
+                    "{lines:?}"
+                );
+                assert!(
+                    lines.iter().any(|l| l.contains("unknown decider 'rule'")),
+                    "{lines:?}"
+                );
+            }
+            _ => panic!("expected errors"),
+        }
+        assert_eq!(session.step(1), 0);
     }
 }

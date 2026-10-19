@@ -7,8 +7,8 @@
 use std::path::Path;
 
 use policyspace_engine::{
-    GoodId, HexId, LoadErrors, Perishes, PerishesAt, PopId, Quantity, Stockpile, Turn, TurnReport,
-    World,
+    GoodId, HexId, LoadErrors, Perishes, PerishesAt, PopId, Quantity, ReportedFailure, Stockpile,
+    Turn, TurnReport, World,
 };
 
 /// The lines reported for a failed load: each error's `Display`, in order, then
@@ -21,6 +21,33 @@ pub fn error_lines(errors: &LoadErrors, folder: &Path) -> Vec<String> {
         errors.len(),
         folder.display()
     ));
+    lines
+}
+
+/// The lines shown when a setting loads but its deciders can't start (or a name can't be
+/// resolved): `message`'s lines, then `1 error(s) found in {folder.display()}` so the status
+/// bar's count and the error view read as for a broken setting.
+pub fn load_failure_lines(message: &str, folder: &Path) -> Vec<String> {
+    let mut lines: Vec<String> = message.lines().map(str::to_string).collect();
+    lines.push(format!("1 error(s) found in {}", folder.display()));
+    lines
+}
+
+/// The lines logged for one decider failure at `turn`: `Turn {turn}: decider '{name}' failed:
+/// {failure}` (the failure's one-line `Display`), then each stderr tail line as
+/// `    stderr: {line}`.
+pub fn failure_lines(turn: Turn, failure: &ReportedFailure) -> Vec<String> {
+    let mut lines = vec![format!(
+        "Turn {turn}: decider '{}' failed: {}",
+        failure.decider, failure.failure
+    )];
+    lines.extend(
+        failure
+            .failure
+            .stderr_tail()
+            .iter()
+            .map(|line| format!("    stderr: {line}")),
+    );
     lines
 }
 
@@ -440,10 +467,51 @@ pub fn pop_type_rows(world: &World) -> Vec<PopTypeRow> {
 mod tests {
     use std::num::NonZeroU32;
 
-    use policyspace_engine::{HexCoord, load_setting};
+    use std::time::Duration;
+
+    use policyspace_engine::{DeciderFailure, DeciderHost, HexCoord, load_setting};
 
     use super::*;
     use crate::test_support::world_at;
+
+    #[test]
+    fn failure_lines_and_load_failure_lines() {
+        let failure = ReportedFailure {
+            decider: "x".to_string(),
+            failure: DeciderFailure::TimedOut {
+                limit: Duration::from_millis(2500),
+                stderr: vec!["a".to_string(), "b".to_string()],
+            },
+        };
+        assert_eq!(
+            failure_lines(Turn::new(7), &failure),
+            [
+                "Turn 7: decider 'x' failed: no reply within the time limit of 2.5 s",
+                "    stderr: a",
+                "    stderr: b"
+            ]
+        );
+        let quiet = ReportedFailure {
+            decider: "y".to_string(),
+            failure: DeciderFailure::NoRecording { turn: Turn::new(3) },
+        };
+        assert_eq!(
+            failure_lines(Turn::new(3), &quiet),
+            ["Turn 3: decider 'y' failed: no recording for turn 3"]
+        );
+        let folder = Path::new("some/folder");
+        assert_eq!(
+            load_failure_lines(
+                "one
+two", folder
+            ),
+            [
+                "one".to_string(),
+                "two".to_string(),
+                format!("1 error(s) found in {}", folder.display())
+            ]
+        );
+    }
 
     /// The sample world at turn 0.
     fn sample() -> World {
@@ -453,8 +521,8 @@ mod tests {
     /// The `turns_valid` world stepped to turn 2.
     fn turns_valid_at_2() -> World {
         let mut world = world_at("crates/engine/tests/settings/turns_valid");
-        world.step().unwrap();
-        world.step().unwrap();
+        world.step(&mut DeciderHost::idle()).unwrap();
+        world.step(&mut DeciderHost::idle()).unwrap();
         world
     }
 
@@ -597,7 +665,7 @@ mod tests {
         for steps in 0..2 {
             if steps == 1 {
                 for _ in 0..3 {
-                    world.step().unwrap();
+                    world.step(&mut DeciderHost::idle()).unwrap();
                 }
             }
             let rows = good_rows(&world);
@@ -895,7 +963,7 @@ mod tests {
         let mut world = sample();
         let id = pop_on(&world, 2, -2, "peasant");
         let before = world.pops().get(id).size;
-        world.step().unwrap();
+        world.step(&mut DeciderHost::idle()).unwrap();
         let section = pop_section(&world, id);
         assert_eq!(section.growth, {
             format!("Started at {before}; index -1.0000; rate -10.00%")
@@ -938,7 +1006,7 @@ mod tests {
         let (world, report) = {
             let setting = load_setting(crate::test_support::repo_path("settings/sample"))
                 .expect("the sample loads");
-            World::new(setting)
+            World::new(setting, &mut DeciderHost::idle()).unwrap()
         };
         let rows = pop_type_rows(&world);
         assert_eq!(rows.len(), 2);
@@ -1019,7 +1087,7 @@ mod tests {
     #[test]
     fn pop_stockpile_lines_are_written_like_a_hexs() {
         let mut world = world_at("crates/engine/tests/settings/pops_placed");
-        world.step().unwrap();
+        world.step(&mut DeciderHost::idle()).unwrap();
         let hoarder = world.pops().iter().nth(1).expect("POP 1 exists").0;
         assert_eq!(
             pop_stockpile_lines(&world, hoarder),

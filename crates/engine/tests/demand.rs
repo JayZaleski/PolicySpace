@@ -7,7 +7,9 @@ use common::{close, good, hex, load, q, sample_setting};
 use policyspace_engine::{Demand, Quantity, World, demand};
 
 fn sample_world() -> World {
-    World::new(load(&sample_setting())).0
+    World::new(load(&sample_setting()), &mut common::idle())
+        .unwrap()
+        .0
 }
 
 /// The demand of a POP of the named type with `size` individuals holding `labor` unskilled

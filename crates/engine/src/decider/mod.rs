@@ -14,8 +14,10 @@
 //! valid request that Step 08 trims. One turn's exchange is a [`Request`] (every view) and
 //! a [`Reply`] (any subset of decisions, in any order); a [`Recording`] keeps both. Every
 //! type reads and writes JSON losslessly, keyed by setting names and factory ID numbers,
-//! never by engine IDs. Nothing here runs a decider or touches the turn: Step 06 writes the
-//! first script against this format, Step 07 runs the exchange, Step 08 resolves decisions.
+//! never by engine IDs. The [`host`] module runs the exchange once per turn through a
+//! [`DeciderHost`] of named [`Decider`]s (an external process, a replayed recording, or a
+//! Rust closure), stores each business's [`BusinessAnswer`] and reports every
+//! [`DeciderFailure`]; Step 08 resolves the valid decisions.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -27,10 +29,21 @@ use serde::{Deserialize, Serialize};
 
 pub mod batch;
 pub mod decision;
+pub mod external;
+pub mod host;
+pub mod python;
+pub mod replay;
 pub mod view;
 
 pub use batch::{Answer, Recording, Reply, ReplyError, ReplyErrors, Request};
 pub use decision::{Decision, DecisionError, DecisionErrors, FactoryOrder, Place};
+pub use external::{ExternalCommand, ExternalDecider, ProcessConfig, StartError};
+pub use host::{
+    BusinessAnswer, ClosureDecider, Decider, DeciderFailure, DeciderHost, DecisionCounts,
+    ReportedFailure, UnknownDecider,
+};
+pub use python::{HostError, PythonError};
+pub use replay::{ReplayDecider, ReplayError};
 pub use view::{BusinessView, DepositsView, FactoryView, PerishGroup, TechnologyView};
 
 /// Why a message couldn't be read from JSON.

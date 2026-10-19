@@ -281,7 +281,9 @@ mod tests {
     fn trade_world() -> World {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/settings/pops_trade");
         let setting = load_setting(&path).unwrap_or_else(|e| panic!("should load:\n{e}"));
-        World::new(setting).0
+        World::new(setting, &mut crate::decider::DeciderHost::idle())
+            .unwrap()
+            .0
     }
 
     fn hex(world: &World, x: i32) -> HexId {

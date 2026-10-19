@@ -228,7 +228,7 @@ fn buying_removes_currency_and_adds_the_good() {
     assert_eq!(pile, before);
 
     // After one step the new unit's perish time follows the current turn.
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
     let mut pile = stock(&world, 1);
     assert_eq!(pile.total(gold), q(3.0));
     let market = world.market(hex(&world, 0, 0));
@@ -271,7 +271,7 @@ fn untraded_goods_and_the_currency_are_refused() {
 #[test]
 fn the_soonest_perishing_group_is_sold_first() {
     let mut world = turns_world();
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
     let stew = good(&world, "stew");
     let mut pile = stock(&world, 0);
     assert_eq!(groups(&pile, stew), vec![(end(2), 5.0), (end(3), 5.0)]);
@@ -400,7 +400,7 @@ fn buy_for_spends_exactly_and_adds_the_good() {
 #[test]
 fn buy_for_refuses_when_short_and_zero_spend_buys_nothing() {
     let mut world = turns_world();
-    world.step().unwrap();
+    world.step(&mut common::idle()).unwrap();
     let stew = good(&world, "stew");
     let gold = good(&world, "gold");
     let market = world.market(hex(&world, 0, 0));
@@ -447,7 +447,7 @@ fn stepping_does_not_change_prices() {
         .map(|(h, _)| world.hex_prices().has_market(h))
         .collect();
     for _ in 0..3 {
-        world.step().unwrap();
+        world.step(&mut common::idle()).unwrap();
     }
     assert_eq!(lists(&world), before);
     let after: Vec<bool> = world

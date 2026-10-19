@@ -17,6 +17,14 @@
 //!   Exit codes: 0 = success; 1 = the setting has errors; 2 = wrong usage.
 //! - `dev-ui --version` prints the engine's name and version.
 //!
+//! The window and `check --turns` start the setting's deciders as Python processes (one per
+//! decider name its businesses carry, found in the project's virtual environment). A decider
+//! that won't start is a load error: the window shows it in its error view and `check`
+//! prints it to stderr and exits with code 1. A decider that fails during a turn (it exits,
+//! answers late or answers nonsense) is not an error: its businesses do nothing that turn
+//! and the turn log (the window's, and `check --turns`'s output) shows the failure after
+//! that turn's line.
+//!
 //! Any other arguments print the usage message to stderr and exit with code 2.
 
 mod app;

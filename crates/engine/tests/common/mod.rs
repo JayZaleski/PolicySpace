@@ -6,8 +6,8 @@
 use std::path::{Path, PathBuf};
 
 use policyspace_engine::{
-    GoodId, HexCoord, HexId, LoadErrors, LoadedSetting, PerishesAt, PopId, PopOutcome, Quantity,
-    Stockpile, Turn, TurnReport, World, load_setting,
+    DeciderHost, GoodId, HexCoord, HexId, LoadErrors, LoadedSetting, PerishesAt, PopId, PopOutcome,
+    Quantity, Stockpile, Turn, TurnReport, World, load_setting,
 };
 
 /// The folder of the test setting `name` (`tests/settings/<name>`).
@@ -40,9 +40,14 @@ pub fn failures_of(name: &str) -> Vec<String> {
     }
 }
 
-/// Builds a world from the setting at `path`, with its turn 0 report.
+/// The idle host: every business does nothing.
+pub fn idle() -> DeciderHost {
+    DeciderHost::idle()
+}
+
+/// Builds a world from the setting at `path` under the idle host, with its turn 0 report.
 pub fn world_of(path: &Path) -> (World, TurnReport) {
-    World::new(load(path))
+    World::new(load(path), &mut idle()).expect("the idle host holds every name")
 }
 
 /// The hex at (`q`, `r`), panicking if the map has none.
