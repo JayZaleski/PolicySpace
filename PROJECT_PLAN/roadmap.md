@@ -123,7 +123,7 @@
 - Description: The project's Python package: a client that reads a batch of views and writes a batch of decisions in Step 05's format, and the first business decider, the arithmetic rule: a factory runs at capacity and is maintained when the margin at posted prices covers inputs and maintenance, and is otherwise left to run down; offers of last turn's output and surplus unimproved goods, bids for the inputs and maintenance that implies. The rule works over whole batches, not one business at a time. Python tests against recorded views, run from the project's virtual environment.
 
 ### Step 07: decider-host
-- Status: planned
+- Status: specified
 - Tags: #deciders #turn-loop #engine #python
 - Description: The decision point in the engine: once per turn, every business's view is served and every decision collected in one batched exchange. A Decider abstraction with two implementations: the external-process decider, which starts the Python script once, keeps it alive across turns, and exchanges one batch per turn; and the replay decider, which answers from a recording so engine tests that don't test strategy don't need Python. Failure semantics: what the engine does when a decider errors, answers late, or sends a decision it can't resolve. Resolving the decider names businesses give in the setting, and the test setup that finds the project's Python environment. The engine never depends on a decider's memory.
 
