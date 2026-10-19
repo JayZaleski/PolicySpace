@@ -1,5 +1,6 @@
 //! A bundle is a list of goods with amounts: a technology's inputs per unit of output, its
-//! capital bundle and its construction bundle, and later a factory's current capital. Kept
+//! capital bundle and its construction bundle, and the goods a run uses and the goods maintenance
+//! costs (bundles are also the engine's working lists of goods with amounts). Kept
 //! sorted by good ID with no good twice, so two bundles with the same goods and amounts are
 //! equal and lookups are cheap. Amounts are `Quantity` (finite, at least 0); whether 0 is
 //! allowed is up to the owner (a technology's bundles are all positive; a factory's capital
@@ -45,6 +46,52 @@ impl Bundle {
             Ok(i) => self.items[i].1,
             Err(_) => Quantity::ZERO,
         }
+    }
+
+    /// Every amount multiplied by `factor` (saturating). The goods stay named even when
+    /// `factor` is zero.
+    pub fn scaled(&self, factor: Quantity) -> Bundle {
+        Bundle {
+            items: self
+                .items
+                .iter()
+                .map(|&(good, amount)| (good, amount.saturating_mul(factor)))
+                .collect(),
+        }
+    }
+
+    /// The goods of both bundles, with the amounts of a good named in both added
+    /// (saturating), in good ID order.
+    pub fn merged(&self, other: &Bundle) -> Bundle {
+        let mut items = Vec::with_capacity(self.items.len() + other.items.len());
+        let (mut a, mut b) = (self.items.iter().peekable(), other.items.iter().peekable());
+        loop {
+            match (a.peek().copied(), b.peek().copied()) {
+                (Some(&(ga, qa)), Some(&(gb, qb))) => {
+                    if ga < gb {
+                        items.push((ga, qa));
+                        a.next();
+                    } else if gb < ga {
+                        items.push((gb, qb));
+                        b.next();
+                    } else {
+                        items.push((ga, qa.saturating_add(qb)));
+                        a.next();
+                        b.next();
+                    }
+                }
+                (Some(&item), None) => {
+                    items.push(item);
+                    a.next();
+                }
+                (None, Some(&item)) => {
+                    items.push(item);
+                    b.next();
+                }
+                (None, None) => break,
+            }
+        }
+        Bundle { items }
     }
 
     /// True if the bundle names `good` (even with amount 0).
@@ -125,6 +172,57 @@ mod tests {
         let bundle = Bundle::default();
         assert!(bundle.is_empty());
         assert_eq!(bundle, Bundle::new(Vec::new()));
+    }
+
+    #[test]
+    fn scaled_multiplies_every_amount_and_keeps_the_goods_named() {
+        let bundle = Bundle::new(vec![(good(0), q(2.5)), (good(2), q(4.0))]);
+        assert_eq!(
+            bundle.scaled(q(0.5)).as_slice(),
+            &[(good(0), q(1.25)), (good(2), q(2.0))]
+        );
+        let zero = bundle.scaled(Quantity::ZERO);
+        assert_eq!(
+            zero.as_slice(),
+            &[(good(0), Quantity::ZERO), (good(2), Quantity::ZERO)]
+        );
+        assert!(zero.contains(good(0)));
+        assert_eq!(bundle.scaled(Quantity::ONE), bundle);
+    }
+
+    #[test]
+    fn merged_adds_shared_goods_and_keeps_the_rest_sorted() {
+        let a = Bundle::new(vec![
+            (good(0), q(1.0)),
+            (good(2), q(2.0)),
+            (good(5), q(3.0)),
+        ]);
+        let b = Bundle::new(vec![
+            (good(1), q(4.0)),
+            (good(2), q(0.5)),
+            (good(6), q(1.0)),
+        ]);
+        let merged = a.merged(&b);
+        assert_eq!(
+            merged.as_slice(),
+            &[
+                (good(0), q(1.0)),
+                (good(1), q(4.0)),
+                (good(2), q(2.5)),
+                (good(5), q(3.0)),
+                (good(6), q(1.0)),
+            ]
+        );
+        assert_eq!(merged, b.merged(&a));
+    }
+
+    #[test]
+    fn merging_with_an_empty_bundle_gives_a_copy() {
+        let a = Bundle::new(vec![(good(0), q(1.0)), (good(2), q(2.0))]);
+        let empty = Bundle::default();
+        assert_eq!(a.merged(&empty), a);
+        assert_eq!(empty.merged(&a), a);
+        assert!(empty.merged(&empty).is_empty());
     }
 
     #[test]

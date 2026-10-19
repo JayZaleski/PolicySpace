@@ -18,9 +18,10 @@
 //!   of both can be paid per turn.
 //! - **t > t₁ is allowed.** Such a factory wears out faster than it can be maintained.
 //!
-//! Nothing runs technologies yet: Steps 03 to 06 of this Stage do. Knows nothing about
-//! files: the setting loader builds [`Technologies`] from a checked setting, and everything
-//! else only reads them.
+//! The [`production`](crate::production) module runs, wears and maintains factories by
+//! these numbers, as pure functions; Step 08 of this Stage wires it into the turn. Knows
+//! nothing about files: the setting loader builds [`Technologies`] from a checked setting,
+//! and everything else only reads them.
 
 use crate::bundle::Bundle;
 use crate::goods::GoodId;

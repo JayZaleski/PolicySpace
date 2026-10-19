@@ -1,0 +1,20 @@
+[[good]]
+name = "coin"
+
+[[good]]
+name = "labor"
+perishes_after = 1
+
+[[good]]
+name = "ore"
+perishes_after = 3
+
+[[good]]
+name = "iron"
+
+[[good]]
+name = "tools"
+
+[[good]]
+name = "bread"
+perishes_after = 2

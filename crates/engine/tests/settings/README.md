@@ -79,6 +79,21 @@ Valid settings:
   (index, hex, technology, owner, condition): 0 (0, 0) `mill` `farm_a` 1; 1 and 2 (the
   `count = 2` entry) (0, 0) `forge` `farm_a` 0.5; 3 (0, 0) `mill` `farm_b` 1 (written);
   4 (1, 0) `forge` `idle` 0.25.
+- `production_valid`: a small chain for the factory mechanics (`crates/engine/tests/production.rs`):
+  businesses with factories of several lifetimes and condition levels, and stockpiles that
+  make every shortage and cap happen. Goods (IDs 0-5): `coin`, `labor` (perishes after 1),
+  `ore` (perishes after 3), `iron`, `tools`, `bread` (perishes after 2). Technologies (IDs
+  0-2): `smelter` (inputs 2 `ore` and 1 `labor`, output `iron`, capacity 10, capital 4 `tools`,
+  construction 8 `labor`, 2 turns, lifetime 4), `bakery` (input 1 `labor`, output `bread`,
+  capacity 6, capital 3 `tools`, no construction, 1, 3), `spring` (no inputs, output `ore`,
+  capacity 5, capital 1 `tools`, construction 2 `labor`, 4, 3). Hexes (0, 0) and (1, 0),
+  both with currency `coin`. Businesses (IDs 0, 1, no deposits, decider `rule`): `works` at
+  (0, 0) with `coin` 50, `labor` 13, `ore` 30 and `tools` 3, and `springs` at (1, 0) with
+  `tools` 1. Factories (IDs 0-4, each on its owner's hex): 0 `smelter` `works` condition 1;
+  1 `smelter` `works` 0.5; 2 `bakery` `works` 1; 3 `spring` `springs` 1; 4 `spring` `springs`
+  0.5. At turn 0 (no deposits, no POPs) `works` holds `coin` 50 (never perishes), `labor` 13
+  (perishes at the end of turn 0), `ore` 30 (end of turn 2) and `tools` 3 (never); `springs`
+  holds `tools` 1.
 - `factories_one`: one good, one technology, one hex, one business and one factory (for the
   setting checker's `1 factory`).
 - `pops_one`: one good, one POP type, one hex and one POP (for the setting checker's

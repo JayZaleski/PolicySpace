@@ -25,14 +25,18 @@
 //! the rate to the POP's size after every hex has traded.
 //! Technologies (the fixed-proportion recipes factories run, with their capital and
 //! construction bundles, construction time and lifetime) are rules in the [`technologies`]
-//! module, and a [`Bundle`] (the [`bundle`] module) is a list of goods with amounts; nothing
-//! runs technologies yet. Businesses (the [`businesses`] module) are named actors in the
+//! module, and a [`Bundle`] (the [`bundle`] module) is a list of goods with amounts; the
+//! [`production`] module runs them. Businesses (the [`businesses`] module) are named actors in the
 //! starting state, each on one hex with a decider name, a starting inventory and the
 //! deposits it owns, each with its own stockpile in the world; an owned deposit emits into
 //! its owner's stockpile; nothing decides or trades for them yet. Factories (the [`factories`]
 //! module) are placed in the starting state, each on its owner's hex, running one
-//! technology and holding a share (its condition) of that technology's capital bundle;
-//! nothing runs them yet.
+//! technology and holding a share (its condition) of that technology's capital bundle; the
+//! [`production`] module gives them their mechanics as pure functions over one business's
+//! factories and stockpile (running at a fraction of capacity with inputs shared when short,
+//! wear of one lifetime-slice per turn with shutdown below one slice, and maintenance that
+//! replenishes a fraction of the capital bundle at the cost of that fraction of the capital
+//! and construction bundles); nothing in the turn calls them yet.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -63,6 +67,8 @@ pub use pops::{
     Endowment, GrowthParams, Pop, PopId, PopKind, PopType, PopTypeId, PopTypeKind, PopTypes, Pops,
     UtilityGood,
 };
+pub mod production;
+pub use production::{FactoryRecord, MaintenanceRecord, Operation, RunRecord, operate};
 pub mod quantity;
 pub use quantity::Quantity;
 pub mod resources;

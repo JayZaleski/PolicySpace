@@ -1,0 +1,32 @@
+[[factory]]
+q = 0
+r = 0
+technology = "smelter"
+owner = "works"
+condition = 1
+
+[[factory]]
+q = 0
+r = 0
+technology = "smelter"
+owner = "works"
+condition = 0.5
+
+[[factory]]
+q = 0
+r = 0
+technology = "bakery"
+owner = "works"
+
+[[factory]]
+q = 1
+r = 0
+technology = "spring"
+owner = "springs"
+
+[[factory]]
+q = 1
+r = 0
+technology = "spring"
+owner = "springs"
+condition = 0.5

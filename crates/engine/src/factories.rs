@@ -7,8 +7,9 @@
 //! bundle in its own proportions). Factories have no names: deciders, the dev UI and later
 //! decisions address them by ID. A factory sits on its owner's hex until trade between
 //! hexes exists (the loader checks this). A hex and a business may hold any number of
-//! factories. Nothing runs, wears, maintains or shuts down a factory yet (Steps 04 and 08),
-//! and nothing changes a factory during play yet. Knows nothing about files.
+//! factories. The [`production`](crate::production) module runs, wears and maintains factories
+//! as pure functions over one business's factories (Step 08 wires it into the turn), and
+//! nothing changes a factory during play yet. Knows nothing about files.
 
 use crate::businesses::BusinessId;
 use crate::id::{Id, IdKind, IdVec};
