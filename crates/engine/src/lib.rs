@@ -36,7 +36,13 @@
 //! factories and stockpile (running at a fraction of capacity with inputs shared when short,
 //! wear of one lifetime-slice per turn with shutdown below one slice, and maintenance that
 //! replenishes a fraction of the capital bundle at the cost of that fraction of the capital
-//! and construction bundles); nothing in the turn calls them yet.
+//! and construction bundles); nothing in the turn calls them yet. The [`decider`] module
+//! defines the decider protocol as data: the view a business is served each turn (its hex's
+//! currency and posted prices, its stockpile by perish group, its cash, its factories, their
+//! technologies and its deposits, and nothing outside its circumstances), the decision it
+//! answers with (a run and a maintenance fraction per factory, offers, bids and an optional
+//! trace), the validation of a decision against its view, the request and reply that carry
+//! one turn's batch, and lossless JSON for all of it; no decider runs yet (Steps 06 and 07).
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -48,6 +54,11 @@ pub mod businesses;
 pub use businesses::{Business, BusinessId, BusinessKind, Businesses};
 pub mod currency;
 pub use currency::HexCurrencies;
+pub mod decider;
+pub use decider::{
+    Answer, BusinessView, Decision, DecisionErrors, FormatError, Recording, Reply, ReplyErrors,
+    Request,
+};
 pub mod demand;
 pub use demand::{Demand, DemandedGood, PriceList, demand};
 pub mod factories;

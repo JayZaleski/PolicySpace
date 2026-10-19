@@ -2,12 +2,17 @@
 //!
 //! The clock counts turns as whole numbers from 0. A world starts at turn 0 and a step
 //! advances it by one. [`Turn`] is a `u64` behind a type, so turn numbers can't be
-//! confused with other integers and the clock can't wrap.
+//! confused with other integers and the clock can't wrap. A turn is written to JSON as a
+//! whole number.
 
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 /// A turn number. Turn 0 is the first turn.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
+)]
 pub struct Turn(u64);
 
 impl Turn {
@@ -47,6 +52,24 @@ impl fmt::Display for Turn {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn turns_round_trip_through_json_as_whole_numbers() {
+        for n in [0, 7, u64::MAX] {
+            let turn = Turn::new(n);
+            let text = serde_json::to_string(&turn).unwrap();
+            assert_eq!(text, n.to_string());
+            assert_eq!(serde_json::from_str::<Turn>(&text).unwrap(), turn);
+        }
+    }
+
+    #[test]
+    fn reading_refuses_a_fraction_a_negative_and_a_string() {
+        for text in ["3.0", "-1", "\"3\""] {
+            let error = serde_json::from_str::<Turn>(text).unwrap_err();
+            assert!(!error.to_string().is_empty(), "{text} should be refused");
+        }
+    }
 
     #[test]
     fn new_and_get() {

@@ -6,8 +6,14 @@
 //! cross-platform determinism) in one place. A [`Quantity`] is always finite and never
 //! negative. Arithmetic is added when a system needs it; so far, `saturating_add`,
 //! `checked_sub`, `saturating_mul` and `checked_div`.
+//!
+//! A quantity is written to JSON as a plain number and read back through [`Quantity::new`],
+//! so the written form is defined here and nowhere else: the shortest text that reads back
+//! to the same `f64`, and a negative or non-finite number is refused.
 
 use std::fmt;
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 /// An amount of a good: a finite, non-negative number.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -81,9 +87,74 @@ impl fmt::Display for Quantity {
     }
 }
 
+/// Written as a plain JSON number.
+impl Serialize for Quantity {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_f64(self.0)
+    }
+}
+
+/// Read as a JSON number (an integer is fine) through [`Quantity::new`].
+impl<'de> Deserialize<'de> for Quantity {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Quantity, D::Error> {
+        let value = f64::deserialize(deserializer)?;
+        Quantity::new(value).ok_or_else(|| {
+            de::Error::custom(format!(
+                "a quantity must be a finite number of at least 0, not {value}"
+            ))
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quantities_round_trip_through_json_exactly() {
+        for value in [
+            0.0,
+            0.1,
+            1.0 / 3.0,
+            1e-300,
+            5e-324,
+            f64::MAX,
+            123_456_789.123_456_79,
+        ] {
+            let q = Quantity::new(value).unwrap();
+            let text = serde_json::to_string(&q).unwrap();
+            let back: Quantity = serde_json::from_str(&text).unwrap();
+            assert_eq!(back, q, "{value} wrote {text}");
+        }
+    }
+
+    #[test]
+    fn a_json_integer_reads_as_a_quantity() {
+        let q: Quantity = serde_json::from_str("100").unwrap();
+        assert_eq!(q.get(), 100.0);
+    }
+
+    #[test]
+    fn negative_zero_reads_as_zero() {
+        let q: Quantity = serde_json::from_str("-0.0").unwrap();
+        assert_eq!(q, Quantity::ZERO);
+        assert!(q.get().is_sign_positive());
+    }
+
+    #[test]
+    fn reading_refuses_bad_quantities_with_a_message() {
+        for text in ["-1", "1e999", "\"1\""] {
+            let error = serde_json::from_str::<Quantity>(text).unwrap_err();
+            assert!(!error.to_string().is_empty(), "{text} should be refused");
+        }
+        let error = serde_json::from_str::<Quantity>("-1").unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("a quantity must be a finite number of at least 0"),
+            "{error}"
+        );
+    }
 
     #[test]
     fn new_accepts_finite_non_negative_values() {

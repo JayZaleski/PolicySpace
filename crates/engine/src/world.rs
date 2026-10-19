@@ -16,6 +16,9 @@
 //!   and holding a share of its capital bundle) as state, because their technology and
 //!   condition change in later Steps. Nothing runs, wears or maintains them yet, so the
 //!   turn and the report are unchanged.
+//! - A business's view of its circumstances at the current turn is taken with
+//!   [`World::business_view`], which reads and changes nothing (the decision point that
+//!   serves it is Step 07's).
 //! - A turn has three parts:
 //!   1. start of turn: every deposit emits its type's `output` of its good into its
 //!      owner's stockpile if it has an owner and its hex's stockpile otherwise (the hex
@@ -50,6 +53,7 @@ use std::fmt;
 
 use crate::businesses::{BusinessId, BusinessKind, Businesses};
 use crate::currency::HexCurrencies;
+use crate::decider::{BusinessView, view};
 use crate::factories::Factories;
 use crate::goods::GoodId;
 use crate::growth::grown_size;
@@ -298,6 +302,16 @@ impl World {
     /// Panics if `business` isn't from this world's businesses.
     pub fn business_stockpile(&self, business: BusinessId) -> &Stockpile {
         self.business_stockpiles.get(business)
+    }
+
+    /// `business`'s view of its circumstances at the current turn: its hex's currency and
+    /// posted prices, its stockpile, its cash, its factories, their technologies and its
+    /// deposits. Reads and changes nothing.
+    ///
+    /// # Panics
+    /// Panics if `business` isn't from this world's businesses.
+    pub fn business_view(&self, business: BusinessId) -> BusinessView {
+        view::build(self, business)
     }
 
     /// The outcome of the current turn's trade round for `pop`: its demand, what it sold,

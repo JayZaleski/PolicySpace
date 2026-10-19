@@ -8,6 +8,8 @@ publish.workspace = true
 [lib]
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
 toml = { version = "1.1", default-features = false, features = ["parse", "std"] }
 
 [dev-dependencies]
