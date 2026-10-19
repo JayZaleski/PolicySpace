@@ -118,7 +118,7 @@
 - Description: The decider protocol as engine data, sized to the minimal business. The view a business is served each turn: its hex's posted prices, its stockpile and cash, its factories with their technology's numbers and bundle state, and its deposits; nothing outside its circumstances. The action vocabulary: per-factory run level and maintenance share, offers, and bids, each with the bounds the engine enforces, and an optional trace. Validation of a decision against the view it answers. Lossless serialization of both, with no references into the engine, and a recording format for a turn's batch of views and decisions. No Python yet; everything has its own tests.
 
 ### Step 06: business-script
-- Status: planned
+- Status: specified
 - Tags: #deciders #businesses #python
 - Description: The project's Python package: a client that reads a batch of views and writes a batch of decisions in Step 05's format, and the first business decider, the arithmetic rule: a factory runs at capacity and is maintained when the margin at posted prices covers inputs and maintenance, and is otherwise left to run down; offers of last turn's output and surplus unimproved goods, bids for the inputs and maintenance that implies. The rule works over whole batches, not one business at a time. Python tests against recorded views, run from the project's virtual environment.
 
