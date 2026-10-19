@@ -1,0 +1,51 @@
+{
+  "turn": 5,
+  "views": [
+    {
+      "turn": 5,
+      "business": "remote",
+      "currency": "coin",
+      "cash": 10.0,
+      "prices": {},
+      "stockpile": {
+        "coin": [
+          {
+            "amount": 10.0,
+            "perishes": null
+          }
+        ],
+        "metal": [
+          {
+            "amount": 3.0,
+            "perishes": null
+          }
+        ]
+      },
+      "factories": {
+        "0": {
+          "technology": "smelter",
+          "condition": 1.0
+        }
+      },
+      "technologies": {
+        "smelter": {
+          "inputs": {
+            "labor": 1.0,
+            "ore": 2.0
+          },
+          "output": "metal",
+          "capacity": 10.0,
+          "capital": {
+            "tools": 2.0
+          },
+          "construction": {
+            "labor": 4.0
+          },
+          "construction_turns": 2,
+          "lifetime": 10
+        }
+      },
+      "deposits": {}
+    }
+  ]
+}

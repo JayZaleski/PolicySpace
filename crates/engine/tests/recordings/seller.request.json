@@ -1,0 +1,48 @@
+{
+  "turn": 5,
+  "views": [
+    {
+      "turn": 5,
+      "business": "trader",
+      "currency": "coin",
+      "cash": 5.0,
+      "prices": {
+        "grain": 2.0,
+        "metal": 4.0
+      },
+      "stockpile": {
+        "coin": [
+          {
+            "amount": 5.0,
+            "perishes": null
+          }
+        ],
+        "grain": [
+          {
+            "amount": 4.0,
+            "perishes": 6
+          }
+        ],
+        "metal": [
+          {
+            "amount": 1.0,
+            "perishes": 6
+          },
+          {
+            "amount": 2.0,
+            "perishes": null
+          }
+        ]
+      },
+      "factories": {},
+      "technologies": {},
+      "deposits": {
+        "field": {
+          "count": 1,
+          "produces": "grain",
+          "output": 4.0
+        }
+      }
+    }
+  ]
+}

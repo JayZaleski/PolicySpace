@@ -1,0 +1,224 @@
+{
+  "request": {
+    "turn": 0,
+    "views": [
+      {
+        "turn": 0,
+        "business": "center_farm",
+        "currency": "silver",
+        "cash": 100.0,
+        "prices": {
+          "copper": 5.0,
+          "grain": 2.0,
+          "tools": 12.0,
+          "unimproved_copper": 1.0,
+          "unimproved_grain": 0.5,
+          "unskilled_labor": 1.0
+        },
+        "stockpile": {
+          "silver": [
+            {
+              "amount": 100.0,
+              "perishes": null
+            }
+          ],
+          "unimproved_grain": [
+            {
+              "amount": 8.0,
+              "perishes": 0
+            }
+          ]
+        },
+        "factories": {
+          "0": {
+            "technology": "farm",
+            "condition": 1.0
+          }
+        },
+        "technologies": {
+          "farm": {
+            "inputs": {
+              "unimproved_grain": 1.0,
+              "unskilled_labor": 0.5
+            },
+            "output": "grain",
+            "capacity": 12.0,
+            "capital": {
+              "tools": 4.0
+            },
+            "construction": {
+              "unskilled_labor": 8.0
+            },
+            "construction_turns": 2,
+            "lifetime": 8
+          }
+        },
+        "deposits": {
+          "arable_land": {
+            "count": 2,
+            "produces": "unimproved_grain",
+            "output": 4.0
+          }
+        }
+      },
+      {
+        "turn": 0,
+        "business": "center_mine",
+        "currency": "silver",
+        "cash": 50.0,
+        "prices": {
+          "copper": 5.0,
+          "grain": 2.0,
+          "tools": 12.0,
+          "unimproved_copper": 1.0,
+          "unimproved_grain": 0.5,
+          "unskilled_labor": 1.0
+        },
+        "stockpile": {
+          "silver": [
+            {
+              "amount": 50.0,
+              "perishes": null
+            }
+          ],
+          "unimproved_copper": [
+            {
+              "amount": 2.5,
+              "perishes": 0
+            }
+          ]
+        },
+        "factories": {
+          "1": {
+            "technology": "mine",
+            "condition": 0.75
+          }
+        },
+        "technologies": {
+          "mine": {
+            "inputs": {
+              "unimproved_copper": 1.0,
+              "unskilled_labor": 1.0
+            },
+            "output": "copper",
+            "capacity": 2.5,
+            "capital": {
+              "tools": 2.0
+            },
+            "construction": {
+              "unskilled_labor": 4.0
+            },
+            "construction_turns": 2,
+            "lifetime": 8
+          }
+        },
+        "deposits": {
+          "copper_ore": {
+            "count": 1,
+            "produces": "unimproved_copper",
+            "output": 2.5
+          }
+        }
+      },
+      {
+        "turn": 0,
+        "business": "center_toolmaker",
+        "currency": "silver",
+        "cash": 200.0,
+        "prices": {
+          "copper": 5.0,
+          "grain": 2.0,
+          "tools": 12.0,
+          "unimproved_copper": 1.0,
+          "unimproved_grain": 0.5,
+          "unskilled_labor": 1.0
+        },
+        "stockpile": {
+          "silver": [
+            {
+              "amount": 200.0,
+              "perishes": null
+            }
+          ]
+        },
+        "factories": {
+          "2": {
+            "technology": "toolmaker",
+            "condition": 1.0
+          }
+        },
+        "technologies": {
+          "toolmaker": {
+            "inputs": {
+              "copper": 2.0,
+              "unskilled_labor": 1.5
+            },
+            "output": "tools",
+            "capacity": 4.0,
+            "capital": {
+              "tools": 3.0
+            },
+            "construction": {
+              "unskilled_labor": 6.0
+            },
+            "construction_turns": 3,
+            "lifetime": 24
+          }
+        },
+        "deposits": {}
+      }
+    ]
+  },
+  "reply": {
+    "turn": 0,
+    "decisions": [
+      {
+        "business": "center_farm",
+        "factories": {
+          "0": {
+            "run": 1.0,
+            "maintenance": 0.125
+          }
+        },
+        "offers": {},
+        "bids": {
+          "tools": 0.5,
+          "unimproved_grain": 4.0,
+          "unskilled_labor": 7.0
+        },
+        "trace": "farm: revenue 24; inputs 12; maintenance 7; margin 5: run and maintain\nfactory #0 (farm, condition 1): run 1, maintenance 0.125\nbudget 100 = cash 100 + offers 0; bids cost 15: within budget"
+      },
+      {
+        "business": "center_mine",
+        "factories": {
+          "1": {
+            "run": 1.0,
+            "maintenance": 0.375
+          }
+        },
+        "offers": {},
+        "bids": {
+          "tools": 0.75,
+          "unskilled_labor": 4.0
+        },
+        "trace": "mine: revenue 12.5; inputs 5; maintenance 3.5; margin 4: run and maintain\nfactory #1 (mine, condition 0.75): run 1, maintenance 0.375\nbudget 50 = cash 50 + offers 0; bids cost 13: within budget"
+      },
+      {
+        "business": "center_toolmaker",
+        "factories": {
+          "2": {
+            "run": 1.0,
+            "maintenance": 0.04166666666666663
+          }
+        },
+        "offers": {},
+        "bids": {
+          "copper": 8.0,
+          "tools": 0.12499999999999989,
+          "unskilled_labor": 6.25
+        },
+        "trace": "toolmaker: revenue 48; inputs 46; maintenance 1.75; margin 0.25: run and maintain\nfactory #2 (toolmaker, condition 1): run 1, maintenance 0.0416667\nbudget 200 = cash 200 + offers 0; bids cost 47.75: within budget"
+      }
+    ]
+  }
+}

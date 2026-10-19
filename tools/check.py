@@ -4,8 +4,12 @@ Runs, in order, from the project root (so the current directory doesn't matter):
     cargo fmt --all -- --check
     cargo clippy --workspace --all-targets -- -D warnings
     cargo test --workspace
+    python -m pytest python/tests
 
-All three always run, even if an earlier one fails. Standard library only.
+The fourth check runs the Python tests with the interpreter running this script, so
+`.venv/Scripts/python tools/check.py` uses the virtual environment. If `pytest` isn't
+installed it fails with Python's "No module named pytest"; `pip install -r requirements.txt`
+fixes it. All four always run, even if an earlier one fails. Standard library only.
 
 Usage:
     python tools/check.py                    # or .venv/Scripts/python tools/check.py
@@ -24,6 +28,7 @@ CHECKS = [
     ("cargo fmt", ["cargo", "fmt", "--all", "--", "--check"]),
     ("cargo clippy", ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]),
     ("cargo test", ["cargo", "test", "--workspace"]),
+    ("pytest", [sys.executable, "-m", "pytest", "python/tests"]),
 ]
 
 

@@ -1,0 +1,54 @@
+{
+  "turn": 5,
+  "views": [
+    {
+      "turn": 5,
+      "business": "strapped",
+      "currency": "coin",
+      "cash": 25.5,
+      "prices": {
+        "bread": 5.0,
+        "flour": 1.0,
+        "labor": 1.0,
+        "oven": 20.0
+      },
+      "stockpile": {
+        "coin": [
+          {
+            "amount": 25.5,
+            "perishes": null
+          }
+        ]
+      },
+      "factories": {
+        "0": {
+          "technology": "bakery",
+          "condition": 1.0
+        },
+        "1": {
+          "technology": "bakery",
+          "condition": 1.0
+        }
+      },
+      "technologies": {
+        "bakery": {
+          "inputs": {
+            "flour": 1.0,
+            "labor": 1.0
+          },
+          "output": "bread",
+          "capacity": 10.0,
+          "capital": {
+            "oven": 1.0
+          },
+          "construction": {
+            "labor": 2.0
+          },
+          "construction_turns": 2,
+          "lifetime": 4
+        }
+      },
+      "deposits": {}
+    }
+  ]
+}

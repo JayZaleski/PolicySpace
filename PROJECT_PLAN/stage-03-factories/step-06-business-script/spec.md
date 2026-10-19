@@ -48,6 +48,7 @@ Read before starting:
 - `requirements.txt` — becomes `jupyter`, `pytest`, `-e ./python` (one per line; the `-e` path is relative to the directory `pip` runs in, which is the project root in `CLAUDE.md`'s setup command).
 - `tools/check.py` — a fourth entry in `CHECKS`: `("pytest", [sys.executable, "-m", "pytest", "python/tests"])`. Docstring: four checks, the fourth runs the Python tests from the interpreter running the script (so `.venv/Scripts/python tools/check.py` uses the virtual environment); if `pytest` isn't installed the check fails with Python's "No module named pytest", and `pip install -r requirements.txt` fixes it. "All three always run" becomes "All four".
 - `.gitignore` — add `*.egg-info/` and `.pytest_cache/`.
+- `.gitattributes` — new file, one line: `crates/engine/tests/recordings/** text eol=lf`. The Rust fixture tests compare these files byte for byte, and git on Windows would otherwise check them out with CRLF line endings.
 
 Nothing else changes: not `crates/engine/src/`, `crates/engine/tests/decider.rs`, the dev UI, any setting, `CLAUDE.md`, `docs/` or `manual.ipynb`.
 
@@ -201,15 +202,15 @@ The Rust tests (`mod common;`, the engine's public API only):
 - `sample_request(world: &World) -> Request`: `turn: world.turn()`, one `world.business_view(id)` per business in `world.businesses().iter()` order (ID order: `center_farm`, `center_mine`, `center_toolmaker`).
 - `the_sample_recording_matches_the_engine`: build the sample world and request. If updating: the reply is the existing file's reply if the file reads as a `Recording`, else `Reply { turn: request.turn, decisions: vec![] }`; write `Recording { request, reply }.to_json_pretty() + "\n"` to `sample_turn0.recording.json`. Then (always) read the file (a missing file fails with a message naming the two regeneration steps); `Recording::from_json` succeeds; `recording.request == request`; the file's text equals `recording.to_json_pretty() + "\n"` (canonical form); `recording.reply.validate(&request, &world.rules().goods)` is `Ok` with every answer `Answer::Valid`; the reply has exactly one decision per view, in the request's order (same business names). When updating with a stale or empty reply this last check fails: that is the signal to run the Python step.
 - `the_exactness_request_is_the_engines`: a hand-built `Request { turn: Turn::MAX, views: vec![view] }` where `view` is `BusinessView { turn: Turn::MAX, business: "exact", currency: "coin", cash: q(f64::MAX), prices: {a: 1e-5, b: 1.23e-5, c: 1e-6, d: 1e-4, e: 1e16, f: 1e15, g: 1.5e16, h: 123.0, i: 1e21, j: 12345678901234567.0, k: 0.1, l: 100.0, m: 5e-324, n: 1.0/3.0, o: 123456789.123456789, p: 1e-300}, stockpile: {coin: [(f64::MAX, None)], a: [(5e-324, Some(Turn::MAX)), (0.0, Some(Turn::ZERO))]}, factories: {0: (t, 1.0/3.0), u32::MAX: (t, 0.0)}, technologies: {t: inputs {a: 2.5}, output b, capacity 1e-5, capital {c: 7.0}, construction {}, construction_turns u32::MAX, lifetime 1}, deposits: {z: (count u32::MAX, produces a, output 0.0)} }`. `text = request.to_json() + "\n"`. If updating, write it to `exactness.request.json`; always read the file and assert it equals `text`.
-- `hand_written_requests_parse`: every `*.request.json` in the folder, in name order (`exactness` included): `Request::from_json` succeeds, `views` is non-empty, every view's `turn` equals the request's.
+- `hand_written_requests_parse`: every `*.request.json` in the folder, in name order: `Request::from_json` succeeds, `views` is non-empty, every view's `turn` equals the request's. When not updating, the test asserts exactly 7 files (the six hand-written ones and `exactness`); when updating it skips `exactness.request.json` (another test may be writing it at the same moment) and asserts the six.
 
 `README.md` in the folder: the three kinds of file (the sample recording, written half by each side; the exactness request, written by the engine, compact; the hand-written requests, pretty, edited by hand), who reads each, and the regeneration steps:
 
 ```
 set POLICYSPACE_UPDATE_RECORDINGS=1      (PowerShell: $env:POLICYSPACE_UPDATE_RECORDINGS = "1")
-cargo test -p policyspace-engine --test recordings     # rewrites the engine's halves
+cargo test -p policyspace-engine --test recordings -- --test-threads=1   # rewrites the engine's halves
 .venv/Scripts/python -m pytest python/tests            # rewrites the rule's reply
-cargo test -p policyspace-engine --test recordings     # confirms
+cargo test -p policyspace-engine --test recordings -- --test-threads=1   # confirms
 ```
 
 The hand-written requests, all at turn 5 with currency `coin`, each with one view, pretty JSON (every quantity as a float with `.0`, every table in sorted order; `deposits: {}` unless stated). Two technologies are reused:
@@ -279,6 +280,15 @@ Run everything with `.venv/Scripts/python tools/check.py`; the Python tests alon
 - Rust: the existing conventions (doc comments where clippy wants them, `cargo fmt`, `BTreeMap`); the fixture tests use only the engine's public API and `tests/common`. Nothing under `crates/engine/src/` changes; `crates/engine/tests/decider.rs` doesn't change.
 - Do not change the sample setting, any test setting, the dev UI, `CLAUDE.md`, `docs/` or `manual.ipynb` (docs are drafted later in the loop; `docs/workspace.md`'s check-command section becomes stale and `step-docs-draft` will propose the fix).
 - Out of scope: starting the script from the engine, keeping it alive, timeouts, failure semantics (Step 07); resolving decisions, the cash cap, the per-business record (Step 08); any strategy beyond the arithmetic rule; vectorization; packaging beyond the editable install.
+
+## Notes from the build
+
+Recorded after Code Review, for Step 08 and the docs:
+
+- `.gitattributes` pins the recordings folder to LF; the regeneration's `cargo test` runs single-threaded so the two file-writing tests don't race. Both were added in the fix round.
+- clippy's `excessive_precision` lint rejects the literal `123456789.123456789`; `recordings.rs` writes it as `123_456_789.123_456_79`, the same `f64`.
+- If a setting puts the hex's currency itself in a technology's inputs or bundles, the rule prices it at 1 in the margin test but doesn't reserve that cash in the budget (the currency is never bid, so `trade` skips it). The sample never does this; the engine's cash cap in Step 08 is the safety net. A later rule could subtract the currency's own need from the budget.
+- `docs/workspace.md`'s check-command section and dependency list are stale; `step-docs-draft` proposes the fix.
 
 ## Done When
 
