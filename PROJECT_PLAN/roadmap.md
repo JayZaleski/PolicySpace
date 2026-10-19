@@ -108,7 +108,7 @@
 - Description: Place factories in the starting state: hex, technology, owner business, and the current capital bundle. Each factory gets an ID, points at one technology (state, so it can change later), and has exactly one owner. Validate the references and the bundle. Add the chain's factories to the sample setting.
 
 ### Step 04: factory-mechanics
-- Status: planned
+- Status: specified
 - Tags: #factories #production #capital #engine
 - Description: Pure functions with their own tests, not yet wired into the turn. Running a factory at a given level: the level is clamped to the technology's capacity and to the inputs the business has on hand, inputs leave the business's stockpile and output enters it. Depreciation: each turn a factory consumes its capital bundle divided by its technology's lifetime, in the bundle's proportions, whether or not it ran, and shuts down when the bundle is exhausted. Maintenance: replenishing a share of the bundle costs that share of the capital and construction bundles, capped at one construction slice per turn. The choice of run level and maintenance share is not made here: it belongs to the business's decider (Step 06).
 
