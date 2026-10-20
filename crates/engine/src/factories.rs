@@ -8,8 +8,10 @@
 //! decisions address them by ID. A factory sits on its owner's hex until trade between
 //! hexes exists (the loader checks this). A hex and a business may hold any number of
 //! factories. The [`production`](crate::production) module runs, wears and maintains factories
-//! as pure functions over one business's factories (Step 08 wires it into the turn), and
-//! nothing changes a factory during play yet. Knows nothing about files.
+//! as pure functions over one business's factories; the World operates each business's
+//! factories every turn and writes the conditions back with `Factories::set_condition`, the
+//! only change to a factory in play (its technology and owner stay as placed). Knows nothing
+//! about files.
 
 use crate::businesses::BusinessId;
 use crate::id::{Id, IdKind, IdVec};
@@ -37,7 +39,7 @@ pub struct Factory {
     pub owner: BusinessId,
     /// The share of its technology's full capital bundle it holds: finite, from 0 to 1.
     /// A setting places a factory with a condition greater than 0 (1 if none is written);
-    /// once depreciation runs (Step 04) the engine may store 0.
+    /// the World's operation writes it back every turn and may store 0.
     pub condition: f64,
 }
 
@@ -109,6 +111,19 @@ impl Factories {
     /// Panics if `hex` isn't from the map these factories were built with.
     pub fn on_hex(&self, hex: HexId) -> &[FactoryId] {
         self.by_hex.get(hex)
+    }
+
+    /// Sets `id`'s condition. Crate-private: only the World's operation changes it.
+    ///
+    /// # Panics
+    /// Panics if `id` isn't from this list, or if `condition` isn't a finite number from 0
+    /// to 1 (`"a factory's condition must be a finite number from 0 to 1"`).
+    pub(crate) fn set_condition(&mut self, id: FactoryId, condition: f64) {
+        assert!(
+            condition.is_finite() && (0.0..=1.0).contains(&condition),
+            "a factory's condition must be a finite number from 0 to 1"
+        );
+        self.factories.get_mut(id).condition = condition;
     }
 
     /// The factories owned by `business`, in ID order (a filter over every factory).
@@ -237,6 +252,43 @@ mod tests {
             1,
         );
         assert_eq!(factories.len(), 2);
+    }
+
+    #[test]
+    fn set_condition_changes_one_factory_only() {
+        let mut factories = sample_factories();
+        let before: Vec<Factory> = factories.iter().map(|(_, f)| *f).collect();
+        factories.set_condition(FactoryId::from_index(2), 0.125);
+        for (id, factory) in factories.iter() {
+            if id.index() == 2 {
+                assert_eq!(factory.condition, 0.125);
+                assert_eq!(factory.hex, before[2].hex);
+                assert_eq!(factory.technology, before[2].technology);
+                assert_eq!(factory.owner, before[2].owner);
+            } else {
+                assert_eq!(*factory, before[id.index()]);
+            }
+        }
+        factories.set_condition(FactoryId::from_index(2), 0.0);
+        assert_eq!(factories.get(FactoryId::from_index(2)).condition, 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "a factory's condition must be a finite number from 0 to 1")]
+    fn set_condition_panics_on_a_condition_above_1() {
+        sample_factories().set_condition(FactoryId::from_index(0), 1.5);
+    }
+
+    #[test]
+    #[should_panic(expected = "a factory's condition must be a finite number from 0 to 1")]
+    fn set_condition_panics_on_a_nan_condition() {
+        sample_factories().set_condition(FactoryId::from_index(0), f64::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from this list")]
+    fn set_condition_panics_on_a_foreign_id() {
+        sample_factories().set_condition(FactoryId::from_index(4), 0.5);
     }
 
     #[test]

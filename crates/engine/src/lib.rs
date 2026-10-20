@@ -29,14 +29,15 @@
 //! [`production`] module runs them. Businesses (the [`businesses`] module) are named actors in the
 //! starting state, each on one hex with a decider name, a starting inventory and the
 //! deposits it owns, each with its own stockpile in the world; an owned deposit emits into
-//! its owner's stockpile; nothing decides or trades for them yet. Factories (the [`factories`]
+//! its owner's stockpile; businesses trade in each hex's round after the POPs. Factories (the [`factories`]
 //! module) are placed in the starting state, each on its owner's hex, running one
 //! technology and holding a share (its condition) of that technology's capital bundle; the
 //! [`production`] module gives them their mechanics as pure functions over one business's
 //! factories and stockpile (running at a fraction of capacity with inputs shared when short,
 //! wear of one lifetime-slice per turn with shutdown below one slice, and maintenance that
 //! replenishes a fraction of the capital bundle at the cost of that fraction of the capital
-//! and construction bundles); nothing in the turn calls them yet. The [`decider`] module
+//! and construction bundles); the turn operates every business's factories right after its
+//! trade round. The [`decider`] module
 //! defines the decider protocol as data: the view a business is served each turn (its hex's
 //! currency and posted prices, its stockpile by perish group, its cash, its factories, their
 //! technologies and its deposits, and nothing outside its circumstances), the decision it
@@ -45,7 +46,10 @@
 //! one turn's batch, and lossless JSON for all of it; a [`DeciderHost`] of named deciders (a
 //! Python process the engine starts and keeps alive, a replayed recording, or a closure)
 //! answers every business's view once per turn at the decision point, and the world stores
-//! each business's answer; nothing resolves the decisions yet (Step 08).
+//! each business's answer, which the world resolves: a business with a valid decision sells its
+//! offers and buys its bids in the trade round (its bids scaled by one proportion if they cost
+//! more than its cash), then runs and maintains its factories at the fractions the decision
+//! gives, and every business's outcome is recorded.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -103,11 +107,11 @@ pub use stockpile::{PerishesAt, Stockpile};
 pub mod technologies;
 pub use technologies::{Technologies, Technology, TechnologyId, TechnologyKind};
 pub mod trade;
-pub use trade::PopOutcome;
+pub use trade::{BusinessTrade, PopOutcome};
 pub mod turn;
 pub use turn::Turn;
 pub mod world;
-pub use world::{StepError, TurnReport, World};
+pub use world::{BusinessOutcome, StepError, TurnReport, World};
 #[cfg(test)]
 pub(crate) mod test_support;
 

@@ -253,6 +253,13 @@ fn identical_runs_give_identical_results() {
         for (id, _) in a.pops().iter() {
             assert_eq!(a.pop_stockpile(id), b.pop_stockpile(id));
         }
+        for (id, _, _) in a.businesses().iter() {
+            assert_eq!(a.business_outcome(id), b.business_outcome(id));
+            assert_eq!(a.business_stockpile(id), b.business_stockpile(id));
+        }
+        for ((_, fa), (_, fb)) in a.factories().iter().zip(b.factories().iter()) {
+            assert_eq!(fa.condition, fb.condition);
+        }
     }
 }
 

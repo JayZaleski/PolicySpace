@@ -11,13 +11,15 @@
 //! stores and never acts on. Validation refuses nonsense (a factory not in the view, an
 //! unknown good, a bad fraction or amount, the currency, an unpriced good) and reports
 //! every problem at its place; asking for more than the business holds or can pay is a
-//! valid request that Step 08 trims. One turn's exchange is a [`Request`] (every view) and
+//! valid request that the trade round trims (offers to what is held, bids to the cash). One turn's exchange is a [`Request`] (every view) and
 //! a [`Reply`] (any subset of decisions, in any order); a [`Recording`] keeps both. Every
 //! type reads and writes JSON losslessly, keyed by setting names and factory ID numbers,
 //! never by engine IDs. The [`host`] module runs the exchange once per turn through a
 //! [`DeciderHost`] of named [`Decider`]s (an external process, a replayed recording, or a
 //! Rust closure), stores each business's [`BusinessAnswer`] and reports every
-//! [`DeciderFailure`]; Step 08 resolves the valid decisions.
+//! [`DeciderFailure`]; the world then resolves each valid decision into the business's offers, bids
+//! and factory fractions (see the [`trade`](crate::trade) and [`world`](crate::world)
+//! modules).
 
 use std::collections::BTreeMap;
 use std::error::Error;

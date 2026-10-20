@@ -1,0 +1,19 @@
+[[technology]]
+name = "smelter"
+inputs = { ore = 2, labor = 1 }
+output = "iron"
+capacity = 10
+capital = { tools = 4 }
+construction = { labor = 8 }
+construction_turns = 2
+lifetime = 4
+
+[[technology]]
+name = "bakery"
+inputs = { labor = 1 }
+output = "bread"
+capacity = 6
+capital = { tools = 3 }
+construction = {}
+construction_turns = 1
+lifetime = 3

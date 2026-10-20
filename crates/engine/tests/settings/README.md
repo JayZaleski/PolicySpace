@@ -94,6 +94,22 @@ Valid settings:
   0.5. At turn 0 (no deposits, no POPs) `works` holds `coin` 50 (never perishes), `labor` 13
   (perishes at the end of turn 0), `ore` 30 (end of turn 2) and `tools` 3 (never); `springs`
   holds `tools` 1.
+- `business_trade`: businesses that trade and operate factories in the hex round
+  (`crates/engine/tests/business_trade.rs`). Goods (IDs 0-5): `coin`, `labor` (perishes
+  after 1), `ore` (perishes after 3), `iron`, `tools`, `bread` (perishes after 2).
+  Technologies (IDs 0-1), the same numbers as `production_valid`'s: `smelter` (inputs 2 `ore`
+  and 1 `labor`, output `iron`, capacity 10, capital 4 `tools`, construction 8 `labor`, 2
+  turns, lifetime 4) and `bakery` (input 1 `labor`, output `bread`, capacity 6, capital 3
+  `tools`, no construction, 1, 3). One POP type `worker` (endows 10 `labor`; utility `labor`
+  subsistence 2 share 0.2 and `bread` subsistence 2 share 0.8; zero growth) and one POP of it
+  at (0, 0), size 2. Hexes (0, 0) and (1, 0), both with currency `coin`; (0, 0) has a market
+  (`labor` 1, `ore` 2, `iron` 6, `tools` 10, `bread` 3) and (1, 0) has none. Businesses (IDs
+  0-2, decider `rule`, no deposits): `works` at (0, 0) with `coin` 100 and `tools` 3, `poor`
+  at (0, 0) with `coin` 10 and `ore` 30, `remote` at (1, 0) with `labor` 6. Factories (IDs
+  0-3, each at condition 1): 0 `smelter` `works`; 1 `bakery` `works`; 2 `smelter` `poor`; 3
+  `bakery` `remote`. The numbers make `works`'s steady plan cost 78 a turn and earn 78 at the
+  posted prices, so its cash cycles exactly; `poor`'s bids cost 50 against 10 cash (a
+  proportion of exactly 0.2); `remote` has labor for exactly one full run.
 - `factories_one`: one good, one technology, one hex, one business and one factory (for the
   setting checker's `1 factory`).
 - `pops_one`: one good, one POP type, one hex and one POP (for the setting checker's

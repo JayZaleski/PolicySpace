@@ -70,11 +70,12 @@ fn list(world: &World, entries: &[(GoodId, Quantity)]) -> String {
 }
 
 /// The line printed for a turn, by `check` and in the window's turn log: what perished, what
-/// deposits emitted, what POPs were endowed with, and what POPs sold, bought and consumed,
-/// each a list or `nothing`, and the total population after growth.
+/// deposits emitted, what POPs were endowed with, what POPs sold, bought and consumed, the
+/// total population after growth, and what businesses sold and bought and what their
+/// factories produced and used, each list a list or `nothing`.
 pub fn turn_line(world: &World, report: &TurnReport) -> String {
     format!(
-        "Turn {}: perished {}; emitted {}; endowed {}; sold {}; bought {}; consumed {}; population {}",
+        "Turn {}: perished {}; emitted {}; endowed {}; sold {}; bought {}; consumed {}; population {}; businesses sold {}; businesses bought {}; produced {}; used {}",
         report.turn,
         list(world, &report.perished),
         list(world, &report.emitted),
@@ -82,7 +83,11 @@ pub fn turn_line(world: &World, report: &TurnReport) -> String {
         list(world, &report.sold),
         list(world, &report.bought),
         list(world, &report.consumed),
-        report.population
+        report.population,
+        list(world, &report.business_sold),
+        list(world, &report.business_bought),
+        list(world, &report.produced),
+        list(world, &report.used)
     )
 }
 
@@ -544,6 +549,36 @@ two", folder
     /// Strings from literals.
     fn strings(items: &[&str]) -> Vec<String> {
         items.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn the_turn_line_ends_with_the_business_lists_in_order() {
+        let world = sample();
+        let good = |name: &str| world.rules().goods.id(name).unwrap();
+        let q = |value: f64| Quantity::new(value).unwrap();
+        let report = TurnReport {
+            turn: Turn::new(4),
+            perished: vec![],
+            emitted: vec![],
+            endowed: vec![],
+            sold: vec![],
+            bought: vec![],
+            consumed: vec![],
+            population: q(12.5),
+            business_sold: vec![(good("copper"), q(2.5)), (good("grain"), q(12.0))],
+            business_bought: vec![(good("tools"), q(0.75))],
+            produced: vec![(good("tools"), q(4.0))],
+            used: vec![
+                (good("unskilled_labor"), q(17.25)),
+                (good("copper"), q(8.0)),
+            ],
+            decisions: Default::default(),
+            decider_failures: vec![],
+        };
+        assert_eq!(
+            turn_line(&world, &report),
+            "Turn 4: perished nothing; emitted nothing; endowed nothing; sold nothing; bought nothing; consumed nothing; population 12.5; businesses sold 2.5 copper, 12 grain; businesses bought 0.75 tools; produced 4 tools; used 17.25 unskilled_labor, 8 copper"
+        );
     }
 
     #[test]

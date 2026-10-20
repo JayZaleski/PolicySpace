@@ -3,10 +3,12 @@
 mod common;
 
 use common::{
-    assert_list, close, end, good, groups, sample_setting, stockpile_totals, test_setting, world_of,
+    assert_list, close, end, good, groups, load, sample_setting, stockpile_totals, test_setting,
+    world_of,
 };
 use policyspace_engine::{
-    BusinessId, FactoryRecord, Operation, PerishesAt, Stockpile, Turn, World, operate,
+    BusinessId, FactoryRecord, LoadedSetting, Operation, PerishesAt, Stockpile, Turn, World,
+    operate,
 };
 
 fn business(world: &World, name: &str) -> BusinessId {
@@ -14,9 +16,13 @@ fn business(world: &World, name: &str) -> BusinessId {
 }
 
 /// One operation per factory the business owns, in ID order, with the given
-/// (run, maintenance) fractions.
+/// (run, maintenance) fractions. The conditions are the ones `placed` (the same setting the
+/// world was built from, loaded separately) puts the factories at: a world is past turn 0's
+/// operation when `World::new` returns, so under the idle host its factories have already
+/// worn one slice. The technologies come from the world.
 fn operations<'a>(
     world: &'a World,
+    placed: &LoadedSetting,
     owner: BusinessId,
     orders: &[(f64, f64)],
 ) -> Vec<Operation<'a>> {
@@ -29,7 +35,7 @@ fn operations<'a>(
             let factory = world.factories().get(id);
             Operation {
                 technology: world.rules().technologies.get(factory.technology),
-                condition: factory.condition,
+                condition: placed.start.factories.get(id).condition,
                 run_fraction,
                 maintenance_fraction,
             }
@@ -78,6 +84,7 @@ fn assert_record(
 #[test]
 fn every_factory_of_the_sample_can_be_operated_without_labor_nothing_runs_or_is_maintained() {
     let (world, _) = world_of(&sample_setting());
+    let placed = load(&sample_setting());
     let turn = world.turn();
     for (name, before, after, wear_lost) in [
         ("center_farm", 1.0, 0.875, 0.125),
@@ -85,8 +92,10 @@ fn every_factory_of_the_sample_can_be_operated_without_labor_nothing_runs_or_is_
         ("center_toolmaker", 1.0, 23.0 / 24.0, 1.0 / 24.0),
     ] {
         let owner = business(&world, name);
-        let mut ops = operations(&world, owner, &[(1.0, 1.0)]);
+        let mut ops = operations(&world, &placed, owner, &[(1.0, 1.0)]);
         let mut stockpile = stock(&world, owner);
+        let factory_id = world.factories().owned_by(owner).next().unwrap();
+        let world_condition = world.factories().get(factory_id).condition;
         let records = operate(&mut ops, &mut stockpile, &world.rules().goods, turn);
         assert_eq!(records.len(), 1, "{name}");
         let record = &records[0];
@@ -102,18 +111,25 @@ fn every_factory_of_the_sample_can_be_operated_without_labor_nothing_runs_or_is_
         assert!(close(record.condition_after, after), "{name}: {record:?}");
         assert!(close(ops[0].condition, after), "{name}");
         assert_eq!(&stockpile, world.business_stockpile(owner), "{name}");
-        let factory = world
-            .factories()
-            .get(world.factories().owned_by(owner).next().unwrap());
-        assert_eq!(factory.condition, before, "{name}");
+        assert_eq!(
+            world.factories().get(factory_id).condition,
+            world_condition,
+            "{name}"
+        );
     }
 }
 
 #[test]
 fn running_shares_a_shortage_cuts_by_the_worst_good_and_keeps_the_leftover() {
     let (world, _) = world_of(&test_setting("production_valid"));
+    let placed = load(&test_setting("production_valid"));
     let works = business(&world, "works");
-    let mut ops = operations(&world, works, &[(1.0, 0.0), (1.0, 0.0), (1.0, 0.0)]);
+    let mut ops = operations(
+        &world,
+        &placed,
+        works,
+        &[(1.0, 0.0), (1.0, 0.0), (1.0, 0.0)],
+    );
     let mut stockpile = stock(&world, works);
     let records = operate(&mut ops, &mut stockpile, &world.rules().goods, Turn::ZERO);
 
@@ -153,10 +169,16 @@ fn running_shares_a_shortage_cuts_by_the_worst_good_and_keeps_the_leftover() {
 #[test]
 fn the_order_of_a_businesss_factories_does_not_matter() {
     let (world, _) = world_of(&test_setting("production_valid"));
+    let placed = load(&test_setting("production_valid"));
     let works = business(&world, "works");
     let goods = &world.rules().goods;
 
-    let mut ops = operations(&world, works, &[(1.0, 0.0), (1.0, 0.0), (1.0, 0.0)]);
+    let mut ops = operations(
+        &world,
+        &placed,
+        works,
+        &[(1.0, 0.0), (1.0, 0.0), (1.0, 0.0)],
+    );
     let mut reversed_ops = ops.clone();
     reversed_ops.reverse();
 
@@ -174,8 +196,14 @@ fn the_order_of_a_businesss_factories_does_not_matter() {
 #[test]
 fn maintenance_costs_both_bundles_is_capped_and_shares_a_shortage_proportionally() {
     let (world, _) = world_of(&test_setting("production_valid"));
+    let placed = load(&test_setting("production_valid"));
     let works = business(&world, "works");
-    let mut ops = operations(&world, works, &[(0.0, 1.0), (0.0, 0.5), (0.0, 1.0)]);
+    let mut ops = operations(
+        &world,
+        &placed,
+        works,
+        &[(0.0, 1.0), (0.0, 0.5), (0.0, 1.0)],
+    );
     let mut stockpile = stock(&world, works);
     let records = operate(&mut ops, &mut stockpile, &world.rules().goods, Turn::ZERO);
 
@@ -224,13 +252,14 @@ fn maintenance_costs_both_bundles_is_capped_and_shares_a_shortage_proportionally
 fn a_full_factory_runs_its_lifetime_one_and_a_half_slices_run_once_and_the_perish_group_follows_the_turn()
  {
     let (world, _) = world_of(&test_setting("production_valid"));
+    let placed = load(&test_setting("production_valid"));
     let springs = business(&world, "springs");
     let goods = &world.rules().goods;
     let ore = good(&world, "ore");
     let mut stockpile = stock(&world, springs);
     let none = (0.0, 0.0, &[][..]);
 
-    let mut ops = operations(&world, springs, &[(1.0, 1.0), (1.0, 1.0)]);
+    let mut ops = operations(&world, &placed, springs, &[(1.0, 1.0), (1.0, 1.0)]);
     let records = operate(&mut ops, &mut stockpile, goods, Turn::ZERO);
     let spring_run = (1.0, 1.0, &[][..], 5.0);
     // Maintenance is capped to 1/4 by the four construction turns and needs labor, which the

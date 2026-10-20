@@ -4,13 +4,19 @@
 
 mod common;
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
-use common::{q, sample_setting, world_of};
-use policyspace_engine::decider::{DepositsView, FactoryView, PerishGroup, TechnologyView};
-use policyspace_engine::{Answer, BusinessView, Quantity, Recording, Reply, Request, Turn, World};
+use common::{load, q, sample_setting};
+use policyspace_engine::decider::{
+    ClosureDecider, DepositsView, FactoryView, PerishGroup, TechnologyView,
+};
+use policyspace_engine::{
+    Answer, BusinessView, DeciderHost, Quantity, Recording, Reply, Request, Turn, World,
+};
 
 fn recordings_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/recordings")
@@ -29,22 +35,35 @@ fn read(path: &Path) -> String {
         .unwrap_or_else(|error| panic!("{} can't be read ({error}); {REGENERATE}", path.display()))
 }
 
-/// The request the engine builds for every business of `world`, in business ID order.
-fn sample_request(world: &World) -> Request {
-    Request {
-        turn: world.turn(),
-        views: world
-            .businesses()
-            .iter()
-            .map(|(id, _, _)| world.business_view(id))
-            .collect(),
-    }
+/// The sample world, and the request its businesses were served at turn 0's decision point
+/// (the loaded state plus emission, in business ID order). A world is past turn 0's
+/// operation when `World::new` returns, so the request is captured at the decision point
+/// by a closure decider that answers nothing, rather than built from the world afterwards.
+fn sample_world_and_request() -> (World, Request) {
+    let captured: Rc<RefCell<Option<Request>>> = Rc::new(RefCell::new(None));
+    let seen = Rc::clone(&captured);
+    let mut host = DeciderHost::new().with(
+        "arithmetic",
+        ClosureDecider::new(move |request: &Request| {
+            *seen.borrow_mut() = Some(request.clone());
+            Reply {
+                turn: request.turn,
+                decisions: vec![],
+            }
+        }),
+    );
+    let (world, _) = World::new(load(&sample_setting()), &mut host)
+        .expect("the host holds the sample's decider");
+    let request = captured
+        .borrow_mut()
+        .take()
+        .expect("the decision point serves the sample's decider");
+    (world, request)
 }
 
 #[test]
 fn the_sample_recording_matches_the_engine() {
-    let (world, _) = world_of(&sample_setting());
-    let request = sample_request(&world);
+    let (world, request) = sample_world_and_request();
     let path = recordings_dir().join("sample_turn0.recording.json");
 
     if updating() {

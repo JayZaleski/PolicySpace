@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{failures_of, load, sample_setting, test_setting, world_of};
+use common::{close, failures_of, load, sample_setting, test_setting, world_of};
 use policyspace_engine::{FactoryId, HexCoord, LoadedSetting, World};
 
 /// One factory as (index, coordinates, technology name, owner name, condition).
@@ -88,6 +88,19 @@ fn owned(setting: &LoadedSetting, index: usize) -> Vec<usize> {
         .collect()
 }
 
+/// Asserts `actual` equals `expected` row by row, the conditions to within 1e-9.
+fn assert_rows(actual: &[FactoryRow], expected: &[FactoryRow]) {
+    assert_eq!(actual.len(), expected.len(), "{actual:?} vs {expected:?}");
+    for (a, e) in actual.iter().zip(expected) {
+        assert_eq!(
+            (&a.0, &a.1, &a.2, &a.3),
+            (&e.0, &e.1, &e.2, &e.3),
+            "{a:?} vs {e:?}"
+        );
+        assert!(close(a.4, e.4), "{a:?} vs {e:?}");
+    }
+}
+
 fn sample_rows() -> Vec<FactoryRow> {
     vec![
         row(0, 0, 0, "farm", "center_farm", 1.0),
@@ -97,7 +110,7 @@ fn sample_rows() -> Vec<FactoryRow> {
 }
 
 #[test]
-fn the_sample_setting_loads_with_three_factories_that_a_fresh_world_holds_unchanged() {
+fn the_sample_setting_loads_with_three_factories_that_a_world_wears_one_slice_a_turn() {
     let setting = load(&sample_setting());
     assert_eq!(setting.start.factories.len(), 3);
     assert_eq!(factories_of(&setting), sample_rows());
@@ -107,11 +120,21 @@ fn the_sample_setting_loads_with_three_factories_that_a_fresh_world_holds_unchan
     assert_eq!(owned(&setting, 1), vec![1]);
     assert_eq!(owned(&setting, 2), vec![2]);
 
+    // Under the idle host nothing runs or is maintained, so each factory wears one
+    // lifetime-slice a turn, turn 0's included (a world is past turn 0's operation when
+    // `World::new` returns). The lifetimes are 8, 8 and 24 turns.
+    let worn = |slices: f64| {
+        let mut rows = sample_rows();
+        for (row, lifetime) in rows.iter_mut().zip([8.0, 8.0, 24.0]) {
+            row.4 -= slices / lifetime;
+        }
+        rows
+    };
     let (mut world, _) = world_of(&sample_setting());
-    assert_eq!(factory_rows(&world), sample_rows());
-    for _ in 0..3 {
+    assert_rows(&factory_rows(&world), &worn(1.0));
+    for turn in 1..=3 {
         world.step(&mut common::idle()).unwrap();
-        assert_eq!(factory_rows(&world), sample_rows());
+        assert_rows(&factory_rows(&world), &worn(f64::from(turn) + 1.0));
     }
 }
 

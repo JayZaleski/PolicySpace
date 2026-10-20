@@ -133,8 +133,8 @@ fn counts_pops_and_prints_the_endowment_for_a_setting_with_pops() {
         stdout_lines(&output),
         vec![
             "Loaded setting 'Pops Placed' (format version 1): 3 goods, 3 hexes, 1 resource, 1 deposit, 0 markets, 3 pop types, 4 pops, 0 technologies, 0 businesses, 0 factories",
-            "Turn 0: perished nothing; emitted 2 grain; endowed 43 labor, 3 gold; sold nothing; bought nothing; consumed 35 labor; population 12.5",
-            "Turn 1: perished 8 labor, 2 grain; emitted 2 grain; endowed 43 labor, 3 gold; sold nothing; bought nothing; consumed 35 labor; population 12.5",
+            "Turn 0: perished nothing; emitted 2 grain; endowed 43 labor, 3 gold; sold nothing; bought nothing; consumed 35 labor; population 12.5; businesses sold nothing; businesses bought nothing; produced nothing; used nothing",
+            "Turn 1: perished 8 labor, 2 grain; emitted 2 grain; endowed 43 labor, 3 gold; sold nothing; bought nothing; consumed 35 labor; population 12.5; businesses sold nothing; businesses bought nothing; produced nothing; used nothing",
         ]
     );
 }
@@ -207,10 +207,12 @@ fn turns_prints_a_line_for_each_turn() {
         stdout_lines(&output),
         vec![
             SAMPLE_LINE.to_string(),
-            "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666"
+            "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666; businesses sold nothing; businesses bought 17.25 unskilled_labor, 4 unimproved_grain, 8 copper, 1.375 tools; produced 2.5 copper, 12 grain, 4 tools; used 17.25 unskilled_labor, 2.5 unimproved_copper, 12 unimproved_grain, 8 copper, 1.375 tools"
                 .to_string(),
-            "Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4194.466666666667 unskilled_labor; sold 2955.6459999999997 unskilled_labor; bought 5.15 copper, 1464.9479999999999 grain; consumed 1238.8206666666667 unskilled_labor, 5.15 copper, 1464.9479999999999 grain; population 429.2982444444444".to_string(),
-            "Turn 2: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4292.982444444444 unskilled_labor; sold 3034.7550599999995 unskilled_labor; bought 5.304500000000001 copper, 1504.1162799999997 grain; consumed 1258.2273844444444 unskilled_labor, 5.304500000000001 copper, 1504.1162799999997 grain; population 439.55036096296294".to_string(),
+            "Turn 1: perished 0.0000000000000002220446049250313 unskilled_labor, 7.5 unimproved_copper, 16 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4194.466666666667 unskilled_labor; sold 2955.6459999999997 unskilled_labor; bought 5.15 copper, 1464.9479999999999 grain; consumed 1238.8206666666667 unskilled_labor, 5.15 copper, 1464.9479999999999 grain; population 429.2982444444444; businesses sold 2.5 copper, 12 grain, 3.875 tools; businesses bought 16.25 unskilled_labor, 4 unimproved_grain, 8 copper, 0.75 tools; produced 2.5 copper, 12 grain, 4 tools; used 16.25 unskilled_labor, 2.5 unimproved_copper, 12 unimproved_grain, 8 copper, 0.8749999999999999 tools"
+                .to_string(),
+            "Turn 2: perished 0.0000000000000002220446049250313 unskilled_labor, 7.5 unimproved_copper, 16 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4292.982444444444 unskilled_labor; sold 3034.7550599999995 unskilled_labor; bought 5.304500000000001 copper, 1504.1162799999997 grain; consumed 1258.2273844444444 unskilled_labor, 5.304500000000001 copper, 1504.1162799999997 grain; population 439.55036096296294; businesses sold 2.5 copper, 12 grain, 3.875 tools; businesses bought 16.25 unskilled_labor, 4 unimproved_grain, 8 copper, 0.75 tools; produced 2.5 copper, 12 grain, 4 tools; used 16.25 unskilled_labor, 2.5 unimproved_copper, 12 unimproved_grain, 8 copper, 0.8749999999999999 tools"
+                .to_string(),
         ]
     );
 }
@@ -236,8 +238,8 @@ fn empty_lists_print_nothing_and_decimals_print_as_is() {
     assert_eq!(
         &lines[1..],
         [
-            "Turn 0: perished nothing; emitted nothing; endowed nothing; sold nothing; bought nothing; consumed nothing; population 0",
-            "Turn 1: perished nothing; emitted nothing; endowed nothing; sold nothing; bought nothing; consumed nothing; population 0"
+            "Turn 0: perished nothing; emitted nothing; endowed nothing; sold nothing; bought nothing; consumed nothing; population 0; businesses sold nothing; businesses bought nothing; produced nothing; used nothing",
+            "Turn 1: perished nothing; emitted nothing; endowed nothing; sold nothing; bought nothing; consumed nothing; population 0; businesses sold nothing; businesses bought nothing; produced nothing; used nothing"
         ]
     );
 
@@ -249,7 +251,7 @@ fn empty_lists_print_nothing_and_decimals_print_as_is() {
     let lines = stdout_lines(&output);
     assert_eq!(
         lines.last().unwrap(),
-        "Turn 3: perished 6.5 daily, 5 stew; emitted 6.5 daily, 5 stew, 1.5 gold; endowed nothing; sold nothing; bought nothing; consumed nothing; population 0"
+        "Turn 3: perished 6.5 daily, 5 stew; emitted 6.5 daily, 5 stew, 1.5 gold; endowed nothing; sold nothing; bought nothing; consumed nothing; population 0; businesses sold nothing; businesses bought nothing; produced nothing; used nothing"
     );
 }
 

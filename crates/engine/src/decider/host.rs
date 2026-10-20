@@ -6,7 +6,9 @@
 //! receives exactly one request per turn (empty when it controls no business), deciders
 //! are taken in name order, and every request is submitted before any reply is collected.
 //! A refused decision idles its business; a failed decider idles every business it
-//! controls and is reported; the turn never halts.
+//! controls and is reported; the turn never halts. The host only collects the answers: the
+//! World stores them and, after the decision point, resolves each valid decision into the
+//! business's trade and the fractions its factories run and are maintained at.
 
 use std::collections::BTreeMap;
 use std::error::Error;

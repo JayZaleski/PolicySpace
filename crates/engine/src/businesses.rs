@@ -4,8 +4,9 @@
 //! when the world is created; after that the stockpile in the [`world`](crate::world)
 //! module is the truth), and owns deposits on its hex (written on the deposit, see
 //! [`resources`](crate::resources)). A business may own only deposits on its hex, and may
-//! sit on a hex with no market. Business names are their own namespace. Nothing decides or
-//! trades for a business yet. Knows nothing about files.
+//! sit on a hex with no market. Business names are their own namespace. The World's decision
+//! point, trade round and operation act for a business (see [`world`](crate::world)). Knows
+//! nothing about files.
 
 use crate::bundle::Bundle;
 use crate::id::{Id, IdError, IdKind, IdVec, NameRegistry, NamedList};

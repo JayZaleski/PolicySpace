@@ -1,0 +1,4 @@
+[[market]]
+q = 0
+r = 0
+prices = { labor = 1, ore = 2, iron = 6, tools = 10, bread = 3 }

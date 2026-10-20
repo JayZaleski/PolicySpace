@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(
             session.log(),
             [
-                "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666"
+                "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666; businesses sold nothing; businesses bought nothing; produced nothing; used nothing"
             ]
         );
         assert_eq!(session.step_error(), None);
@@ -406,7 +406,7 @@ mod tests {
         assert_eq!(
             session.log().last().map(String::as_str),
             Some(
-                "Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4194.466666666667 unskilled_labor; sold 2955.6459999999997 unskilled_labor; bought 5.15 copper, 1464.9479999999999 grain; consumed 1238.8206666666667 unskilled_labor, 5.15 copper, 1464.9479999999999 grain; population 429.2982444444444"
+                "Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4194.466666666667 unskilled_labor; sold 2955.6459999999997 unskilled_labor; bought 5.15 copper, 1464.9479999999999 grain; consumed 1238.8206666666667 unskilled_labor, 5.15 copper, 1464.9479999999999 grain; population 429.2982444444444; businesses sold nothing; businesses bought nothing; produced nothing; used nothing"
             )
         );
         assert_eq!(session.step(STEP_MANY), 10);
@@ -529,8 +529,8 @@ mod tests {
         assert_eq!(session.selected(), None);
     }
 
-    /// The sample's turn-0 line, as `open_gives_a_log_of_turn_0_and_nothing_selected` has it.
-    const SAMPLE_TURN_0: &str = "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666";
+    /// The sample's turn-0 line under its Python deciders (which now trade and operate).
+    const SAMPLE_TURN_0: &str = "Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666; businesses sold nothing; businesses bought 17.25 unskilled_labor, 4 unimproved_grain, 8 copper, 1.375 tools; produced 2.5 copper, 12 grain, 4 tools; used 17.25 unskilled_labor, 2.5 unimproved_copper, 12 unimproved_grain, 8 copper, 1.375 tools";
 
     #[test]
     fn a_closure_decider_failure_is_logged_each_turn() {

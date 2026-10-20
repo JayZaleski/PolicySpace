@@ -1,0 +1,27 @@
+[[factory]]
+q = 0
+r = 0
+technology = "smelter"
+owner = "works"
+condition = 1
+
+[[factory]]
+q = 0
+r = 0
+technology = "bakery"
+owner = "works"
+condition = 1
+
+[[factory]]
+q = 0
+r = 0
+technology = "smelter"
+owner = "poor"
+condition = 1
+
+[[factory]]
+q = 1
+r = 0
+technology = "bakery"
+owner = "remote"
+condition = 1

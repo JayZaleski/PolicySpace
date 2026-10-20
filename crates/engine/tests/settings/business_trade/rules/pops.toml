@@ -1,0 +1,5 @@
+[[pop_type]]
+name = "worker"
+endowment = { labor = 10 }
+utility = { labor = { subsistence = 2, share = 0.2 }, bread = { subsistence = 2, share = 0.8 } }
+growth = { growth = [0], decline = 0, max_growth = 0 }

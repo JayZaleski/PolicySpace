@@ -8,15 +8,18 @@
 //!   world is created; a POP's first endowment arrives at the start of turn 0), one
 //!   stockpile per business (filled from its starting inventory when the world is
 //!   created), each POP's latest trade outcome (what it demanded, sold, bought and
-//!   consumed), and each business's answer at the current turn's decision point. Hexes,
+//!   consumed), each business's answer at the current turn's decision point, and each
+//!   business's outcome (what its trade round did and what its factories did). Hexes,
 //!   currencies, deposits and businesses don't change yet, but they are world state
-//!   because later Stages change them; a POP's size changes every turn as it grows. The
+//!   because later Stages change them; a POP's size changes every turn as it grows, and a
+//!   factory's condition changes every turn as it wears and is maintained. The
 //!   posted prices don't change yet either; [`World::market`] hands out each hex's
 //!   market view, the seam Stage 05 replaces.
 //! - The world also holds the factories (each on its owner's hex, running one technology
-//!   and holding a share of its capital bundle) as state, because their technology and
-//!   condition change in later Steps. Nothing runs, wears or maintains them yet, so the
-//!   turn and the report are unchanged.
+//!   and holding a share of its capital bundle) as state. Their condition changes every
+//!   turn: each business's factories are run, worn and maintained by the
+//!   [`production`](crate::production) mechanics right after its hex's trade round, and the
+//!   conditions are written back; their technology changes in later Stages.
 //! - A business's view of its circumstances at the current turn is taken with
 //!   [`World::business_view`], which reads and changes nothing (the decision point that
 //!   serves it is `decide`).
@@ -25,30 +28,42 @@
 //!      owner's stockpile if it has an owner and its hex's stockpile otherwise (the hex
 //!      stockpile stays the home of unowned goods), then every POP receives its type's
 //!      endowment times its size into its own stockpile;
-//!   2. actors act: the decision point, then the trade round and consumption, then growth.
-//!      At the decision point every business's view goes to the decider its setting entry
-//!      names, through the host the caller passes to `new` and `step` (see the
-//!      [`decider::host`](crate::decider::host) module), and its answer is stored; nothing
-//!      resolves the answers yet (Step 08). Then on every hex each POP submits its
-//!      parameters and holdings, the market computes demand and settles sales before
-//!      purchases, and each POP consumes (see the [`trade`](crate::trade) module);
-//!      then, once every hex has traded, every POP grows or shrinks by the rate its outcome
-//!      records (see the [`growth`](crate::growth) module). Later Stages add industries and
-//!      the live market here;
+//!   2. actors act: the decision point, then on every hex the trade round, consumption
+//!      and operation, then growth. At the decision point every business's view goes to the
+//!      decider its setting entry names, through the host the caller passes to `new` and
+//!      `step` (see the [`decider::host`](crate::decider::host) module), and its answer is
+//!      stored. Then on every hex each POP submits its parameters and holdings and each
+//!      business the offers and bids its valid decision resolves to (none, for a business
+//!      that decided nothing or was refused); the market computes the POPs' demand and
+//!      settles every sale before any purchase, and each POP consumes (see the
+//!      [`trade`](crate::trade) module). A business's bids are scaled by one proportion when
+//!      they cost more than the currency it holds, and its fractions reach the factory
+//!      mechanics untouched. Right after the hex's round each of its businesses operates
+//!      its factories with the fractions its valid decision gives (0 and 0 for a factory it
+//!      doesn't mention, and for every factory of a business that decided nothing or was
+//!      refused: they only wear), and the conditions are written back. Then, once every hex
+//!      has traded, every POP grows or shrinks by the rate its outcome records (see the
+//!      [`growth`](crate::growth) module). Later Stages add the live market here;
 //!   3. end of turn: whatever perishes at the end of this turn is removed, from the hex
 //!      stockpiles, then the POP stockpiles and then the business stockpiles.
 //! - [`World::new`] takes the host (and fails for a decider name the host doesn't hold),
 //!   puts the world at turn 0, fills every business's stockpile from its starting
 //!   inventory (each good perishing as if added in turn 0), and runs turn 0's start, turn
-//!   0's decision point, turn 0's trade round and turn 0's growth. [`World::step`] ends
+//!   0's decision point, turn 0's trade round, operation and growth. [`World::step`] ends
 //!   the current turn, advances the clock, and starts the next one, decision point, trade
-//!   round and growth included. The world keeps each POP's outcome of the current turn's
-//!   round ([`World::pop_outcome`]) and each business's answer ([`World::business_answer`]).
-//!   Between calls the world is always after part 2, where every business has answered and
-//!   every POP has traded, consumed and grown this turn, and nothing has perished yet.
+//!   round, operation and growth included. The world keeps each POP's outcome of the
+//!   current turn's round ([`World::pop_outcome`]), each business's answer
+//!   ([`World::business_answer`]) and each business's outcome
+//!   ([`World::business_outcome`]). Between calls the world is always after part 2, where
+//!   every business has answered, traded and operated, and every POP has traded, consumed
+//!   and grown this turn, and nothing has perished yet. So a world that has just been
+//!   created is already past turn 0's operation: under the idle host its factories have worn
+//!   one slice.
 //! - Deposits emit in deposit ID order, POPs are endowed in POP ID order, trade runs on
-//!   hexes in hex ID order, POPs in ID order within a hex and goods in ID order within a
-//!   POP, with every sale before every purchase and then consumption, POPs grow in ID
+//!   hexes in hex ID order, POPs in ID order within a hex and then businesses in ID order,
+//!   and goods in ID order within each, with every sale on the hex before every purchase
+//!   (and POPs before businesses within each pass) and then POP consumption, then each
+//!   business on the hex operates its factories in factory ID order, POPs grow in ID
 //!   order, perishing goes through hexes, then POPs, then businesses in business ID order,
 //!   deciders are taken in name order and businesses in ID order within a decider, and
 //!   stockpiles iterate in a fixed order, so the same setting stepped the same number
@@ -64,18 +79,22 @@ use crate::decider::{
     BusinessAnswer, BusinessView, DeciderHost, DecisionCounts, ReportedFailure, UnknownDecider,
     view,
 };
-use crate::factories::Factories;
-use crate::goods::GoodId;
+use crate::factories::{Factories, FactoryId};
+use crate::goods::{GoodId, Goods};
 use crate::growth::grown_size;
 use crate::id::IdVec;
 use crate::map::{HexId, HexKind, HexMap};
 use crate::market::{HexPrices, Market};
 use crate::pops::{PopId, PopKind, Pops};
+use crate::production::{self, FactoryRecord, Operation};
 use crate::quantity::Quantity;
 use crate::resources::Deposits;
 use crate::setting::{LoadedSetting, Manifest, Rules};
 use crate::stockpile::{PerishesAt, Stockpile};
-use crate::trade::{PopOutcome, RefusedTrade, Submission, hex_round};
+use crate::trade::{
+    BusinessSubmission, BusinessTrade, PopOutcome, RefusedTrade, RefusedTrader, Submission,
+    hex_round,
+};
 use crate::turn::Turn;
 
 /// What happened in one step (or in creating the world).
@@ -101,10 +120,50 @@ pub struct TurnReport {
     pub consumed: Vec<(GoodId, Quantity)>,
     /// The total size of every POP after growth in `turn`. Zero for a world with no POPs.
     pub population: Quantity,
+    /// Total sold by businesses per good in the round of `turn`, in good ID order, only
+    /// amounts > 0.
+    pub business_sold: Vec<(GoodId, Quantity)>,
+    /// Total bought by businesses per good in the round of `turn`, likewise.
+    pub business_bought: Vec<(GoodId, Quantity)>,
+    /// Total output made by factories per good in `turn`, likewise.
+    pub produced: Vec<(GoodId, Quantity)>,
+    /// Total inputs and maintenance goods consumed by factories per good in `turn`,
+    /// likewise.
+    pub used: Vec<(GoodId, Quantity)>,
     /// How the businesses answered at the decision point of `turn`.
     pub decisions: DecisionCounts,
     /// Every decider that failed at the decision point of `turn`, in decider name order.
     pub decider_failures: Vec<ReportedFailure>,
+}
+
+/// What the current turn did for one business, after its hex's round and its operation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BusinessOutcome {
+    /// What the trade round did.
+    trade: BusinessTrade,
+    /// One record per factory the business owns, in factory ID order.
+    factories: Vec<(FactoryId, FactoryRecord)>,
+}
+
+impl BusinessOutcome {
+    /// What the trade round did for the business: what it offered, sold, bid and bought,
+    /// the cash cap's proportion and its cash at each point.
+    pub fn trade(&self) -> &BusinessTrade {
+        &self.trade
+    }
+
+    /// What the mechanics did for each factory the business owns, in factory ID order.
+    pub fn factories(&self) -> &[(FactoryId, FactoryRecord)] {
+        &self.factories
+    }
+
+    /// What the mechanics did for `id`; None if the business doesn't own it.
+    pub fn factory(&self, id: FactoryId) -> Option<&FactoryRecord> {
+        self.factories
+            .iter()
+            .find(|(factory, _)| *factory == id)
+            .map(|(_, record)| record)
+    }
 }
 
 /// Why a step was refused.
@@ -157,24 +216,31 @@ pub struct World {
     /// One per business, by `BusinessId`. Holds the starting inventory when the world is
     /// created.
     business_stockpiles: IdVec<BusinessKind, Stockpile>,
-    /// The factories. Nothing changes them yet; their technology and condition are state
-    /// because later Steps change them.
+    /// The factories. Their condition changes every turn (written back after operation);
+    /// their technology is state because a later Stage changes it.
     factories: Factories,
     /// One per business, by `BusinessId`: its answer at the current turn's decision point.
     /// Rebuilt every turn.
     business_answers: IdVec<BusinessKind, BusinessAnswer>,
+    /// One per business, by `BusinessId`: the outcome of the current turn's trade round and
+    /// operation. Rebuilt every turn; empty only while the world is being created.
+    business_outcomes: IdVec<BusinessKind, BusinessOutcome>,
 }
 
-/// The trade round's totals per good, each in good ID order.
+/// The trade round's and the operation's totals per good, each in good ID order.
 struct TradeTotals {
     sold: Vec<(GoodId, Quantity)>,
     bought: Vec<(GoodId, Quantity)>,
     consumed: Vec<(GoodId, Quantity)>,
+    business_sold: Vec<(GoodId, Quantity)>,
+    business_bought: Vec<(GoodId, Quantity)>,
+    produced: Vec<(GoodId, Quantity)>,
+    used: Vec<(GoodId, Quantity)>,
 }
 
 impl World {
     /// Builds a world from `setting` at turn 0 and runs turn 0's start, decision point,
-    /// trade round and growth, with `host` answering for the businesses. Fails, building
+    /// trade round, operation and growth, with `host` answering for the businesses. Fails, building
     /// nothing, if a business names a decider the host doesn't hold. Returns the world and
     /// turn 0's report.
     pub fn new(
@@ -219,6 +285,7 @@ impl World {
             business_stockpiles,
             factories: start.factories,
             business_answers: IdVec::from_vec(Vec::new()),
+            business_outcomes: IdVec::from_vec(Vec::new()),
         };
         world.business_answers =
             IdVec::from_vec(vec![BusinessAnswer::Nothing; world.businesses.len()]);
@@ -354,6 +421,15 @@ impl World {
         self.business_answers.get(business)
     }
 
+    /// The outcome of the current turn for `business`: what its trade round did and what
+    /// its factories did.
+    ///
+    /// # Panics
+    /// Panics if `business` isn't from this world's businesses.
+    pub fn business_outcome(&self, business: BusinessId) -> &BusinessOutcome {
+        self.business_outcomes.get(business)
+    }
+
     /// The outcome of the current turn's trade round for `pop`: its demand, what it sold,
     /// bought and consumed, the currency it carried over, its subsistence index, its
     /// growth rate and its starting size.
@@ -365,8 +441,8 @@ impl World {
     }
 
     /// Runs the current turn's start (emission, endowment) and part 2 (the decision point,
-    /// the trade round, consumption, growth) and returns its report; `perished` is what
-    /// the previous turn's end removed.
+    /// the trade round, consumption, operation, growth) and returns its report; `perished`
+    /// is what the previous turn's end removed.
     fn run_turn(
         &mut self,
         perished: Vec<(GoodId, Quantity)>,
@@ -379,6 +455,10 @@ impl World {
             sold,
             bought,
             consumed,
+            business_sold,
+            business_bought,
+            produced,
+            used,
         } = self.trade();
         let population = self.grow();
         TurnReport {
@@ -390,6 +470,10 @@ impl World {
             bought,
             consumed,
             population,
+            business_sold,
+            business_bought,
+            produced,
+            used,
             decisions,
             decider_failures,
         }
@@ -448,19 +532,33 @@ impl World {
         (counts, point.failures)
     }
 
-    /// Part 2 of the turn, after `decide`: runs the trade round and consumption on every
-    /// hex in hex ID order, records every POP's outcome, and returns the totals
-    /// (sold, bought, consumed) per good, each in good ID order.
+    /// Part 2 of the turn, after `decide`: on every hex in hex ID order, runs the trade round
+    /// and consumption for the hex's POPs and businesses, then operates each of its
+    /// businesses' factories, and records every POP's and every business's outcome. Returns
+    /// the totals (sold, bought, consumed by POPs; sold and bought by businesses; produced
+    /// and used by factories) per good, each in good ID order.
     fn trade(&mut self) -> TradeTotals {
-        let mut outcomes: Vec<Option<PopOutcome>> = (0..self.pops.len()).map(|_| None).collect();
+        let mut pop_results: Vec<Option<PopOutcome>> = (0..self.pops.len()).map(|_| None).collect();
+        let mut business_results: Vec<Option<BusinessOutcome>> =
+            (0..self.businesses.len()).map(|_| None).collect();
         let mut sold = Vec::new();
         let mut bought = Vec::new();
         let mut consumed = Vec::new();
-        for (hex, _) in self.map.iter() {
-            let ids = self.pops.on_hex(hex);
-            if ids.is_empty() {
+        let mut business_sold = Vec::new();
+        let mut business_bought = Vec::new();
+        let mut produced = Vec::new();
+        let mut used = Vec::new();
+        let hexes: Vec<HexId> = self.map.iter().map(|(hex, _)| hex).collect();
+        for hex in hexes {
+            let pop_ids: Vec<PopId> = self.pops.on_hex(hex).to_vec();
+            let business_ids: Vec<BusinessId> = self.businesses.on_hex(hex).to_vec();
+            if pop_ids.is_empty() && business_ids.is_empty() {
                 continue;
             }
+            let mut business_submissions: Vec<BusinessSubmission> = business_ids
+                .iter()
+                .map(|id| self.business_submission(*id))
+                .collect();
             let market = Market::new(
                 hex,
                 &self.rules.goods,
@@ -468,7 +566,7 @@ impl World {
                 self.hex_prices.list(hex),
                 self.turn,
             );
-            let mut submissions: Vec<Submission<'_>> = ids
+            let mut pop_submissions: Vec<Submission<'_>> = pop_ids
                 .iter()
                 .map(|id| {
                     let pop = self.pops.get(*id);
@@ -479,33 +577,131 @@ impl World {
                     }
                 })
                 .collect();
-            let results = match hex_round(&market, &mut submissions) {
-                Ok(results) => results,
-                Err(RefusedTrade { submission, error }) => panic!(
-                    "engine bug: the market on hex #{} refused a trade for POP #{}: {error}",
-                    hex.index(),
-                    ids[submission].index()
-                ),
+            let round = match hex_round(&market, &mut pop_submissions, &mut business_submissions) {
+                Ok(round) => round,
+                Err(RefusedTrade { trader, error }) => match trader {
+                    RefusedTrader::Pop(i) => panic!(
+                        "engine bug: the market on hex #{} refused a trade for POP #{}: {error}",
+                        hex.index(),
+                        pop_ids[i].index()
+                    ),
+                    RefusedTrader::Business(i) => panic!(
+                        "engine bug: the market on hex #{} refused a trade for business '{}': \
+                         {error}",
+                        hex.index(),
+                        self.businesses.name(business_ids[i])
+                    ),
+                },
             };
-            for ((id, submission), outcome) in ids.iter().zip(submissions).zip(results) {
+            for ((id, submission), outcome) in pop_ids.iter().zip(pop_submissions).zip(round.pops) {
                 *self.pop_stockpiles.get_mut(*id) = submission.stockpile;
                 sold.extend_from_slice(outcome.sold());
                 bought.extend_from_slice(outcome.bought());
                 consumed.extend_from_slice(outcome.consumed());
-                outcomes[id.index()] = Some(outcome);
+                pop_results[id.index()] = Some(outcome);
+            }
+            for ((id, submission), trade) in business_ids
+                .iter()
+                .zip(business_submissions)
+                .zip(round.businesses)
+            {
+                *self.business_stockpiles.get_mut(*id) = submission.stockpile;
+                business_sold.extend_from_slice(trade.sold());
+                business_bought.extend_from_slice(trade.bought());
+                let records = self.operate_business(*id);
+                for (factory, record) in &records {
+                    let technology = self
+                        .rules
+                        .technologies
+                        .get(self.factories.get(*factory).technology);
+                    if record.run.output > Quantity::ZERO {
+                        produced.push((technology.output(), record.run.output));
+                    }
+                    used.extend(record.run.inputs.iter());
+                    used.extend(record.maintenance.cost.iter());
+                }
+                business_results[id.index()] = Some(BusinessOutcome {
+                    trade,
+                    factories: records,
+                });
             }
         }
         self.pop_outcomes = IdVec::from_vec(
-            outcomes
+            pop_results
                 .into_iter()
                 .map(|o| o.expect("every POP is on exactly one hex"))
+                .collect(),
+        );
+        self.business_outcomes = IdVec::from_vec(
+            business_results
+                .into_iter()
+                .map(|o| o.expect("every business is on exactly one hex"))
                 .collect(),
         );
         TradeTotals {
             sold: totals_by_good(sold),
             bought: totals_by_good(bought),
             consumed: totals_by_good(consumed),
+            business_sold: totals_by_good(business_sold),
+            business_bought: totals_by_good(business_bought),
+            produced: totals_by_good(produced),
+            used: totals_by_good(used),
         }
+    }
+
+    /// Resolves `business`'s answer into offers and bids by good ID, in good ID order, only
+    /// amounts > 0; both empty unless the answer is `Valid`. Moves the stockpile out.
+    fn business_submission(&mut self, business: BusinessId) -> BusinessSubmission {
+        let (offers, bids) = match self.business_answers.get(business) {
+            BusinessAnswer::Valid(decision) => (
+                resolve_amounts(&self.rules.goods, &decision.offers),
+                resolve_amounts(&self.rules.goods, &decision.bids),
+            ),
+            BusinessAnswer::Nothing | BusinessAnswer::Refused { .. } => (Vec::new(), Vec::new()),
+        };
+        BusinessSubmission {
+            offers,
+            bids,
+            stockpile: std::mem::take(self.business_stockpiles.get_mut(business)),
+        }
+    }
+
+    /// Operates `business`'s factories with the fractions its answer gives (0 and 0 for a
+    /// factory it doesn't mention, and for every factory when it decided nothing or was
+    /// refused), writes the conditions back, and returns the records in factory ID order.
+    fn operate_business(&mut self, business: BusinessId) -> Vec<(FactoryId, FactoryRecord)> {
+        let ids: Vec<FactoryId> = self.factories.owned_by(business).collect();
+        if ids.is_empty() {
+            return Vec::new();
+        }
+        let rules = &self.rules;
+        let decision = match self.business_answers.get(business) {
+            BusinessAnswer::Valid(decision) => Some(decision),
+            BusinessAnswer::Nothing | BusinessAnswer::Refused { .. } => None,
+        };
+        let mut operations: Vec<Operation<'_>> = ids
+            .iter()
+            .map(|id| {
+                let factory = self.factories.get(*id);
+                let number = u32::try_from(id.index()).expect("factory IDs fit in a u32");
+                let (run_fraction, maintenance_fraction) = decision
+                    .and_then(|d| d.factories.get(&number))
+                    .map_or((0.0, 0.0), |order| (order.run, order.maintenance));
+                Operation {
+                    technology: rules.technologies.get(factory.technology),
+                    condition: factory.condition,
+                    run_fraction,
+                    maintenance_fraction,
+                }
+            })
+            .collect();
+        let mut stockpile = std::mem::take(self.business_stockpiles.get_mut(business));
+        let records = production::operate(&mut operations, &mut stockpile, &rules.goods, self.turn);
+        *self.business_stockpiles.get_mut(business) = stockpile;
+        for (id, operation) in ids.iter().zip(&operations) {
+            self.factories.set_condition(*id, operation.condition);
+        }
+        ids.into_iter().zip(records).collect()
     }
 
     /// Part 2 of the turn, after `trade`: every POP, in ID order, grows by the rate its
@@ -533,6 +729,23 @@ impl World {
                 .flat_map(|stockpile| stockpile.remove_perishing(turn)),
         )
     }
+}
+
+/// A decision's amounts by good name as (good, amount) in good ID order, leaving out zero
+/// amounts. A valid decision names known goods with valid amounts.
+fn resolve_amounts(goods: &Goods, amounts: &BTreeMap<String, f64>) -> Vec<(GoodId, Quantity)> {
+    let mut resolved: Vec<(GoodId, Quantity)> = amounts
+        .iter()
+        .map(|(name, amount)| {
+            (
+                goods.id(name).expect("a valid decision names known goods"),
+                Quantity::new(*amount).expect("a valid decision has valid amounts"),
+            )
+        })
+        .filter(|(_, amount)| *amount > Quantity::ZERO)
+        .collect();
+    resolved.sort_by_key(|(good, _)| *good);
+    resolved
 }
 
 /// Sums `amounts` per good (saturating) and returns the totals in good ID order, leaving
@@ -595,6 +808,10 @@ mod tests {
             let outcomes_before: IdVec<PopKind, PopOutcome> = world.pop_outcomes.clone();
             let answers_before: IdVec<BusinessKind, BusinessAnswer> =
                 world.business_answers.clone();
+            let business_outcomes_before: IdVec<BusinessKind, BusinessOutcome> =
+                world.business_outcomes.clone();
+            let conditions_before: Vec<f64> =
+                world.factories.iter().map(|(_, f)| f.condition).collect();
             assert_eq!(
                 world.step(&mut DeciderHost::idle()),
                 Err(StepError::ClockAtMaximum)
@@ -605,6 +822,10 @@ mod tests {
             assert_eq!(world.business_stockpiles, businesses_before);
             assert_eq!(world.pop_outcomes, outcomes_before);
             assert_eq!(world.business_answers, answers_before);
+            assert_eq!(world.business_outcomes, business_outcomes_before);
+            let conditions_after: Vec<f64> =
+                world.factories.iter().map(|(_, f)| f.condition).collect();
+            assert_eq!(conditions_after, conditions_before);
             let sizes_after: Vec<Quantity> = world.pops.iter().map(|(_, p)| p.size).collect();
             assert_eq!(sizes_after, sizes_before);
         }

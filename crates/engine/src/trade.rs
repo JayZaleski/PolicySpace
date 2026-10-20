@@ -1,19 +1,28 @@
-//! The trade round: the "actors act" part of the turn for POPs.
+//! The trade round: the "actors act" part of the turn, for POPs and for businesses.
 //!
 //! Each POP submits its type's utility parameters, its size and its holdings to its hex's
-//! market. The market posts its prices (fixed, this Stage), computes every submission's
-//! demand with [`demand`](crate::demand), and settles every POP's sales before any POP's
-//! purchases (so that in the live market every purchase sees the income the sales actually
-//! produced). Then each POP consumes its utility goods up to what it demanded. The currency
-//! is never traded: proceeds add it, purchases spend it, and what is left is its demanded
+//! market. The market posts its prices (fixed, this Stage), computes every POP submission's
+//! demand with [`demand`](crate::demand), and settles every sale on the hex before any
+//! purchase (so that in the live market every purchase sees the income the sales actually
+//! produced): POP sales, then business sales, then POP purchases, then business purchases.
+//! Then each POP consumes its utility goods up to what it demanded. The currency is never
+//! traded: proceeds add it, purchases spend it, and what is left is a POP's demanded
 //! quantity up to rounding. Hexes are handled by the World in hex ID order; within a hex
-//! POPs go in POP ID order and goods in good ID order. Leftover currency stays in the
-//! stockpile. A refused trade is an engine bug. The record also carries the POP's
-//! subsistence index and growth rate, computed by the [`growth`](crate::growth) module from
-//! the demand and the type, and the size the turn started with; the World applies the rate
-//! after every hex has traded. Stage 05 replaces the inside of the round (adjusted prices,
-//! rationing); the submission, the order, consumption and the outcome stay. Knows nothing
-//! about the World or files.
+//! POPs go in POP ID order, then businesses in business ID order, and goods in good ID
+//! order. Leftover currency stays in the stockpile. A refused trade is an engine bug.
+//!
+//! A business submits what the World resolved from its decision: offers and bids by good,
+//! and its stockpile. It sells each offer up to what it holds, and buys its bids at posted
+//! prices; when the bids cost more than the currency it holds after its sales, every bid is
+//! scaled by one proportion (cash over cost), so what it buys keeps the shape it chose.
+//! The round records what it did as a [`BusinessTrade`]. Operating the factories is not
+//! part of the round: the World does that for each business right after the hex's round.
+//!
+//! A POP's record also carries its subsistence index and growth rate, computed by the
+//! [`growth`](crate::growth) module from the demand and the type, and the size the turn
+//! started with; the World applies the rate after every hex has traded. Stage 05 replaces
+//! the inside of the round (adjusted prices, rationing); the submissions, the order,
+//! consumption and the outcomes stay. Knows nothing about the World, deciders or files.
 
 use crate::demand::{Demand, demand};
 use crate::goods::GoodId;
@@ -117,59 +126,198 @@ impl PopOutcome {
     }
 }
 
-/// The exchange refused a trade during the round: an engine bug, since the demand and the
-/// purchase cap make every trade acceptable. The stockpiles are left as they were at the
-/// refusal.
+/// One business's submission to its hex's market: its offers and bids as the World resolved
+/// them from its decision (good ID order, only amounts > 0; both empty for a business that
+/// decided nothing or was refused), and its stockpile, moved out for the round.
+pub(crate) struct BusinessSubmission {
+    pub offers: Vec<(GoodId, Quantity)>,
+    pub bids: Vec<(GoodId, Quantity)>,
+    pub stockpile: Stockpile,
+}
+
+/// What one turn's round did for one business.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BusinessTrade {
+    /// As submitted.
+    offered: Vec<(GoodId, Quantity)>,
+    /// Per good sold, in the offers' order, only amounts > 0.
+    sold: Vec<(GoodId, Quantity)>,
+    /// As submitted.
+    bid: Vec<(GoodId, Quantity)>,
+    /// Per good bought, in the bids' order, only amounts > 0.
+    bought: Vec<(GoodId, Quantity)>,
+    /// The cash cap's scaling of every bid; 1 when the bids were within the cash.
+    proportion: f64,
+    /// The currency held at the start of the round.
+    cash_before: Quantity,
+    /// The currency held after the whole sales pass.
+    cash_after_sales: Quantity,
+    /// The currency held after the whole purchase pass.
+    cash_after_purchases: Quantity,
+}
+
+impl BusinessTrade {
+    /// What the business offered as (good, amount), as submitted.
+    pub fn offered(&self) -> &[(GoodId, Quantity)] {
+        &self.offered
+    }
+
+    /// What the business sold as (good, amount), only amounts > 0.
+    pub fn sold(&self) -> &[(GoodId, Quantity)] {
+        &self.sold
+    }
+
+    /// What the business bid for as (good, amount), as submitted.
+    pub fn bid(&self) -> &[(GoodId, Quantity)] {
+        &self.bid
+    }
+
+    /// What the business bought as (good, amount), only amounts > 0.
+    pub fn bought(&self) -> &[(GoodId, Quantity)] {
+        &self.bought
+    }
+
+    /// The amount of `good` offered; zero if none.
+    pub fn offered_of(&self, good: GoodId) -> Quantity {
+        amount_of(&self.offered, good)
+    }
+
+    /// The amount of `good` sold; zero if none.
+    pub fn sold_of(&self, good: GoodId) -> Quantity {
+        amount_of(&self.sold, good)
+    }
+
+    /// The amount of `good` bid for; zero if none.
+    pub fn bid_of(&self, good: GoodId) -> Quantity {
+        amount_of(&self.bid, good)
+    }
+
+    /// The amount of `good` bought; zero if none.
+    pub fn bought_of(&self, good: GoodId) -> Quantity {
+        amount_of(&self.bought, good)
+    }
+
+    /// The scaling the cash cap applied to every bid: 1 when the bids were within the cash,
+    /// 0 for a business with no currency.
+    pub fn proportion(&self) -> f64 {
+        self.proportion
+    }
+
+    /// The currency held at the start of the round.
+    pub fn cash_before(&self) -> Quantity {
+        self.cash_before
+    }
+
+    /// The currency held after the sales.
+    pub fn cash_after_sales(&self) -> Quantity {
+        self.cash_after_sales
+    }
+
+    /// The currency held after the purchases.
+    pub fn cash_after_purchases(&self) -> Quantity {
+        self.cash_after_purchases
+    }
+}
+
+/// The results of one hex's round, each in submission order.
+pub(crate) struct HexRound {
+    pub pops: Vec<PopOutcome>,
+    pub businesses: Vec<BusinessTrade>,
+}
+
+/// Which submission the exchange refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RefusedTrader {
+    /// The POP submission at this index.
+    Pop(usize),
+    /// The business submission at this index.
+    Business(usize),
+}
+
+/// The exchange refused a trade during the round: an engine bug, since the demand, the
+/// offers' cap and the purchase caps make every trade acceptable. The stockpiles are left
+/// as they were at the refusal.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RefusedTrade {
-    /// Index of the submission in the slice passed to `hex_round`.
-    pub submission: usize,
+    /// Which submission, by index in the slice passed to `hex_round`.
+    pub trader: RefusedTrader,
     pub error: TradeError,
 }
 
-/// Runs one hex's trade round and consumption for `submissions` (the hex's POPs in POP ID
-/// order). Returns one outcome per submission, in the same order.
+/// Runs one hex's trade round and consumption for `pops` (the hex's POPs in POP ID order)
+/// and `businesses` (its businesses in business ID order): every POP's demand; every sale
+/// (POPs, then businesses); every purchase (POPs, then businesses); POP consumption.
+/// Returns one result per submission, in the same order.
 pub(crate) fn hex_round(
     market: &Market<'_>,
-    submissions: &mut [Submission<'_>],
-) -> Result<Vec<PopOutcome>, RefusedTrade> {
+    pops: &mut [Submission<'_>],
+    businesses: &mut [BusinessSubmission],
+) -> Result<HexRound, RefusedTrade> {
     // 1. Demand.
-    let demands: Vec<Demand> = submissions
+    let demands: Vec<Demand> = pops
         .iter()
         .map(|s| demand(s.pop_type, s.size, s.stockpile.iter(), market))
         .collect();
+    let cash_before: Vec<Quantity> = businesses
+        .iter()
+        .map(|b| b.stockpile.total(market.currency()))
+        .collect();
 
-    // 2. Every POP's sales, before any purchase.
-    let mut sold = Vec::with_capacity(submissions.len());
-    for (i, s) in submissions.iter_mut().enumerate() {
+    // 2. Every sale on the hex, before any purchase: POPs, then businesses.
+    let mut pops_sold = Vec::with_capacity(pops.len());
+    for (i, s) in pops.iter_mut().enumerate() {
         let done =
             settle_sales(market, &demands[i], &mut s.stockpile).map_err(|error| RefusedTrade {
-                submission: i,
+                trader: RefusedTrader::Pop(i),
                 error,
             })?;
-        sold.push(done);
+        pops_sold.push(done);
     }
+    let mut businesses_sold = Vec::with_capacity(businesses.len());
+    for (i, b) in businesses.iter_mut().enumerate() {
+        let done =
+            settle_offers(market, &b.offers, &mut b.stockpile).map_err(|error| RefusedTrade {
+                trader: RefusedTrader::Business(i),
+                error,
+            })?;
+        businesses_sold.push(done);
+    }
+    let cash_after_sales: Vec<Quantity> = businesses
+        .iter()
+        .map(|b| b.stockpile.total(market.currency()))
+        .collect();
 
-    // 3. Every POP's purchases.
-    let mut bought = Vec::with_capacity(submissions.len());
-    for (i, s) in submissions.iter_mut().enumerate() {
+    // 3. Every purchase: POPs, then businesses.
+    let mut pops_bought = Vec::with_capacity(pops.len());
+    for (i, s) in pops.iter_mut().enumerate() {
         let done = settle_purchases(market, &demands[i], &mut s.stockpile).map_err(|error| {
             RefusedTrade {
-                submission: i,
+                trader: RefusedTrader::Pop(i),
                 error,
             }
         })?;
-        bought.push(done);
+        pops_bought.push(done);
+    }
+    let mut businesses_bought = Vec::with_capacity(businesses.len());
+    for (i, b) in businesses.iter_mut().enumerate() {
+        let done =
+            settle_bids(market, &b.bids, &mut b.stockpile).map_err(|error| RefusedTrade {
+                trader: RefusedTrader::Business(i),
+                error,
+            })?;
+        businesses_bought.push(done);
     }
 
-    // 4. Consumption and the record.
-    let mut outcomes = Vec::with_capacity(submissions.len());
-    for (((s, demand), sold), bought) in submissions.iter_mut().zip(demands).zip(sold).zip(bought) {
+    // 4. POP consumption and the records.
+    let mut pop_outcomes = Vec::with_capacity(pops.len());
+    for (((s, demand), sold), bought) in
+        pops.iter_mut().zip(demands).zip(pops_sold).zip(pops_bought)
+    {
         let consumed = consume(s.pop_type, &demand, &mut s.stockpile);
         let carried_over = s.stockpile.total(market.currency());
         let subsistence_index = subsistence_index(&demand);
         let growth_rate = growth_rate(s.pop_type.growth(), subsistence_index);
-        outcomes.push(PopOutcome {
+        pop_outcomes.push(PopOutcome {
             demand,
             sold,
             bought,
@@ -180,7 +328,87 @@ pub(crate) fn hex_round(
             starting_size: s.size,
         });
     }
-    Ok(outcomes)
+    let mut business_trades = Vec::with_capacity(businesses.len());
+    for (i, b) in businesses.iter().enumerate() {
+        let (bought, proportion) = businesses_bought[i].clone();
+        business_trades.push(BusinessTrade {
+            offered: b.offers.clone(),
+            sold: businesses_sold[i].clone(),
+            bid: b.bids.clone(),
+            bought,
+            proportion,
+            cash_before: cash_before[i],
+            cash_after_sales: cash_after_sales[i],
+            cash_after_purchases: b.stockpile.total(market.currency()),
+        });
+    }
+    Ok(HexRound {
+        pops: pop_outcomes,
+        businesses: business_trades,
+    })
+}
+
+/// Sells each offered amount, or everything held if that is less. Returns (good, sold) in
+/// the offers' order, only amounts > 0.
+fn settle_offers(
+    market: &Market<'_>,
+    offers: &[(GoodId, Quantity)],
+    stockpile: &mut Stockpile,
+) -> Result<Vec<(GoodId, Quantity)>, TradeError> {
+    let mut sold_list = Vec::new();
+    for &(good, offer) in offers {
+        let held = stockpile.total(good);
+        let amount = if offer < held { offer } else { held };
+        if amount > Quantity::ZERO {
+            market.sell(stockpile, good, amount)?;
+            sold_list.push((good, amount));
+        }
+    }
+    Ok(sold_list)
+}
+
+/// Values the bids at posted prices; scales every bid by `cash / cost` when the cost exceeds
+/// the currency held (1 otherwise); buys each scaled amount, capped at the currency left.
+/// Returns ((good, bought) in the bids' order, only amounts > 0; the proportion).
+fn settle_bids(
+    market: &Market<'_>,
+    bids: &[(GoodId, Quantity)],
+    stockpile: &mut Stockpile,
+) -> Result<(Vec<(GoodId, Quantity)>, f64), TradeError> {
+    let mut cost = Quantity::ZERO;
+    for &(good, bid) in bids {
+        let price = market.price(good).ok_or(TradeError::NotTraded { good })?;
+        cost = cost.saturating_add(bid.saturating_mul(price));
+    }
+    let cash = stockpile.total(market.currency());
+    // `cost > cash` implies `cost > 0`, so there is no division by zero; no cash gives 0.
+    let proportion = if cost > cash {
+        cash.get() / cost.get()
+    } else {
+        1.0
+    };
+    let scale = Quantity::new(proportion).expect("a proportion is a valid quantity");
+    let mut bought_list = Vec::new();
+    for &(good, bid) in bids {
+        let wanted = bid.saturating_mul(scale);
+        if wanted == Quantity::ZERO {
+            continue;
+        }
+        let price = market.price(good).ok_or(TradeError::NotTraded { good })?;
+        let needed = wanted.saturating_mul(price);
+        let held = stockpile.total(market.currency());
+        let bought = if needed <= held {
+            market.buy(stockpile, good, wanted)?;
+            wanted
+        } else {
+            // A rounding sliver: spend what is left.
+            market.buy_for(stockpile, good, held)?
+        };
+        if bought > Quantity::ZERO {
+            bought_list.push((good, bought));
+        }
+    }
+    Ok((bought_list, proportion))
 }
 
 /// Sells, for every good in the demand except the currency, whatever the stockpile holds
@@ -348,7 +576,7 @@ mod tests {
             size: q(1.0),
             stockpile: stock(&[(labor, 10.0)], &world),
         }];
-        let outcomes = hex_round(&market, &mut subs).unwrap();
+        let outcomes = hex_round(&market, &mut subs, &mut []).unwrap().pops;
         assert_eq!(outcomes.len(), 1);
         let o = &outcomes[0];
         assert_list(&world, o.sold(), &[("labor", 7.2)]);
@@ -377,11 +605,11 @@ mod tests {
             stockpile: stock(&[(labor, 10.0 * size)], &world),
         };
         let mut together = vec![submission("peasant", 2.0), submission("artisan", 1.0)];
-        let outcomes = hex_round(&market, &mut together).unwrap();
+        let outcomes = hex_round(&market, &mut together, &mut []).unwrap().pops;
         assert_eq!(outcomes.len(), 2);
         for (i, name, size) in [(0, "peasant", 2.0), (1, "artisan", 1.0)] {
             let mut alone = vec![submission(name, size)];
-            let alone_outcomes = hex_round(&market, &mut alone).unwrap();
+            let alone_outcomes = hex_round(&market, &mut alone, &mut []).unwrap().pops;
             assert_eq!(outcomes[i], alone_outcomes[0], "{name}");
             assert_eq!(together[i].stockpile, alone[0].stockpile, "{name}");
         }
@@ -401,7 +629,7 @@ mod tests {
             size: q(1.0),
             stockpile: stock(&[(labor, 10.0)], &world),
         }];
-        let outcomes = hex_round(&market, &mut subs).unwrap();
+        let outcomes = hex_round(&market, &mut subs, &mut []).unwrap().pops;
         let o = &outcomes[0];
         assert!(o.sold().is_empty());
         assert!(o.bought().is_empty());
@@ -416,7 +644,9 @@ mod tests {
     fn an_empty_slice_gives_no_outcomes() {
         let world = trade_world();
         let market = world.market(hex(&world, 0));
-        assert_eq!(hex_round(&market, &mut []), Ok(vec![]));
+        let round = hex_round(&market, &mut [], &mut []).unwrap();
+        assert!(round.pops.is_empty());
+        assert!(round.businesses.is_empty());
     }
 
     #[test]
@@ -429,7 +659,7 @@ mod tests {
             size: q(1.0),
             stockpile: stock(&[(labor, 10.0), (copper, 1.0)], &world),
         }];
-        let outcomes = hex_round(&market, &mut subs).unwrap();
+        let outcomes = hex_round(&market, &mut subs, &mut []).unwrap().pops;
         assert_eq!(outcomes[0].sold_of(copper), q(1.0));
         assert_eq!(subs[0].stockpile.total(copper), Quantity::ZERO);
     }
@@ -541,7 +771,7 @@ mod tests {
             size: q(1.0),
             stockpile: stock(&[(labor, 10.0)], &world),
         }];
-        let outcomes = hex_round(&market, &mut subs).unwrap();
+        let outcomes = hex_round(&market, &mut subs, &mut []).unwrap().pops;
         let o = &outcomes[0];
         assert_list(&world, o.sold(), &[("labor", 5.5)]);
         assert!(o.bought().is_empty());
@@ -576,5 +806,213 @@ mod tests {
         assert!(close(total_of(&stockpile, labor), 4.8));
         assert!(close(total_of(&stockpile, silver), 5.2));
         assert_eq!(stockpile.total(copper), q(2.0));
+    }
+
+    /// A business submission with `stockpile` held (durable goods; see `stock`).
+    fn business(
+        offers: &[(GoodId, f64)],
+        bids: &[(GoodId, f64)],
+        stockpile: Stockpile,
+    ) -> BusinessSubmission {
+        let list = |items: &[(GoodId, f64)]| items.iter().map(|(g, a)| (*g, q(*a))).collect();
+        BusinessSubmission {
+            offers: list(offers),
+            bids: list(bids),
+            stockpile,
+        }
+    }
+
+    /// Runs the round for the businesses alone on hex `x`.
+    fn business_round(
+        world: &World,
+        x: i32,
+        businesses: &mut [BusinessSubmission],
+    ) -> Result<Vec<BusinessTrade>, RefusedTrade> {
+        let market = world.market(hex(world, x));
+        hex_round(&market, &mut [], businesses).map(|round| round.businesses)
+    }
+
+    #[test]
+    fn a_business_sells_its_offers_and_buys_its_bids() {
+        let world = trade_world();
+        let (copper, grain, silver) = (
+            good(&world, "copper"),
+            good(&world, "grain"),
+            good(&world, "silver"),
+        );
+        let mut subs = vec![business(
+            &[(copper, 2.0)],
+            &[(grain, 3.0)],
+            stock(&[(silver, 10.0), (copper, 2.0)], &world),
+        )];
+        let trades = business_round(&world, 0, &mut subs).unwrap();
+        let t = &trades[0];
+        assert_list(&world, t.offered(), &[("copper", 2.0)]);
+        assert_list(&world, t.sold(), &[("copper", 2.0)]);
+        assert_list(&world, t.bid(), &[("grain", 3.0)]);
+        assert_list(&world, t.bought(), &[("grain", 3.0)]);
+        assert!(close(t.sold_of(copper).get(), 2.0));
+        assert!(close(t.bought_of(grain).get(), 3.0));
+        assert!(close(t.offered_of(copper).get(), 2.0));
+        assert!(close(t.bid_of(grain).get(), 3.0));
+        assert_eq!(t.proportion(), 1.0);
+        assert!(close(t.cash_before().get(), 10.0));
+        assert!(close(t.cash_after_sales().get(), 20.0));
+        assert!(close(t.cash_after_purchases().get(), 14.0));
+        let stockpile = &subs[0].stockpile;
+        assert_eq!(stockpile.total(copper), Quantity::ZERO);
+        assert!(close(total_of(stockpile, grain), 3.0));
+        assert!(close(total_of(stockpile, silver), 14.0));
+        // Bought in turn 0, grain lasts 3 turns: it perishes at the end of turn 2.
+        let groups: Vec<_> = stockpile.groups(grain).collect();
+        assert_eq!(groups, vec![(PerishesAt::EndOfTurn(Turn::new(2)), q(3.0))]);
+    }
+
+    #[test]
+    fn an_offer_above_holdings_sells_what_is_held() {
+        let world = trade_world();
+        let (labor, copper, silver) = (
+            good(&world, "labor"),
+            good(&world, "copper"),
+            good(&world, "silver"),
+        );
+        let mut subs = vec![business(
+            &[(labor, 1.0), (copper, 5.0)],
+            &[],
+            stock(&[(copper, 2.0)], &world),
+        )];
+        let trades = business_round(&world, 0, &mut subs).unwrap();
+        let t = &trades[0];
+        assert_list(&world, t.sold(), &[("copper", 2.0)]);
+        assert!(close(t.offered_of(copper).get(), 5.0));
+        assert_eq!(t.sold_of(labor), Quantity::ZERO);
+        assert!(t.sold().iter().all(|(g, _)| *g != labor));
+        assert!(close(total_of(&subs[0].stockpile, silver), 10.0));
+    }
+
+    #[test]
+    fn bids_beyond_cash_are_scaled_by_one_proportion() {
+        let world = trade_world();
+        let (grain, copper, silver) = (
+            good(&world, "grain"),
+            good(&world, "copper"),
+            good(&world, "silver"),
+        );
+        let mut subs = vec![business(
+            &[],
+            &[(grain, 10.0), (copper, 6.0)],
+            stock(&[(silver, 10.0)], &world),
+        )];
+        let trades = business_round(&world, 0, &mut subs).unwrap();
+        let t = &trades[0];
+        assert!(close(t.proportion(), 0.2));
+        assert_list(&world, t.bought(), &[("grain", 2.0), ("copper", 1.2)]);
+        assert_list(&world, t.bid(), &[("grain", 10.0), ("copper", 6.0)]);
+        assert!(total_of(&subs[0].stockpile, silver) < 1e-9);
+        assert!(close(t.cash_before().get(), 10.0));
+        assert!(close(t.cash_after_sales().get(), 10.0));
+        assert!(t.cash_after_purchases().get() < 1e-9);
+    }
+
+    #[test]
+    fn a_business_with_no_currency_buys_nothing() {
+        let world = trade_world();
+        let grain = good(&world, "grain");
+        let mut subs = vec![business(&[], &[(grain, 1.0)], Stockpile::new())];
+        let trades = business_round(&world, 0, &mut subs).unwrap();
+        assert!(trades[0].bought().is_empty());
+        assert_eq!(trades[0].proportion(), 0.0);
+        assert!(subs[0].stockpile.is_empty());
+    }
+
+    #[test]
+    fn a_rounding_sliver_caps_the_last_purchase() {
+        let world = trade_world();
+        let (grain, silver) = (good(&world, "grain"), good(&world, "silver"));
+        let mut subs = vec![business(
+            &[],
+            &[(grain, 3.0)],
+            stock(&[(silver, 6.0 - 1e-9)], &world),
+        )];
+        let trades = business_round(&world, 0, &mut subs).unwrap();
+        let t = &trades[0];
+        assert_eq!(t.proportion(), (6.0 - 1e-9) / 6.0);
+        assert!(close(t.bought_of(grain).get(), 3.0));
+        assert!(total_of(&subs[0].stockpile, silver) < 1e-9);
+        assert!(close(total_of(&subs[0].stockpile, grain), 3.0));
+    }
+
+    #[test]
+    fn empty_submissions_trade_nothing() {
+        let world = trade_world();
+        let silver = good(&world, "silver");
+        let mut subs = vec![business(&[], &[], stock(&[(silver, 7.0)], &world))];
+        let trades = business_round(&world, 0, &mut subs).unwrap();
+        let t = &trades[0];
+        assert!(t.offered().is_empty());
+        assert!(t.sold().is_empty());
+        assert!(t.bid().is_empty());
+        assert!(t.bought().is_empty());
+        assert_eq!(t.proportion(), 1.0);
+        assert_eq!(t.cash_before(), q(7.0));
+        assert_eq!(t.cash_after_sales(), q(7.0));
+        assert_eq!(t.cash_after_purchases(), q(7.0));
+    }
+
+    #[test]
+    fn pops_and_businesses_together_equal_each_alone() {
+        let world = trade_world();
+        let (labor, copper, grain, silver) = (
+            good(&world, "labor"),
+            good(&world, "copper"),
+            good(&world, "grain"),
+            good(&world, "silver"),
+        );
+        let market = world.market(hex(&world, 0));
+        let peasant = || Submission {
+            pop_type: pop_type(&world, "peasant"),
+            size: q(1.0),
+            stockpile: stock(&[(labor, 10.0)], &world),
+        };
+        let shop = || {
+            business(
+                &[(copper, 2.0)],
+                &[(grain, 3.0)],
+                stock(&[(silver, 10.0), (copper, 2.0)], &world),
+            )
+        };
+        let mut pops = vec![peasant()];
+        let mut shops = vec![shop()];
+        let both = hex_round(&market, &mut pops, &mut shops).unwrap();
+
+        let mut pops_alone = vec![peasant()];
+        let pop_round = hex_round(&market, &mut pops_alone, &mut []).unwrap();
+        let mut shops_alone = vec![shop()];
+        let shop_round = hex_round(&market, &mut [], &mut shops_alone).unwrap();
+
+        assert_eq!(both.pops, pop_round.pops);
+        assert_eq!(pops[0].stockpile, pops_alone[0].stockpile);
+        assert_eq!(both.businesses, shop_round.businesses);
+        assert_eq!(shops[0].stockpile, shops_alone[0].stockpile);
+    }
+
+    #[test]
+    fn a_refused_business_trade_names_the_business() {
+        let world = trade_world();
+        let (grain, silver) = (good(&world, "grain"), good(&world, "silver"));
+        let mut subs = vec![business(
+            &[],
+            &[(grain, 1.0)],
+            stock(&[(silver, 10.0)], &world),
+        )];
+        let market = world.market(hex(&world, 2));
+        let refused = hex_round(&market, &mut [], &mut subs).err().unwrap();
+        assert_eq!(
+            refused,
+            RefusedTrade {
+                trader: RefusedTrader::Business(0),
+                error: TradeError::NotTraded { good: grain },
+            }
+        );
     }
 }

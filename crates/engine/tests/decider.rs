@@ -5,7 +5,7 @@ mod common;
 
 use std::collections::BTreeMap;
 
-use common::{q, sample_setting, test_setting, world_of};
+use common::{close, q, sample_setting, test_setting, world_of};
 use policyspace_engine::decider::{FactoryOrder, PerishGroup, ReplyError};
 use policyspace_engine::{
     Answer, BusinessId, BusinessView, Decision, Quantity, Recording, Reply, Request, Turn, World,
@@ -44,6 +44,19 @@ fn factory_rows(view: &BusinessView) -> Vec<(u32, String, f64)> {
         .iter()
         .map(|(id, f)| (*id, f.technology.clone(), f.condition))
         .collect()
+}
+
+/// Asserts `view`'s factories are exactly `expected` as (ID, technology, condition), the
+/// conditions to within 1e-9. A world is past turn 0's operation when `World::new` returns,
+/// so under the idle host each factory has worn one slice.
+fn assert_factory_rows(view: &BusinessView, expected: &[(u32, &str, f64)]) {
+    let actual = factory_rows(view);
+    assert_eq!(actual.len(), expected.len(), "{actual:?} vs {expected:?}");
+    for ((id, technology, condition), (eid, etechnology, econdition)) in actual.iter().zip(expected)
+    {
+        assert_eq!((id, technology.as_str()), (eid, *etechnology), "{actual:?}");
+        assert!(close(*condition, *econdition), "{actual:?} vs {expected:?}");
+    }
 }
 
 fn deposit_rows(view: &BusinessView) -> Vec<(String, u32, String, f64)> {
@@ -97,7 +110,7 @@ fn the_sample_businesses_see_their_own_circumstances() {
     );
     assert_eq!(groups_of(&farm, "silver"), [(100.0, None)]);
     assert_eq!(groups_of(&farm, "unimproved_grain"), [(8.0, Some(0))]);
-    assert_eq!(factory_rows(&farm), [(0, "farm".to_string(), 1.0)]);
+    assert_factory_rows(&farm, &[(0, "farm", 0.875)]);
     let t = &farm.technologies["farm"];
     assert_eq!(
         t.inputs,
@@ -125,7 +138,7 @@ fn the_sample_businesses_see_their_own_circumstances() {
     );
     assert_eq!(groups_of(&mine, "silver"), [(50.0, None)]);
     assert_eq!(groups_of(&mine, "unimproved_copper"), [(2.5, Some(0))]);
-    assert_eq!(factory_rows(&mine), [(1, "mine".to_string(), 0.75)]);
+    assert_factory_rows(&mine, &[(1, "mine", 0.625)]);
     let t = &mine.technologies["mine"];
     assert_eq!(
         t.inputs,
@@ -149,10 +162,7 @@ fn the_sample_businesses_see_their_own_circumstances() {
     assert_eq!(toolmaker.cash.get(), 200.0);
     assert_eq!(toolmaker.stockpile.keys().collect::<Vec<_>>(), ["silver"]);
     assert_eq!(groups_of(&toolmaker, "silver"), [(200.0, None)]);
-    assert_eq!(
-        factory_rows(&toolmaker),
-        [(2, "toolmaker".to_string(), 1.0)]
-    );
+    assert_factory_rows(&toolmaker, &[(2, "toolmaker", 23.0 / 24.0)]);
     let t = &toolmaker.technologies["toolmaker"];
     assert_eq!(t.inputs, qmap(&[("copper", 2.0), ("unskilled_labor", 1.5)]));
     assert_eq!(t.output, "tools");
@@ -212,13 +222,13 @@ fn a_business_on_a_hex_with_no_market_sees_no_prices() {
 fn a_technology_is_listed_once_however_many_factories_run_it() {
     let (world, _) = world_of(&test_setting("production_valid"));
     let works = view(&world, "works");
-    assert_eq!(
-        factory_rows(&works),
-        [
-            (0, "smelter".to_string(), 1.0),
-            (1, "smelter".to_string(), 0.5),
-            (2, "bakery".to_string(), 1.0),
-        ]
+    assert_factory_rows(
+        &works,
+        &[
+            (0, "smelter", 0.75),
+            (1, "smelter", 0.25),
+            (2, "bakery", 2.0 / 3.0),
+        ],
     );
     assert_eq!(
         works.technologies.keys().collect::<Vec<_>>(),

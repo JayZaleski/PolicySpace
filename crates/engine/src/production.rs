@@ -1,8 +1,9 @@
 //! Factory mechanics: what happens when a business runs a factory at a fraction of its
 //! capacity, how a factory wears each turn, and what maintaining it costs. Pure functions
-//! over one business's factories, each with its own tests; nothing in the turn calls them
-//! yet (Step 08 does, after the trade round, once per business, in the order [`operate`]
-//! fixes).
+//! over one business's factories, each with its own tests. The turn calls [`operate`] once
+//! per business, right after its hex's trade round, with the fractions the business's valid
+//! decision gives (0 and 0 for a factory it doesn't mention, and for every factory of a
+//! business that decided nothing or was refused, which then only wear).
 //!
 //! - **Two fractions.** A business's decider chooses, for each factory, a run fraction and
 //!   a maintenance fraction, each 0 to 1.

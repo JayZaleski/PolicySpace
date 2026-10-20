@@ -1,0 +1,23 @@
+[[business]]
+name = "works"
+q = 0
+r = 0
+inventory = { coin = 100, tools = 3 }
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "poor"
+q = 0
+r = 0
+inventory = { coin = 10, ore = 30 }
+deposits = {}
+decider = "rule"
+
+[[business]]
+name = "remote"
+q = 1
+r = 0
+inventory = { labor = 6 }
+deposits = {}
+decider = "rule"
