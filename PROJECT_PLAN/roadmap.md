@@ -128,7 +128,7 @@
 - Description: The decision point in the engine: once per turn, every business's view is served and every decision collected in one batched exchange. A Decider abstraction with two implementations: the external-process decider, which starts the Python script once, keeps it alive across turns, and exchanges one batch per turn; and the replay decider, which answers from a recording so engine tests that don't test strategy don't need Python. Failure semantics: what the engine does when a decider errors, answers late, or sends a decision it can't resolve. Resolving the decider names businesses give in the setting, and the test setup that finds the project's Python environment. The engine never depends on a decider's memory.
 
 ### Step 08: business-trade
-- Status: planned
+- Status: specified
 - Tags: #businesses #factories #market #turn-loop #deciders
 - Description: The business's turn. After the decision point, each business's offers and bids go through the same hex round as POPs: sales settle before purchases, purchases are capped by cash on hand after sales, and when cash is short the run level is scaled down. Then its factories run at the resolved levels, depreciate, and are maintained by the chosen shares, and the output goes to inventory for next turn. Labor is bought and used in the same turn. A per-business outcome records the decision, its trace, and what was traded, and the turn report gains business totals. The cash cap is the seam for operating budgets; maintenance is the seam for expansion; the decider is the seam for richer strategy.
 
