@@ -17,7 +17,7 @@ A previous session ended partway through the development loop (see `CLAUDE.md`).
 2. Run `git status --short`, `git log --oneline -15`, and `git worktree list`. If the project isn't a git repository, tell the user the loop needs git (safe points and checkpoints are commits) and stop.
 3. Find the current Stage: the first Stage in `roadmap.md` that isn't `done`. Read its Stage folder and the folders of its Steps.
 4. Run `.venv/Scripts/python tools/export_status.py --check`. Any mismatch between `roadmap.md` and the plan folders is part of the evidence: point it out to the user.
-5. Note what has uncommitted changes: `vision.md`, `roadmap.md`, `bugs.md`, the current Stage's plan files, bug `fix.md` files, `docs/`, `manual.ipynb`, and code (anything outside `PROJECT_PLAN/`, `docs/`, and `manual.*`).
+5. Note what has uncommitted changes: `vision.md`, `roadmap.md`, `bugs.md`, the current Stage's plan files, bug `fix.md` files, `docs/`, `manual.ipynb`, `manual.css`, and code (anything outside `PROJECT_PLAN/`, `docs/`, and `manual.*`).
 
 If `scratchpad.md` isn't empty, an interactive skill was interrupted mid-discussion. Show the user what's in it. The skill you send them to will ask whether to use it as context.
 

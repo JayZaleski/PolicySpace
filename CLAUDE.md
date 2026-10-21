@@ -64,7 +64,7 @@ Steps in `roadmap.md` are tagged using `#tag` format (lowercase, kebab-case, e.g
 ## Documentation
 
 - `docs/` — Markdown files explaining how the code works, for developers who want to modify the project. `docs/README.md` indexes them.
-- `manual.ipynb` — the user manual, a Jupyter notebook. It explains the project to users and points to the technical documents in `docs/` where appropriate. `manual.html` is generated from it with `.venv/Scripts/python -m jupyter nbconvert --to html --execute --no-input manual.ipynb`. Edit the notebook, never the HTML, and regenerate the HTML after every edit. Set up the virtual environment with `python -m venv .venv` and `.venv/Scripts/python -m pip install -r requirements.txt`.
+- `manual.ipynb` — the user manual, a Jupyter notebook. It explains the project to users and points to the technical documents in `docs/` where appropriate. `manual.html` is generated from it with `.venv/Scripts/python -m jupyter nbconvert --to html --execute --no-input manual.ipynb`. Edit the notebook, never the HTML, and regenerate the HTML after every edit. The manual's look lives in `manual.css`: the notebook's first code cell embeds it in the HTML, and the chart and map figures are SVGs drawn by code cells whose colors match it. Edit `manual.css` for styling changes, and regenerate the HTML after those too. Set up the virtual environment with `python -m venv .venv` and `.venv/Scripts/python -m pip install -r requirements.txt`.
 
 ## Code Navigation
 

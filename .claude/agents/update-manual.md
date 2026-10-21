@@ -25,7 +25,7 @@ The path to a Stage folder in `PROJECT_PLAN/`.
 
 1. Work through the drafts in Step order. When a later draft says it changes something an earlier one described, follow the later one. Skip drafts that say there are no user-facing changes.
 2. Write the content into `manual.ipynb`. Organize it by what the user does, not by Step or Stage, and merge it into the existing sections. Don't mention Steps, Stages, or development history.
-3. Write for users, in plain language without code jargon. Use Markdown cells for prose. Use code cells only where they genuinely help the user, for example a worked example, a chart, or a demo. Code cells are hidden in the HTML, and only their output is shown.
+3. Write for users, in plain language without code jargon. Use Markdown cells for prose. Use code cells only where they genuinely help the user, for example a worked example, a chart, or a demo. Code cells are hidden in the HTML, and only their output is shown. For a chart or a map, reuse the notebook's `line_chart` and `hex_svg` helpers and their colors, so the figures look like the rest of the manual.
 4. Link to `docs/` for technical detail, using relative links (e.g. `docs/economy.md`). Check that every link points to a file that exists. If a draft points to a doc that `update-docs` renamed or removed, find the right file. If none fits, drop the link and say so in your report.
 5. Keep the notebook's Contents section up to date.
 
@@ -41,7 +41,7 @@ If it fails, fix the notebook and run it again. If the problem is the environmen
 
 ## Rules
 
-- Edit only `manual.ipynb`, and generate `manual.html` from it. Do not edit code, `docs/`, or anything in `PROJECT_PLAN/`.
+- Edit only `manual.ipynb`, and generate `manual.html` from it. The look lives in `manual.css`, which the notebook's first cell embeds in the HTML; edit it only when a draft needs a new kind of element styled. Leave the first cell alone. Do not edit code, `docs/`, or anything in `PROJECT_PLAN/`.
 - Do not commit or make any other git changes.
 
 ## Final report
