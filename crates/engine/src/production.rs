@@ -11,7 +11,8 @@
 //!   capacity times the run fraction. Below one slice it is shut down and makes nothing, so
 //!   every turn of output costs exactly one slice. Inputs leave the stockpile soonest-
 //!   perishing first, and output enters it only after every factory has run, as goods of
-//!   the current turn.
+//!   the current turn. The rule is public as [`slices_held`] so a UI can show remaining
+//!   life with the engine's own arithmetic.
 //! - **Shared shortages.** A business's factories run as if at the same moment, so a
 //!   shortage is shared: each factory is cut by the smallest held/asked proportion over the
 //!   goods it needs, in one pass, and the leftovers stay in the stockpile. The cuts are a
@@ -130,9 +131,11 @@ fn check(operations: &[Operation<'_>], run_fractions: bool, maintenance_fraction
     }
 }
 
-/// A condition as a number of lifetime-slices, snapped to the nearest whole number when
-/// within `TOLERANCE` of it.
-fn slices(condition: f64, lifetime: u32) -> f64 {
+/// The number of lifetime-slices a factory of a technology with `lifetime` holds at
+/// `condition` (`condition × lifetime`), snapped to the nearest whole number when within
+/// `TOLERANCE` of it. A factory runs only when this is at least 1, and `floor` of it is the
+/// number of further turns it can run with no maintenance.
+pub fn slices_held(condition: f64, lifetime: u32) -> f64 {
     let exact = condition * f64::from(lifetime);
     let rounded = exact.round();
     if (exact - rounded).abs() < TOLERANCE {
@@ -230,7 +233,7 @@ pub fn run(
     check(operations, true, false);
     let eligible: Vec<bool> = operations
         .iter()
-        .map(|o| slices(o.condition, o.technology.lifetime()) >= 1.0)
+        .map(|o| slices_held(o.condition, o.technology.lifetime()) >= 1.0)
         .collect();
 
     let mut needs = BTreeMap::new();
@@ -294,7 +297,7 @@ pub fn wear(operations: &mut [Operation<'_>]) -> Vec<f64> {
         .iter_mut()
         .map(|operation| {
             let lifetime = operation.technology.lifetime();
-            let held = slices(operation.condition, lifetime);
+            let held = slices_held(operation.condition, lifetime);
             let lost = held.min(1.0);
             operation.condition = condition_of(held - lost, lifetime);
             lost / f64::from(lifetime)
@@ -683,6 +686,16 @@ mod tests {
             let records = operate(&mut ops, &mut stockpile, &g, Turn::new(1000));
             assert!(close(records[0].run.output.get(), 0.0), "L {lifetime}");
         }
+    }
+
+    #[test]
+    fn slices_held_snaps_within_the_tolerance() {
+        assert_eq!(slices_held(1.0, 8), 8.0);
+        assert_eq!(slices_held(0.125, 8), 1.0);
+        assert!(slices_held(0.125 - 1e-6, 8) < 1.0);
+        assert_eq!(slices_held(0.0, 8), 0.0);
+        assert_eq!(slices_held(2.0 / 3.0, 3), 2.0);
+        assert_eq!(slices_held(1.0 - 1e-12, 24), 24.0);
     }
 
     #[test]

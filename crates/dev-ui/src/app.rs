@@ -1,8 +1,9 @@
 //! The developer UI window: panels, the map canvas, and the eframe app that ties them to a
 //! [`Session`]. The window also has the world panel (turn log, goods, resource types, POP
-//! types) and the hex panel (the selected hex's deposits, stockpile, market and POPs), and
-//! steps turns. The drawing is checked by hand (see the Step 07 and Step 08 specs); the map
-//! math it uses is tested in `geometry`, and the panel text in `text`.
+//! types, technologies and businesses) and the hex panel (the selected hex's deposits,
+//! stockpile, market, POPs and businesses), and steps turns. The drawing is checked by hand
+//! (see the Step 07 to 09 specs); the map math it uses is tested in `geometry`, and the
+//! panel text in `text`.
 
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -11,7 +12,7 @@ use std::process::ExitCode;
 
 use eframe::egui::{
     self, Align2, Button, CentralPanel, CollapsingHeader, Color32, FontId, Grid, Key, Label,
-    Modifiers, Panel, Pos2, RichText, ScrollArea, Sense, Shape, Stroke, TextStyle, Ui,
+    Modifiers, Panel, Pos2, Rect, RichText, ScrollArea, Sense, Shape, Stroke, TextStyle, Ui, Vec2,
     ViewportCommand,
 };
 use policyspace_engine::{ENGINE_NAME, ENGINE_VERSION, HexId, World};
@@ -21,8 +22,8 @@ use crate::geometry::{
 };
 use crate::session::{Hosting, Loaded, STEP_MANY, Session};
 use crate::text::{
-    StockLine, count, deposit_lines, good_rows, market_lines, pop_section, pop_type_rows,
-    resource_rows, stockpile_lines,
+    StockLine, business_rows, business_section, count, deposit_lines, good_rows, market_lines,
+    pop_section, pop_type_rows, resource_rows, stockpile_lines, technology_rows,
 };
 
 /// How much one unit of scroll-wheel input zooms: the factor is `exp(scroll · this)`.
@@ -173,8 +174,8 @@ impl DevApp {
             });
     }
 
-    /// The world panel's sections: the turn log, the goods, the resource types and the POP
-    /// types.
+    /// The world panel's sections: the turn log, the goods, the resource types, the POP
+    /// types, the technologies and the businesses.
     fn world_panel_contents(&self, ui: &mut Ui, world: &World) {
         CollapsingHeader::new("Turn log")
             .default_open(true)
@@ -200,10 +201,17 @@ impl DevApp {
             .default_open(true)
             .show(ui, |ui| {
                 Grid::new("goods")
-                    .num_columns(5)
+                    .num_columns(6)
                     .striped(true)
                     .show(ui, |ui| {
-                        for heading in ["Name", "Lasts", "Movable", "In hexes", "In POPs"] {
+                        for heading in [
+                            "Name",
+                            "Lasts",
+                            "Movable",
+                            "In hexes",
+                            "In POPs",
+                            "In businesses",
+                        ] {
                             ui.strong(heading);
                         }
                         ui.end_row();
@@ -213,6 +221,7 @@ impl DevApp {
                             ui.label(row.movable);
                             ui.label(row.in_hexes);
                             ui.label(row.in_pops);
+                            ui.label(row.in_businesses);
                             ui.end_row();
                         }
                     });
@@ -274,10 +283,91 @@ impl DevApp {
                         }
                     });
             });
+        CollapsingHeader::new("Technologies")
+            .default_open(true)
+            .show(ui, |ui| {
+                Grid::new("technologies")
+                    .num_columns(9)
+                    .striped(true)
+                    .show(ui, |ui| {
+                        for heading in [
+                            "Name",
+                            "Recipe",
+                            "Output",
+                            "Capacity",
+                            "Capital",
+                            "Construction",
+                            "Construction turns",
+                            "Lifetime",
+                            "Factories",
+                        ] {
+                            ui.strong(heading);
+                        }
+                        ui.end_row();
+                        for row in technology_rows(world) {
+                            ui.label(row.name);
+                            ui.vertical(|ui| {
+                                for line in row.recipe {
+                                    ui.label(line);
+                                }
+                            });
+                            ui.label(row.output);
+                            ui.label(row.capacity);
+                            ui.vertical(|ui| {
+                                for line in row.capital {
+                                    ui.label(line);
+                                }
+                            });
+                            ui.vertical(|ui| {
+                                for line in row.construction {
+                                    ui.label(line);
+                                }
+                            });
+                            ui.label(row.construction_turns);
+                            ui.label(row.lifetime);
+                            ui.label(row.factories.to_string());
+                            ui.end_row();
+                        }
+                    });
+            });
+        CollapsingHeader::new("Businesses")
+            .default_open(true)
+            .show(ui, |ui| {
+                Grid::new("businesses")
+                    .num_columns(6)
+                    .striped(true)
+                    .show(ui, |ui| {
+                        for heading in ["Name", "Hex", "Decider", "Cash", "Factories", "Answer"] {
+                            ui.strong(heading);
+                        }
+                        ui.end_row();
+                        for row in business_rows(world) {
+                            let cells = [
+                                row.name,
+                                row.hex,
+                                row.decider,
+                                row.cash,
+                                row.factories.to_string(),
+                                row.answer.to_string(),
+                            ];
+                            if row.refused {
+                                let color = ui.visuals().error_fg_color;
+                                for cell in cells {
+                                    ui.colored_label(color, cell);
+                                }
+                            } else {
+                                for cell in cells {
+                                    ui.label(cell);
+                                }
+                            }
+                            ui.end_row();
+                        }
+                    });
+            });
     }
 
-    /// The hex panel's contents: the selected hex's deposits, stockpile, market and POPs, or
-    /// a hint.
+    /// The hex panel's contents: the selected hex's deposits, stockpile, market, POPs and
+    /// businesses, or a hint.
     fn hex_panel_contents(&self, ui: &mut Ui, world: &World) {
         if world.map().is_empty() {
             ui.label("This setting has no hexes.");
@@ -363,6 +453,125 @@ impl DevApp {
                     ui.label(section.carried_over);
                     ui.strong("Stockpile");
                     stockpile_listing(ui, ("pop", pop.index()), section.stockpile);
+                });
+        }
+        ui.add_space(4.0);
+        ui.strong("Businesses");
+        let businesses = world.businesses().on_hex(hex);
+        if businesses.is_empty() {
+            ui.label("No businesses.");
+        }
+        for &business in businesses {
+            let section = business_section(world, business);
+            let error_color = ui.visuals().error_fg_color;
+            // Every id is explicit: the heading holds the cash, which changes every step.
+            CollapsingHeader::new(section.heading)
+                .id_salt(("business", business.index()))
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.label(section.decider);
+                    if section.refused {
+                        ui.colored_label(error_color, section.answer);
+                    } else {
+                        ui.label(section.answer);
+                    }
+                    for error in section.errors {
+                        ui.colored_label(error_color, error);
+                    }
+                    ui.strong("Deposits");
+                    if section.deposits.is_empty() {
+                        ui.label("Owns no deposits.");
+                    }
+                    for line in section.deposits {
+                        ui.label(line);
+                    }
+                    ui.horizontal(|ui| {
+                        ui.label(section.cash);
+                        if section.cash_short {
+                            ui.colored_label(error_color, section.proportion);
+                        } else {
+                            ui.label(section.proportion);
+                        }
+                    });
+                    ui.strong("Trade");
+                    if section.trade.is_empty() {
+                        ui.label("Nothing was traded.");
+                    } else {
+                        Grid::new(("business trade", business.index()))
+                            .num_columns(5)
+                            .striped(true)
+                            .show(ui, |ui| {
+                                for heading in ["Good", "Offered", "Sold", "Bid", "Bought"] {
+                                    ui.strong(heading);
+                                }
+                                ui.end_row();
+                                for row in section.trade {
+                                    ui.label(row.good);
+                                    ui.label(row.offered);
+                                    ui.label(row.sold);
+                                    ui.label(row.bid);
+                                    ui.label(row.bought);
+                                    ui.end_row();
+                                }
+                            });
+                    }
+                    ui.strong("Factories");
+                    if section.factories.is_empty() {
+                        ui.label("No factories.");
+                    } else {
+                        Grid::new(("business factories", business.index()))
+                            .num_columns(11)
+                            .striped(true)
+                            .show(ui, |ui| {
+                                for heading in [
+                                    "#",
+                                    "Technology",
+                                    "Condition before",
+                                    "Condition after",
+                                    "Remaining life",
+                                    "Run asked",
+                                    "Run done",
+                                    "Output",
+                                    "Wear",
+                                    "Maintenance asked",
+                                    "Maintenance done",
+                                ] {
+                                    ui.strong(heading);
+                                }
+                                ui.end_row();
+                                for row in section.factories {
+                                    ui.label(row.number.to_string());
+                                    ui.label(row.technology);
+                                    ui.label(row.condition_before);
+                                    ui.label(row.condition_after).on_hover_text(row.capital);
+                                    if row.shut_down {
+                                        ui.colored_label(error_color, row.remaining_life);
+                                    } else {
+                                        ui.label(row.remaining_life);
+                                    }
+                                    ui.label(row.run_asked);
+                                    ui.label(row.run_done);
+                                    ui.label(row.output).on_hover_text(row.inputs);
+                                    ui.label(row.wear);
+                                    ui.label(row.maintenance_asked);
+                                    ui.label(row.maintenance_done)
+                                        .on_hover_text(row.maintenance_cost);
+                                    ui.end_row();
+                                }
+                            });
+                    }
+                    if let Some(trace) = section.trace {
+                        CollapsingHeader::new("Trace")
+                            .id_salt(("business trace", business.index()))
+                            .default_open(false)
+                            .show(ui, |ui| {
+                                ui.add(
+                                    Label::new(RichText::new(trace).monospace()).selectable(true),
+                                );
+                            });
+                    }
+                    ui.strong("Stockpile");
+                    stockpile_listing(ui, ("business", business.index()), section.stockpile);
                 });
         }
     }
@@ -517,8 +726,8 @@ fn to_pos(p: Point) -> Pos2 {
 
 /// Draws the map canvas for `world` in the remaining area, and handles panning, zooming and
 /// hovering. A `view` of None is fitted to the canvas first. Hexes with deposits get a filled
-/// mark below the label and hexes with POPs a hollow one above it, and `selected` gets an
-/// outline. Returns `Some(hex under the pointer, or None)` if the
+/// mark below the label, hexes with POPs a hollow one above it and hexes with businesses a
+/// filled square at its lower left, and `selected` gets an outline. Returns `Some(hex under the pointer, or None)` if the
 /// canvas was clicked this frame (a click, not a drag), for the caller to select.
 fn draw_map(
     ui: &mut Ui,
@@ -592,6 +801,7 @@ fn draw_map(
                 stroke,
                 has_deposits: !world.deposits().on_hex(id).is_empty(),
                 has_pops: !world.pops().on_hex(id).is_empty(),
+                has_businesses: !world.businesses().on_hex(id).is_empty(),
             },
             (coord.q, coord.r),
         );
@@ -640,6 +850,9 @@ struct HexLook {
     /// Whether the hex has any POPs (it then gets a hollow mark above the label, unless it is
     /// drawn as a dot).
     has_pops: bool,
+    /// Whether the hex has any businesses (it then gets a filled square at the lower left of
+    /// the label, unless it is drawn as a dot).
+    has_businesses: bool,
 }
 
 /// Paints one visible hex centered at the screen point `center`, in the style for `shape`.
@@ -694,6 +907,16 @@ fn paint_hex(
                     pos - egui::vec2(0.0, offset),
                     radius,
                     Stroke::new(1.0, look.foreground),
+                );
+            }
+            if look.has_businesses {
+                // Lower left of the label: 60 degrees round the same ring from the deposit
+                // mark below it, so a hex can show any combination of the three marks.
+                let center = pos + egui::vec2(-0.866 * offset, 0.5 * offset);
+                painter.rect_filled(
+                    Rect::from_center_size(center, Vec2::splat(2.0 * radius)),
+                    0.0,
+                    look.foreground,
                 );
             }
         }

@@ -89,7 +89,9 @@ pub use pops::{
     UtilityGood,
 };
 pub mod production;
-pub use production::{FactoryRecord, MaintenanceRecord, Operation, RunRecord, operate};
+pub use production::{
+    FactoryRecord, MaintenanceRecord, Operation, RunRecord, operate, slices_held,
+};
 pub mod quantity;
 pub use quantity::Quantity;
 pub mod resources;

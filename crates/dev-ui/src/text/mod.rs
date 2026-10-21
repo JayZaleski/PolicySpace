@@ -1,15 +1,18 @@
 //! All the text the dev UI shows: the `check` output (load errors, counts, turn lines) and
-//! the window's panels (the world's goods, resource types and POP types, and a hex's deposits,
-//! stockpile, market and POPs). It's built from engine types without egui, so it can be tested. The
-//! wording follows the Step 02–08 designs. Amounts are written with `Quantity`'s `Display`,
+//! the window's panels (the world's goods, resource types, POP types, technologies and
+//! businesses, and a hex's deposits, stockpile, market, POPs and businesses). It's built from
+//! engine types without egui, so it can be tested. The wording follows the Step 02–09 designs. Amounts are written with `Quantity`'s `Display`,
 //! the same way `check --turns` writes them.
 
 use std::path::Path;
 
 use policyspace_engine::{
-    GoodId, HexId, LoadErrors, Perishes, PerishesAt, PopId, Quantity, ReportedFailure, Stockpile,
-    Turn, TurnReport, World,
+    GoodId, HexId, LoadErrors, Perishes, PerishesAt, PopId, Quantity, ReportedFailure, ResourceId,
+    Stockpile, Turn, TurnReport, World,
 };
+
+mod businesses;
+pub use businesses::{business_rows, business_section, technology_rows};
 
 /// The lines reported for a failed load: each error's `Display`, in order, then
 /// `"{n} error(s) found in {folder.display()}"`. The `check` command prints them to stderr
@@ -117,10 +120,16 @@ pub fn lasts(perishes: Perishes) -> String {
 /// One line per resource type present on `hex`, in resource ID order:
 /// "{type} × {count}: {output} {good} each, {total} total". Empty if it has no deposits.
 pub fn deposit_lines(world: &World, hex: HexId) -> Vec<String> {
+    deposit_lines_from(world, |id| world.deposits().of_type_on_hex(hex, id).count())
+}
+
+/// One line per resource type with `count_of(type)` above 0, in resource ID order, worded as
+/// `deposit_lines` words them.
+fn deposit_lines_from(world: &World, count_of: impl Fn(ResourceId) -> usize) -> Vec<String> {
     let rules = world.rules();
     let mut lines = Vec::new();
     for (id, name, resource) in rules.resources.iter() {
-        let count = world.deposits().of_type_on_hex(hex, id).count();
+        let count = count_of(id);
         if count == 0 {
             continue;
         }
@@ -318,12 +327,14 @@ pub struct GoodRow {
     pub in_hexes: String,
     /// The world total over every POP stockpile, formatted ("0" if none).
     pub in_pops: String,
+    /// The world total over every business stockpile, formatted ("0" if none).
+    pub in_businesses: String,
 }
 
 /// Every good, in good ID order.
 pub fn good_rows(world: &World) -> Vec<GoodRow> {
     let goods = &world.rules().goods;
-    // Walk the hexes once, then the POPs once, adding each stockpile's totals into the
+    // Walk the hexes once, then the POPs once, then the businesses once, adding each stockpile's totals into the
     // good's slot.
     let mut in_hexes = vec![Quantity::ZERO; goods.len()];
     for (hex, _) in world.map().iter() {
@@ -337,6 +348,12 @@ pub fn good_rows(world: &World) -> Vec<GoodRow> {
             in_pops[good.index()] = in_pops[good.index()].saturating_add(total);
         }
     }
+    let mut in_businesses = vec![Quantity::ZERO; goods.len()];
+    for (business, _, _) in world.businesses().iter() {
+        for (good, total) in world.business_stockpile(business).iter() {
+            in_businesses[good.index()] = in_businesses[good.index()].saturating_add(total);
+        }
+    }
     goods
         .iter()
         .map(|(id, name, good)| GoodRow {
@@ -345,6 +362,7 @@ pub fn good_rows(world: &World) -> Vec<GoodRow> {
             movable: if good.movable { "movable" } else { "fixed" },
             in_hexes: in_hexes[id.index()].to_string(),
             in_pops: in_pops[id.index()].to_string(),
+            in_businesses: in_businesses[id.index()].to_string(),
         })
         .collect()
 }
@@ -477,7 +495,7 @@ mod tests {
     use policyspace_engine::{DeciderFailure, DeciderHost, HexCoord, load_setting};
 
     use super::*;
-    use crate::test_support::world_at;
+    use crate::test_support::{python_world, world_at};
 
     #[test]
     fn failure_lines_and_load_failure_lines() {
@@ -732,10 +750,68 @@ two", folder
             assert_eq!(&in_pops[..5], ["0", "0", "0", "0", "0"]);
             assert_eq!(in_pops[5], pop_silver);
             assert_eq!(in_pops[6], "0");
+            // Businesses hold their owned deposits' output and their silver.
+            let in_businesses: Vec<&str> =
+                rows.iter().map(|row| row.in_businesses.as_str()).collect();
+            if steps == 0 {
+                assert_eq!(in_businesses, ["0", "2.5", "8", "0", "0", "350", "0"]);
+            } else {
+                assert_eq!(in_businesses, business_sums(&world));
+            }
             assert_eq!(rows[4].lasts, "perishes after 3 turns");
             assert_eq!(rows[4].movable, "movable");
             assert_eq!(rows[0].movable, "fixed");
             assert_eq!(rows[3].lasts, "never perishes");
+        }
+    }
+
+    /// The per-good sums over every business stockpile, formatted, in good ID order.
+    fn business_sums(world: &World) -> Vec<String> {
+        world
+            .rules()
+            .goods
+            .iter()
+            .map(|(good, _, _)| {
+                world
+                    .businesses()
+                    .iter()
+                    .fold(Quantity::ZERO, |sum, (id, _, _)| {
+                        sum.saturating_add(world.business_stockpile(id).total(good))
+                    })
+                    .to_string()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn good_rows_in_businesses_under_the_arithmetic_decider() {
+        let (world, _host) = python_world("settings/sample");
+        let rows = good_rows(&world);
+        let cell = |name: &str| {
+            rows.iter()
+                .find(|row| row.name == name)
+                .unwrap()
+                .in_businesses
+                .as_str()
+        };
+        assert_eq!(cell("grain"), "12");
+        assert_eq!(cell("copper"), "2.5");
+        let in_businesses: Vec<String> = rows.iter().map(|row| row.in_businesses.clone()).collect();
+        let sums = business_sums(&world);
+        assert_eq!(in_businesses, sums);
+        for name in ["silver", "tools"] {
+            let index = rows.iter().position(|row| row.name == name).unwrap();
+            assert_eq!(in_businesses[index], sums[index]);
+        }
+    }
+
+    #[test]
+    fn good_rows_in_businesses_is_zero_without_businesses() {
+        for world in [
+            world_at("crates/engine/tests/settings/valid_minimal"),
+            turns_valid_at_2(),
+        ] {
+            assert!(good_rows(&world).iter().all(|row| row.in_businesses == "0"));
         }
     }
 
