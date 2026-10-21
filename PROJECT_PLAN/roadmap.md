@@ -133,7 +133,7 @@
 - Description: The business's turn. After the decision point, each business's offers and bids go through the same hex round as POPs: sales settle before purchases, purchases are capped by cash on hand after sales, and when cash is short the run level is scaled down. Then its factories run at the resolved levels, depreciate, and are maintained by the chosen shares, and the output goes to inventory for next turn. Labor is bought and used in the same turn. A per-business outcome records the decision, its trace, and what was traded, and the turn report gains business totals. The cash cap is the seam for operating budgets; maintenance is the seam for expansion; the decider is the seam for richer strategy.
 
 ### Step 09: dev-ui-businesses
-- Status: planned
+- Status: specified
 - Tags: #dev-ui #businesses #factories #deciders
 - Description: Inspect a hex's businesses in the dev UI: cash, stockpile, owned deposits, decider, last turn's decision with its trace, and the trade outcome. Inspect its factories: technology, capital bundle and remaining life, run level, and whether it has shut down. Show the business totals in the turn log. Taking over a business and submitting its decisions by hand waits for Stage 05.
 
