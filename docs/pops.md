@@ -178,7 +178,7 @@ pub struct Pops {
 }
 ```
 
-`Pops` mirrors `Deposits` (see [resources.md](resources.md)): a list in load order plus a per-hex index.
+`Pops` mirrors `Deposits` (see [resources.md](resources.md)): a list in load order plus a per-hex index. `Businesses` follows the same shape with a named list (see [businesses.md](businesses.md)), and `Factories` with a per-owner index as well (see [factories.md](factories.md)).
 
 | `Pops` method | Result |
 |---|---|
@@ -247,7 +247,7 @@ All `[[pop]]` errors and their exact texts:
 
 The `World` takes the `Pops` over as state (`World::pops()`), because growth changes their sizes every turn, and gives every POP its own `Stockpile` in `pop_stockpiles: IdVec<PopKind, Stockpile>`, read with `World::pop_stockpile(pop)`. Every POP stockpile is empty when the world is created: POPs have no starting cash or goods.
 
-At the start of every turn, including turn 0, after deposits emit, the private `World::endow` walks the POPs in ID order. For each `Endowment { good, amount }` of the POP's type it adds `amount.saturating_mul(size)` to the POP's stockpile, in the group `PerishesAt::for_good(good.perishes, turn)`. So an endowed good with `perishes_after = 1` (the sample's `unskilled_labor`) would be gone at the end of the turn it arrives if the POP kept it, and a durable endowed good accumulates. A type with an empty endowment adds nothing. The totals per good become `TurnReport::endowed`. At the end of the turn, POP stockpiles perish after the hex stockpiles. See [world.md](world.md) for the turn as a whole.
+At the start of every turn, including turn 0, after deposits emit, the private `World::endow` walks the POPs in ID order. For each `Endowment { good, amount }` of the POP's type it adds `amount.saturating_mul(size)` to the POP's stockpile, in the group `PerishesAt::for_good(good.perishes, turn)`. So an endowed good with `perishes_after = 1` (the sample's `unskilled_labor`) would be gone at the end of the turn it arrives if the POP kept it, and a durable endowed good accumulates. A type with an empty endowment adds nothing. The totals per good become `TurnReport::endowed`. At the end of the turn, POP stockpiles perish after the hex stockpiles and before the business stockpiles. See [world.md](world.md) for the turn as a whole.
 
 ### Trade and consumption in the turn
 

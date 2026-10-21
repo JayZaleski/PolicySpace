@@ -14,7 +14,7 @@
 //!   because later Stages change them; a POP's size changes every turn as it grows, and a
 //!   factory's condition changes every turn as it wears and is maintained. The
 //!   posted prices don't change yet either; [`World::market`] hands out each hex's
-//!   market view, the seam Stage 05 replaces.
+//!   market view, the seam Stage 04 replaces.
 //! - The world also holds the factories (each on its owner's hex, running one technology
 //!   and holding a share of its capital bundle) as state. Their condition changes every
 //!   turn: each business's factories are run, worn and maintained by the
@@ -255,6 +255,7 @@ impl World {
         host.check(&start.businesses)?;
         let hex_stockpiles = IdVec::from_vec(vec![Stockpile::new(); start.map.len()]);
         let pop_stockpiles = IdVec::from_vec(vec![Stockpile::new(); start.pops.len()]);
+        let business_count = start.businesses.len();
         let business_stockpiles = IdVec::from_vec(
             start
                 .businesses
@@ -284,11 +285,9 @@ impl World {
             businesses: start.businesses,
             business_stockpiles,
             factories: start.factories,
-            business_answers: IdVec::from_vec(Vec::new()),
+            business_answers: IdVec::from_vec(vec![BusinessAnswer::Nothing; business_count]),
             business_outcomes: IdVec::from_vec(Vec::new()),
         };
-        world.business_answers =
-            IdVec::from_vec(vec![BusinessAnswer::Nothing; world.businesses.len()]);
         let report = world.run_turn(Vec::new(), host);
         Ok((world, report))
     }

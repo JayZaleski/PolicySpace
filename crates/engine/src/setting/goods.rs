@@ -23,25 +23,12 @@ impl GoodsReader {
         // that no key is falsely reported as unknown.
         let name = reader.required_name("name");
 
-        let perishes_after = reader.optional_integer("perishes_after");
-        let perishes = match perishes_after {
-            None => Perishes::Never,
-            Some(value) => {
-                let after = u32::try_from(value.value).ok();
-                match after.and_then(NonZeroU32::new) {
-                    Some(n) => Perishes::After(n),
-                    None => {
-                        let message = if value.value < 1 {
-                            "key 'perishes_after' in good must be at least 1"
-                        } else {
-                            "key 'perishes_after' in good is out of range"
-                        };
-                        reader.errors().at(&value.at, message);
-                        Perishes::Never
-                    }
-                }
-            }
-        };
+        let perishes = reader
+            .optional_integer("perishes_after")
+            .and_then(|value| reader.at_least_one("key 'perishes_after' in good", value, None))
+            .map_or(Perishes::Never, |n| {
+                Perishes::After(NonZeroU32::new(n).expect("at least 1"))
+            });
 
         let movable = reader.optional_bool("movable").is_none_or(|m| m.value);
 

@@ -160,8 +160,8 @@ impl FactoriesReader {
     }
 
     /// The finished list. Only call this after a successful load.
-    pub fn finish(self, hex_count: usize) -> Factories {
-        Factories::from_factories(self.factories, hex_count)
+    pub fn finish(self, hex_count: usize, business_count: usize) -> Factories {
+        Factories::from_factories(self.factories, hex_count, business_count)
     }
 }
 

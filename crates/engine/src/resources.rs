@@ -20,7 +20,7 @@
 //! This module knows nothing about files: the setting loader builds [`ResourceTypes`] and
 //! [`Deposits`] from a checked setting, and everything else only reads them.
 
-use crate::businesses::BusinessId;
+use crate::businesses::{BusinessId, BusinessKind};
 use crate::goods::GoodId;
 use crate::id::{Id, IdKind, IdVec, NamedList};
 use crate::map::{HexId, HexKind};
@@ -73,37 +73,59 @@ pub struct Deposit {
 
 /// Every deposit in a setting, in load order (which is also ID order).
 ///
-/// `Deposits::default()` is empty and was built with no map, so [`on_hex`](Self::on_hex)
-/// panics on it for any hex.
+/// `Deposits::default()` is empty and was built with no map and no businesses, so
+/// [`on_hex`](Self::on_hex) and [`owned_by`](Self::owned_by) panic on it for any hex or
+/// business.
 #[derive(Debug, Default)]
 pub struct Deposits {
     /// One entry per deposit, by `DepositId`.
     deposits: IdVec<DepositKind, Deposit>,
     /// One entry per hex, by `HexId`: the deposits on each hex, in ID order.
     by_hex: IdVec<HexKind, Vec<DepositId>>,
+    /// One entry per business, by `BusinessId`: the deposits each owns, in ID order. A
+    /// deposit with no owner is in none of them.
+    by_owner: IdVec<BusinessKind, Vec<DepositId>>,
 }
 
 impl Deposits {
     /// Builds the list, giving IDs 0, 1, 2, ... in the order given. `hex_count` is the
-    /// number of hexes in the map the deposits sit on. Crate-private: only the setting
-    /// loader builds deposits.
+    /// number of hexes in the map the deposits sit on and `business_count` the number of
+    /// businesses that may own them. Crate-private: only the setting loader builds deposits.
     ///
     /// # Panics
-    /// Panics if a deposit's hex index is `>= hex_count`, or if there are more than
-    /// `u32::MAX` deposits.
-    pub(crate) fn from_deposits(deposits: Vec<Deposit>, hex_count: usize) -> Self {
+    /// Panics if a deposit's hex index is `>= hex_count`, if a deposit's owner index is
+    /// `>= business_count` (`"{owner:?} is not from a list of {business_count}
+    /// businesses"`), or if there are more than `u32::MAX` deposits.
+    pub(crate) fn from_deposits(
+        deposits: Vec<Deposit>,
+        hex_count: usize,
+        business_count: usize,
+    ) -> Self {
         let deposits = IdVec::from_vec(deposits);
         let mut by_hex: IdVec<HexKind, Vec<DepositId>> =
             IdVec::from_vec(vec![Vec::new(); hex_count]);
+        let mut by_owner: IdVec<BusinessKind, Vec<DepositId>> =
+            IdVec::from_vec(vec![Vec::new(); business_count]);
         for (id, deposit) in deposits.iter() {
             assert!(
                 deposit.hex.index() < hex_count,
                 "{:?} is not from a map of {hex_count} hexes",
                 deposit.hex
             );
+            if let Some(owner) = deposit.owner {
+                assert!(
+                    owner.index() < business_count,
+                    "{owner:?} is not from a list of {business_count} businesses"
+                );
+                by_owner.get_mut(owner).push(id);
+            }
             by_hex.get_mut(deposit.hex).push(id);
         }
-        Deposits { deposits, by_hex }
+        Deposits {
+            deposits,
+            by_hex,
+            by_owner,
+        }
     }
 
     /// Number of deposits.
@@ -137,12 +159,13 @@ impl Deposits {
         self.by_hex.get(hex)
     }
 
-    /// The deposits owned by `business`, in ID order (a filter over every deposit).
+    /// The deposits owned by `business`, in ID order; none if it owns none.
+    ///
+    /// # Panics
+    /// Panics if `business` isn't from the businesses these deposits were built with (and
+    /// on `Deposits::default()`, for any business).
     pub fn owned_by(&self, business: BusinessId) -> impl Iterator<Item = DepositId> + '_ {
-        self.deposits
-            .iter()
-            .filter(move |(_, deposit)| deposit.owner == Some(business))
-            .map(|(id, _)| id)
+        self.by_owner.get(business).iter().copied()
     }
 
     /// The deposits of `resource` on `hex`, in ID order.
@@ -208,6 +231,7 @@ mod tests {
                 },
             ],
             3,
+            0,
         )
     }
 
@@ -257,7 +281,7 @@ mod tests {
 
     #[test]
     fn owned_by_lists_only_that_owners_deposits_in_id_order() {
-        let mut names: NameRegistry<crate::businesses::BusinessKind> = NameRegistry::new();
+        let mut names: NameRegistry<BusinessKind> = NameRegistry::new();
         let owners = [
             names.register("b0").unwrap(),
             names.register("b1").unwrap(),
@@ -278,6 +302,7 @@ mod tests {
                 deposit(r[1], Some(owners[1])),
             ],
             1,
+            3,
         );
         let owned =
             |b: BusinessId| -> Vec<usize> { deposits.owned_by(b).map(|id| id.index()).collect() };
@@ -329,6 +354,37 @@ mod tests {
                 owner: None,
             }],
             2,
+            0,
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from a list of 2 businesses")]
+    fn from_deposits_panics_on_an_owner_beyond_business_count() {
+        let mut names: NameRegistry<BusinessKind> = NameRegistry::new();
+        let owners = [
+            names.register("b0").unwrap(),
+            names.register("b1").unwrap(),
+            names.register("b2").unwrap(),
+        ];
+        let r = resource_ids(1);
+        let h = hex_ids(1);
+        Deposits::from_deposits(
+            vec![Deposit {
+                resource: r[0],
+                hex: h[0],
+                owner: Some(owners[2]),
+            }],
+            1,
+            2,
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from this list")]
+    fn owned_by_panics_on_the_default_list() {
+        let mut names: NameRegistry<BusinessKind> = NameRegistry::new();
+        let owner = names.register("b0").unwrap();
+        let _ = Deposits::default().owned_by(owner);
     }
 }

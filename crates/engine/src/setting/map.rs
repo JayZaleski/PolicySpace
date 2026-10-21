@@ -59,21 +59,8 @@ pub(crate) fn count(reader: &mut EntryReader<'_, '_>) -> Option<u32> {
         // Absent gives 1; a wrong type was reported by the reader and gives None.
         return if reader.has("count") { None } else { Some(1) };
     };
-    let label = reader.label().to_string();
-    if count.value < 1 {
-        let message = format!("key 'count' in {label} must be at least 1");
-        reader.errors().at(&count.at, message);
-        return None;
-    }
-    match u32::try_from(count.value) {
-        Ok(n) if n <= MAX_COUNT => Some(n),
-        _ => {
-            let message =
-                format!("key 'count' in {label} is out of range (the most is {MAX_COUNT})");
-            reader.errors().at(&count.at, message);
-            None
-        }
-    }
+    let prefix = format!("key 'count' in {}", reader.label());
+    reader.at_least_one(&prefix, count, Some(MAX_COUNT))
 }
 
 impl MapReader {

@@ -1,8 +1,8 @@
 //! Stockpiles: amounts of goods, grouped by when they perish.
 //!
 //! - A stockpile holds amounts of goods. It is a general type: each hex has a stockpile of
-//!   unowned goods and each POP has its own (see the [`world`](crate::world) module); later
-//!   Stages give industries theirs.
+//!   unowned goods, and each POP and each business has its own (see the
+//!   [`world`](crate::world) module).
 //! - Each good's amount is split into groups by when it perishes, so `perishes_after`
 //!   works without tracking individual units. A good with `perishes_after = N` added in
 //!   turn T perishes at the end of turn T+N−1. A durable good's amount is one group that

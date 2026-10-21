@@ -71,6 +71,8 @@ pub use decider::{
 };
 pub mod demand;
 pub use demand::{Demand, DemandedGood, PriceList, demand};
+pub mod error_list;
+pub use error_list::ErrorList;
 pub mod factories;
 pub use factories::{Factories, Factory, FactoryId, FactoryKind};
 pub mod goods;

@@ -8,7 +8,7 @@
 //! ([`trade`](crate::trade)) records each POP's index and rate in its outcome; the World
 //! applies the rate to the size after every hex has traded. u is per individual (every input
 //! scales with N), so it doesn't depend on the POP's size. In this Stage the demanded and
-//! consumed quantities are the same; Stage 05 revisits which numbers the index reads once
+//! consumed quantities are the same; Stage 04 revisits which numbers the index reads once
 //! rationing exists. Knows nothing about the World or files.
 
 use crate::demand::Demand;

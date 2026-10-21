@@ -4,7 +4,7 @@
 //! traded on that hex; the hex's currency has price 1 and can't be traded against itself.
 //! A `Market` is a [`PriceList`], so the [`demand`](crate::demand) module can compute a POP's
 //! demand against it. The trade round in the [`trade`](crate::trade) module uses the
-//! exchange. This is the seam Stage 05 replaces with the live market. Prices are starting
+//! exchange. This is the seam Stage 04 replaces with the live market. Prices are starting
 //! state and nothing changes them yet. Knows nothing about files.
 
 use std::collections::BTreeMap;
@@ -167,7 +167,7 @@ pub struct Market<'a> {
 }
 
 impl<'a> Market<'a> {
-    /// Crate-private: `World::market` builds it, and later Steps build it inside the World.
+    /// Crate-private: `World::market` and the World's trade round build it.
     pub(crate) fn new(
         hex: HexId,
         goods: &'a Goods,

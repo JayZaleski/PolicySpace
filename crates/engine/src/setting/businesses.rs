@@ -64,23 +64,8 @@ fn read_deposits(reader: &mut EntryReader<'_, '_>) -> Counts {
         .unwrap_or_default()
     {
         let count = value.and_then(|v| {
-            if v.value < 1 {
-                let message = format!(
-                    "key '{}' in deposits of {label} must be at least 1",
-                    key.value
-                );
-                reader.errors().at(&v.at, message);
-                return None;
-            }
-            match u32::try_from(v.value) {
-                Ok(n) => Some(n),
-                Err(_) => {
-                    let message =
-                        format!("key '{}' in deposits of {label} is out of range", key.value);
-                    reader.errors().at(&v.at, message);
-                    None
-                }
-            }
+            let prefix = format!("key '{}' in deposits of {label}", key.value);
+            reader.at_least_one(&prefix, v, None)
         });
         counts.push((key, count));
     }

@@ -89,8 +89,8 @@
 - Description: Inspect a hex's currency, its posted prices, and its POPs in the dev UI: each POP's type, size, inventory, last turn's submission and trade outcome (endowment sold, goods bought and consumed, currency carried over), utility, and growth. Show the POP totals in the turn log.
 
 ## Stage 03: factories
-- Status: in-progress
-- Goal: Technologies, factories, depreciation, and the minimal business. Factories exist in the starting state with a technology and a capital bundle, consume a slice of it each turn and shut down when it's gone. Minimal businesses own sets of factories and deposits, start with cash, trade fixed quantities with the dummy market on a one-turn lag, and maintain the factories that pay for it. Owned deposits emit into their business's stockpile; unowned ones keep emitting into hex stockpiles. The sample setting gets a real production chain on one hex. No POP ownership, budgets, dividends, construction, scrapping, or retooling yet.
+- Status: done
+- Goal: Technologies, factories, depreciation, and the minimal business, behind the first decider boundary. Factories exist in the starting state with a technology and a condition (their share of the technology's capital bundle), lose a slice of it each turn, shut down below one slice, and are revived by maintenance. Minimal businesses own sets of factories and deposits on their one hex, start with cash, trade fixed quantities with the dummy market on a one-turn lag, and maintain the factories that pay for it; their purchases are capped by cash after sales. Owned deposits emit into their business's stockpile; unowned ones keep emitting into hex stockpiles. Each turn has one decision point: the engine serves every business its view, a Python process running the arithmetic rule answers with fractions, offers and bids as plain JSON, and the engine resolves them; a broken decider idles its businesses for the turn and is reported, never halting the turn. The sample setting has a real production chain on one hex, and the dev UI shows businesses, decisions, traces and factories. No POP ownership, budgets, dividends, construction, scrapping, or retooling yet.
 
 ### Step 01: technologies
 - Status: done
@@ -100,12 +100,12 @@
 ### Step 02: businesses
 - Status: done
 - Tags: #businesses #natural-resources #setting-data #turn-loop #deciders
-- Description: Define minimal businesses in the starting state: starting cash, the deposits the business owns, and the name of the decider that controls it (a name only; Step 07 resolves it). Each business gets an ID and one stockpile that holds its goods and cash. Rework emission so an owned deposit emits into its owner's stockpile while unowned deposits keep emitting into the hex stockpile; this replaces the ownership seam Stage 01 left in emission. Design question: whether a business is tied to one hex and may own only assets on it (expected yes, until trade exists). Add businesses to the sample setting.
+- Description: Define minimal businesses in the starting state: starting cash, the deposits the business owns, and the name of the decider that controls it (a name only; Step 07 resolves it). Each business gets an ID and one stockpile that holds its goods and cash. Rework emission so an owned deposit emits into its owner's stockpile while unowned deposits keep emitting into the hex stockpile; this replaces the ownership seam Stage 01 left in emission. A business sits on one hex and owns only assets on it until trade between hexes exists; that hex becomes its headquarters later. Add businesses to the sample setting.
 
 ### Step 03: factories
 - Status: done
 - Tags: #factories #businesses #setting-data #hex-map
-- Description: Place factories in the starting state: hex, technology, owner business, and the current capital bundle. Each factory gets an ID, points at one technology (state, so it can change later), and has exactly one owner. Validate the references and the bundle. Add the chain's factories to the sample setting.
+- Description: Place factories in the starting state: hex, technology, owner business, and a condition, the share of the technology's capital bundle the factory holds (one number, because depreciation and maintenance only ever change the bundle in its own proportions; full when not written). An entry may place several identical factories. Each factory gets an ID, points at one technology (state, so it can change later), has exactly one owner, and must sit on its owner's hex. Validate the references and the condition. Add the chain's factories to the sample setting.
 
 ### Step 04: factory-mechanics
 - Status: done
@@ -139,7 +139,7 @@
 
 ## Stage 04: market
 - Status: outline
-- Goal: The live market of the vision's Markets section, in a single closed economy with no external trade. It brings POPs, factories, and minimal businesses together: the dummy market's infinite counterparty is removed, bids and offers are settled against each other with proportional rationing, sales before purchases, and prices adjust between turns toward clearing using the aggregate curves at a speed set in the setting. Inventory, unemployment, and shortages become visible quantities. The test of correctness is that, with constant fundamentals, prices converge over turns to the known equilibrium. Market power is not part of this Stage.
+- Goal: The live market of the vision's Markets section, in a single closed economy with no external trade. It brings POPs, factories, and minimal businesses together: the dummy market's infinite counterparty is removed, bids and offers (the POPs' Stone-Geary submissions and the businesses' fixed quantities alike) are settled against each other with proportional rationing, sales before purchases, and prices adjust between turns toward clearing using the aggregate curves at a speed set in the setting. Inventory, unemployment, and shortages become visible quantities. The arithmetic rule stays valid without change, because the engine already trims a business that is sold or bought less than it asked. The test of correctness is that, with constant fundamentals, prices converge over turns to the known equilibrium. Market power is not part of this Stage.
 
 ## Stage 05: dev-ui
 - Status: outline

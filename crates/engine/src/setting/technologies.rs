@@ -84,17 +84,8 @@ pub(crate) struct TechnologiesReader {
 /// Reads a whole number of at least 1 that fits a `u32`; anything else is reported.
 fn turns(reader: &mut EntryReader<'_, '_>, key: &str) -> Option<u32> {
     let v = reader.required_integer(key)?;
-    let turns = u32::try_from(v.value).ok().filter(|n| *n >= 1);
-    if turns.is_none() {
-        let label = reader.label().to_string();
-        let message = if v.value < 1 {
-            format!("key '{key}' in {label} must be at least 1")
-        } else {
-            format!("key '{key}' in {label} is out of range")
-        };
-        reader.errors().at(&v.at, message);
-    }
-    turns
+    let prefix = format!("key '{key}' in {}", reader.label());
+    reader.at_least_one(&prefix, v, None)
 }
 
 impl TechnologiesReader {

@@ -1,8 +1,8 @@
 //! Businesses. A business (`[[business]]` in `start/`) is a named actor on one hex: it has
-//! a decider name (the name of the decider that will control it; Step 07 resolves it, this
-//! Step only stores it), a starting inventory (the goods, cash included, in its stockpile
-//! when the world is created; after that the stockpile in the [`world`](crate::world)
-//! module is the truth), and owns deposits on its hex (written on the deposit, see
+//! a decider name (the name of the decider that controls it, resolved against the host when
+//! a world is created; see [`decider::host`](crate::decider::host)), a starting inventory
+//! (the goods, cash included, in its stockpile when the world is created; after that the
+//! stockpile in the [`world`](crate::world) module is the truth), and owns deposits on its hex (written on the deposit, see
 //! [`resources`](crate::resources)). A business may own only deposits on its hex, and may
 //! sit on a hex with no market. Business names are their own namespace. The World's decision
 //! point, trade round and operation act for a business (see [`world`](crate::world)). Knows

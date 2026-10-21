@@ -1,8 +1,8 @@
 # Recordings
 
 Committed messages of the decider protocol (`crates/engine/src/decider/`), shared by the
-engine's tests (`../recordings.rs`), the Python tests (`python/tests/`) and, later, Step 07's
-replay decider. Three kinds of file:
+engine's tests (`../recordings.rs`), the Python tests (`python/tests/`) and the replay decider
+(`crates/engine/src/decider/replay.rs`). Three kinds of file:
 
 - `sample_turn0.recording.json` -- a **recording**: the sample setting's turn-0 request and
   the reply the arithmetic rule (`python/policyspace/arithmetic.py`) gives it. Pretty JSON

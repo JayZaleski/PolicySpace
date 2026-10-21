@@ -17,7 +17,7 @@ Behavior must not change anywhere: every existing test keeps its expectations, i
 ## Recommendations
 
 ### C01: Per-owner indexes for factories and deposits
-- **Status:** approved
+- **Status:** applied
 - **Summary:** `Factories::owned_by` and `Deposits::owned_by` filter the whole list for every business, every turn (`World::operate_business`, `decider::view::build`) and every dev-UI frame (`text::businesses`). Give both lists a `by_owner` index built once at load, like the `by_hex` index they already have. Same results, in the same (ID) order; no caller changes.
 - **Changes:**
   - `crates/engine/src/factories.rs`: add `by_owner: IdVec<BusinessKind, Vec<FactoryId>>` to `Factories`. `from_factories(factories: Vec<Factory>, hex_count: usize, business_count: usize)` fills it in ID order and asserts `factory.owner.index() < business_count` with the message `"{owner:?} is not from a list of {business_count} businesses"` (same style as the hex assertion). `owned_by(&self, business: BusinessId) -> impl Iterator<Item = FactoryId> + '_` returns `self.by_owner.get(business).iter().copied()`; document that it panics if `business` isn't from the businesses the list was built with (and on `Factories::default()`, like `on_hex`). Update the module doc's mention of the index.
@@ -34,7 +34,7 @@ Behavior must not change anywhere: every existing test keeps its expectations, i
 - **Tests:** `cargo test --workspace` unchanged except the unit tests above. `crates/engine/tests/businesses.rs` (`owned`, deposit owners `[0, 0, 1, 1, none]`), `crates/engine/tests/factories.rs` (`owned_by` per business in ID order), `crates/engine/tests/decider.rs` (the sample views' factories and deposits) and the dev-UI business-section tests must pass unchanged: they are the behavior check.
 
 ### C02: Decision-point lookups by name
-- **Status:** approved
+- **Status:** applied
 - **Summary:** `DeciderHost::decision_point` walks every business once per decider to find its businesses, and `Reply::validate` searches the view list for every decision and the decision list for every view; the host then searches the decisions again for each refused answer. All are quadratic in the number of businesses. Group once with maps. Same answers, same error order, same report.
 - **Changes:**
   - `crates/engine/src/decider/host.rs` (`decision_point`): before the decider loop, build `BTreeMap<&str, Vec<BusinessId>>` from one pass over `businesses.iter()` (pushing in ID order, so each decider's list stays in business ID order); in the loop take each decider's list with `remove(name.as_str()).unwrap_or_default()`. Deciders are still taken in name order (the `self.deciders` `BTreeMap`). In the `Ok(validated)` branch, take the refused decision from the `Answer` (see below) instead of searching `reply.decisions`.
@@ -47,7 +47,7 @@ Behavior must not change anywhere: every existing test keeps its expectations, i
 - **Tests:** `cargo test -p policyspace-engine` (unit tests in `batch.rs`, `host.rs`; integration tests `decider.rs`, `decider_host.rs`, `recordings.rs`, `business_trade.rs`, `external_decider.rs`). `decider_host.rs`'s `each_decider_receives_only_its_businesses_in_id_order_and_an_empty_request_otherwise` and `a_refused_decision_idles_only_its_business` are the behavior check and must pass unchanged.
 
 ### C03: One generic error-list type
-- **Status:** approved
+- **Status:** applied
 - **Summary:** `LoadErrors` (`setting/error.rs`), `DecisionErrors` (`decider/decision.rs`) and `ReplyErrors` (`decider/batch.rs`) are three identical newtype wrappers: a never-empty `Vec`, `iter`, `len`, `is_empty`, `IntoIterator for &`, and a `Display` that writes one error per line. Replace them with one generic `ErrorList<E>` behind the three existing names as type aliases, so the public names and every caller stay the same.
 - **Changes:**
   - New `crates/engine/src/error_list.rs`: `#[derive(Debug, Clone, PartialEq, Eq)] pub struct ErrorList<E>(Vec<E>);` with `pub(crate) fn new(errors: Vec<E>) -> Self` (asserts `!errors.is_empty()`, message `"an error list holds at least one error"`), `pub fn iter(&self) -> std::slice::Iter<'_, E>`, `pub fn len(&self) -> usize`, `pub fn is_empty(&self) -> bool` (always false; keep it so `len`/`is_empty` lint stays satisfied), `impl<'a, E> IntoIterator for &'a ErrorList<E>`, `impl<E: fmt::Display> fmt::Display` (errors separated by `\n`, no trailing newline, exactly as the three impls do today), `impl<E: fmt::Debug + fmt::Display> std::error::Error`. Under `#[cfg(test)]`, `pub(crate) fn lines(&self) -> Vec<String>` (each error's `Display`), replacing `LoadErrors::lines`. Module doc explains the three uses. Unit tests: `new` panics on empty; `Display` joins with newlines; `iter`/`len`/`into_iter` agree.
@@ -63,7 +63,7 @@ Behavior must not change anywhere: every existing test keeps its expectations, i
 - **Tests:** `cargo test --workspace`. The `Display` texts asserted in `decision.rs` (`error_displays`), `batch.rs` (`every_reply_problem_is_reported`), `host.rs` (`failure_and_report_displays`), `crates/engine/tests/setting_loader.rs` and the dev-UI `error_lines` tests pin the format and must pass unchanged.
 
 ### C04: One "whole number of at least 1" reader
-- **Status:** approved
+- **Status:** applied
 - **Summary:** The loader checks "an integer, at least 1, within range" in four places with four code shapes: `perishes_after` (`setting/goods.rs`), `construction_turns`/`lifetime` (`turns` in `setting/technologies.rs`), deposit counts (`read_deposits` in `setting/businesses.rs`) and `count` (`setting/map.rs`). One helper on `EntryReader` does the check and the two messages; the four call sites shrink to a line each. Every message text stays byte for byte.
 - **Changes:**
   - `crates/engine/src/setting/reader.rs`: add `pub fn at_least_one(&mut self, prefix: &str, value: Located<i64>, max: Option<u32>) -> Option<u32>`: if `value.value < 1`, report `"{prefix} must be at least 1"` at `value.at` and return None; if it doesn't fit a `u32`, or `max` is `Some(m)` and it exceeds `m`, report `"{prefix} is out of range"` followed by `" (the most is {m})"` only when `max` is `Some`, and return None; otherwise `Some(n)`. Doc it next to `positive_quantity`, which it mirrors. Unit test in `reader.rs`'s test module: 1, a large valid value, 0, -3, `u32::MAX + 1` with `None`, and a value above `max` with `Some`, checking the exact messages.
@@ -77,7 +77,7 @@ Behavior must not change anywhere: every existing test keeps its expectations, i
 - **Tests:** `cargo test -p policyspace-engine`: the pinned messages in `tests/goods.rs` (`perishes_after ... must be at least 1` / `is out of range`), `tests/technologies.rs` (`construction_turns`, `lifetime`), `tests/businesses.rs` (`in deposits of business must be at least 1` / `is out of range`), `tests/resources.rs` and `tests/factories.rs` (`key 'count' ... must be at least 1` / `is out of range (the most is 1000000)`) are the behavior check.
 
 ### C05: Stale comments and a leftover
-- **Status:** approved
+- **Status:** applied
 - **Summary:** Comments written during Stages 02 and 03 still point at the wrong Stage or promise work that is done, and `World::new` initialises a field twice. Comment-only, plus one two-line cleanup; no behavior change.
 - **Changes:**
   - `crates/engine/src/market.rs` line 7: "the seam Stage 05 replaces with the live market" → "Stage 04". Line 170: "Crate-private: `World::market` builds it, and later Steps build it inside the World." → "Crate-private: `World::market` and the World's trade round build it."

@@ -20,7 +20,7 @@
 //!
 //! A POP's record also carries its subsistence index and growth rate, computed by the
 //! [`growth`](crate::growth) module from the demand and the type, and the size the turn
-//! started with; the World applies the rate after every hex has traded. Stage 05 replaces
+//! started with; the World applies the rate after every hex has traded. Stage 04 replaces
 //! the inside of the round (adjusted prices, rationing); the submissions, the order,
 //! consumption and the outcomes stay. Knows nothing about the World, deciders or files.
 

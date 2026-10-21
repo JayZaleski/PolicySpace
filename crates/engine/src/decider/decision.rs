@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::decider::view::BusinessView;
 use crate::decider::{self, FormatError};
+use crate::error_list::ErrorList;
 use crate::goods::Goods;
 
 /// A business's answer for one turn.
@@ -110,48 +111,7 @@ impl fmt::Display for DecisionError {
 impl Error for DecisionError {}
 
 /// Every problem found in one refused decision, in document order. Never empty.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DecisionErrors(Vec<DecisionError>);
-
-impl DecisionErrors {
-    /// The errors, in order.
-    pub fn iter(&self) -> std::slice::Iter<'_, DecisionError> {
-        self.0.iter()
-    }
-
-    /// Number of errors (at least 1).
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Always false: a `DecisionErrors` holds at least one error.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-impl<'a> IntoIterator for &'a DecisionErrors {
-    type Item = &'a DecisionError;
-    type IntoIter = std::slice::Iter<'a, DecisionError>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl fmt::Display for DecisionErrors {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, error) in self.0.iter().enumerate() {
-            if i > 0 {
-                writeln!(f)?;
-            }
-            write!(f, "{error}")?;
-        }
-        Ok(())
-    }
-}
-
-impl Error for DecisionErrors {}
+pub type DecisionErrors = ErrorList<DecisionError>;
 
 /// The problems with one factory's two fractions.
 fn fraction_problems(id: u32, order: &FactoryOrder, problems: &mut Vec<DecisionError>) {
@@ -238,7 +198,7 @@ impl Decision {
         if problems.is_empty() {
             Ok(())
         } else {
-            Err(DecisionErrors(problems))
+            Err(ErrorList::new(problems))
         }
     }
 
@@ -473,7 +433,7 @@ mod tests {
         assert_eq!(error.to_string(), "factory #3: not in this business's view");
         assert_eq!(error.place(), &Place::Factory(3));
         assert_eq!(error.message(), "not in this business's view");
-        let errors = DecisionErrors(vec![error, DecisionError::new(Place::Decision, "second")]);
+        let errors = ErrorList::new(vec![error, DecisionError::new(Place::Decision, "second")]);
         assert_eq!(
             errors.to_string(),
             "factory #3: not in this business's view\ndecision: second"

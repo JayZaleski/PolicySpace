@@ -13,7 +13,7 @@
 //! only change to a factory in play (its technology and owner stay as placed). Knows nothing
 //! about files.
 
-use crate::businesses::BusinessId;
+use crate::businesses::{BusinessId, BusinessKind};
 use crate::id::{Id, IdKind, IdVec};
 use crate::map::{HexId, HexKind};
 use crate::technologies::TechnologyId;
@@ -44,29 +44,40 @@ pub struct Factory {
 }
 
 /// Every factory in a setting, in load order (which is also ID order), with a per-hex
-/// index. `Factories::default()` is empty and was built with no map, so
-/// [`on_hex`](Self::on_hex) panics on it for any hex.
+/// index and a per-owner index. `Factories::default()` is empty and was built with no map
+/// and no businesses, so [`on_hex`](Self::on_hex) and [`owned_by`](Self::owned_by) panic on
+/// it for any hex or business.
 #[derive(Debug, Default)]
 pub struct Factories {
     /// One entry per factory, by `FactoryId`.
     factories: IdVec<FactoryKind, Factory>,
     /// One entry per hex, by `HexId`: the factories on each hex, in ID order.
     by_hex: IdVec<HexKind, Vec<FactoryId>>,
+    /// One entry per business, by `BusinessId`: the factories each owns, in ID order.
+    by_owner: IdVec<BusinessKind, Vec<FactoryId>>,
 }
 
 impl Factories {
     /// Builds the list, giving IDs 0, 1, 2, ... in the order given. `hex_count` is the
-    /// number of hexes in the map. Crate-private: only the loader builds factories.
+    /// number of hexes in the map and `business_count` the number of businesses.
+    /// Crate-private: only the loader builds factories.
     ///
     /// # Panics
     /// Panics if a factory's hex index is `>= hex_count` (`"{hex:?} is not from a map of
-    /// {hex_count} hexes"`), if a condition isn't a finite number from 0 to 1 (`"a
+    /// {hex_count} hexes"`), if a factory's owner index is `>= business_count` (`"{owner:?}
+    /// is not from a list of {business_count} businesses"`), if a condition isn't a finite number from 0 to 1 (`"a
     /// factory's condition must be a finite number from 0 to 1"`), or if there are more
     /// than `u32::MAX` factories.
-    pub(crate) fn from_factories(factories: Vec<Factory>, hex_count: usize) -> Self {
+    pub(crate) fn from_factories(
+        factories: Vec<Factory>,
+        hex_count: usize,
+        business_count: usize,
+    ) -> Self {
         let factories = IdVec::from_vec(factories);
         let mut by_hex: IdVec<HexKind, Vec<FactoryId>> =
             IdVec::from_vec(vec![Vec::new(); hex_count]);
+        let mut by_owner: IdVec<BusinessKind, Vec<FactoryId>> =
+            IdVec::from_vec(vec![Vec::new(); business_count]);
         for (id, factory) in factories.iter() {
             assert!(
                 factory.hex.index() < hex_count,
@@ -74,12 +85,22 @@ impl Factories {
                 factory.hex
             );
             assert!(
+                factory.owner.index() < business_count,
+                "{:?} is not from a list of {business_count} businesses",
+                factory.owner
+            );
+            assert!(
                 factory.condition.is_finite() && (0.0..=1.0).contains(&factory.condition),
                 "a factory's condition must be a finite number from 0 to 1"
             );
             by_hex.get_mut(factory.hex).push(id);
+            by_owner.get_mut(factory.owner).push(id);
         }
-        Factories { factories, by_hex }
+        Factories {
+            factories,
+            by_hex,
+            by_owner,
+        }
     }
 
     /// Number of factories.
@@ -126,19 +147,19 @@ impl Factories {
         self.factories.get_mut(id).condition = condition;
     }
 
-    /// The factories owned by `business`, in ID order (a filter over every factory).
+    /// The factories owned by `business`, in ID order; none if it owns none.
+    ///
+    /// # Panics
+    /// Panics if `business` isn't from the businesses these factories were built with (and
+    /// on `Factories::default()`, for any business).
     pub fn owned_by(&self, business: BusinessId) -> impl Iterator<Item = FactoryId> + '_ {
-        self.factories
-            .iter()
-            .filter(move |(_, factory)| factory.owner == business)
-            .map(|(id, _)| id)
+        self.by_owner.get(business).iter().copied()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::businesses::BusinessKind;
     use crate::id::NameRegistry;
     use crate::technologies::TechnologyKind;
 
@@ -158,7 +179,7 @@ mod tests {
         }
     }
 
-    /// Three hexes, two technologies, two businesses; factories: 0 t0 b0 @h0 (1.0),
+    /// Three hexes, two technologies, three businesses (the third owns nothing); factories: 0 t0 b0 @h0 (1.0),
     /// 1 t1 b1 @h0 (0.5), 2 t0 b0 @h2 (0.25), 3 t0 b0 @h0 (1.0).
     fn sample_factories() -> Factories {
         let h = ids::<HexKind>(3);
@@ -171,6 +192,7 @@ mod tests {
                 factory(h[2], t[0], b[0], 0.25),
                 factory(h[0], t[0], b[0], 1.0),
             ],
+            3,
             3,
         )
     }
@@ -250,6 +272,7 @@ mod tests {
                 factory(h[0], t[0], b[0], 1.0),
             ],
             1,
+            1,
         );
         assert_eq!(factories.len(), 2);
     }
@@ -315,14 +338,30 @@ mod tests {
         let h = ids::<HexKind>(3);
         let t = ids::<TechnologyKind>(1);
         let b = ids::<BusinessKind>(1);
-        Factories::from_factories(vec![factory(h[2], t[0], b[0], 1.0)], 2);
+        Factories::from_factories(vec![factory(h[2], t[0], b[0], 1.0)], 2, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from a list of 2 businesses")]
+    fn from_factories_panics_on_an_owner_beyond_business_count() {
+        let h = ids::<HexKind>(1);
+        let t = ids::<TechnologyKind>(1);
+        let b = ids::<BusinessKind>(3);
+        Factories::from_factories(vec![factory(h[0], t[0], b[2], 1.0)], 1, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not from this list")]
+    fn owned_by_panics_on_the_default_list() {
+        let b = ids::<BusinessKind>(1);
+        let _ = Factories::default().owned_by(b[0]);
     }
 
     fn build_with_condition(condition: f64) {
         let h = ids::<HexKind>(1);
         let t = ids::<TechnologyKind>(1);
         let b = ids::<BusinessKind>(1);
-        Factories::from_factories(vec![factory(h[0], t[0], b[0], condition)], 1);
+        Factories::from_factories(vec![factory(h[0], t[0], b[0], condition)], 1, 1);
     }
 
     #[test]

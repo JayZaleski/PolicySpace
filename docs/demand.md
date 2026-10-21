@@ -65,7 +65,7 @@ pub trait PriceList {
 
 A hex's prices as `demand` needs them: the good prices are posted in, and the price of any good in that currency (`Quantity::ONE` for the currency itself, the posted price, or `None` if the good isn't traded here). Every price must be greater than 0; `demand` relies on this.
 
-`Market<'_>` implements it by forwarding to its own inherent `currency` and `price` methods (see [market.md](market.md)), so `world.market(hex)` can be passed straight in. The live market of Stage 05 should implement the same trait, so `demand` and its callers don't change when the market does. The engine's unit tests implement it over a `BTreeMap<GoodId, Quantity>` (`Prices` in `crates/engine/src/test_support.rs`, see [workspace.md](workspace.md)).
+`Market<'_>` implements it by forwarding to its own inherent `currency` and `price` methods (see [market.md](market.md)), so `world.market(hex)` can be passed straight in. The live market of Stage 04 should implement the same trait, so `demand` and its callers don't change when the market does. The engine's unit tests implement it over a `BTreeMap<GoodId, Quantity>` (`Prices` in `crates/engine/src/test_support.rs`, see [workspace.md](workspace.md)).
 
 ### `DemandedGood`
 

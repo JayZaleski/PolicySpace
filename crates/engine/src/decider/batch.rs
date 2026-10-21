@@ -6,7 +6,7 @@
 //! gives one [`Answer`] per business in the request, so a later Step can resolve a turn from
 //! it. A [`Recording`] is a request and its reply saved together.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 
@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::decider::decision::{Decision, DecisionErrors};
 use crate::decider::view::BusinessView;
 use crate::decider::{self, FormatError};
+use crate::error_list::ErrorList;
 use crate::goods::Goods;
 use crate::turn::Turn;
 
@@ -40,8 +41,8 @@ pub struct Reply {
     pub decisions: Vec<Decision>,
 }
 
-/// A request and its reply, saved together: the recording Step 06's Python tests read and
-/// Step 07's replay decider answers from.
+/// A request and its reply, saved together: the recording the Python tests read and the
+/// replay decider answers from.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Recording {
@@ -92,48 +93,7 @@ impl Error for ReplyError {}
 
 /// Every reply-level problem, in order: the turn first, then the decisions in reply order.
 /// Never empty.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReplyErrors(Vec<ReplyError>);
-
-impl ReplyErrors {
-    /// The errors, in order.
-    pub fn iter(&self) -> std::slice::Iter<'_, ReplyError> {
-        self.0.iter()
-    }
-
-    /// Number of errors (at least 1).
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Always false: a `ReplyErrors` holds at least one error.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-impl<'a> IntoIterator for &'a ReplyErrors {
-    type Item = &'a ReplyError;
-    type IntoIter = std::slice::Iter<'a, ReplyError>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl fmt::Display for ReplyErrors {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, error) in self.0.iter().enumerate() {
-            if i > 0 {
-                writeln!(f)?;
-            }
-            write!(f, "{error}")?;
-        }
-        Ok(())
-    }
-}
-
-impl Error for ReplyErrors {}
+pub type ReplyErrors = ErrorList<ReplyError>;
 
 /// What one business in the request got from the reply.
 #[derive(Debug, Clone, PartialEq)]
@@ -142,8 +102,13 @@ pub enum Answer<'a> {
     Nothing,
     /// A decision that passed validation against the business's view.
     Valid(&'a Decision),
-    /// A decision that failed validation; what happens next is Step 07's.
-    Refused(DecisionErrors),
+    /// A decision that failed validation; the host idles its business for the turn.
+    Refused {
+        /// The decision that failed, as the reply gave it.
+        decision: &'a Decision,
+        /// Every problem found in it.
+        errors: DecisionErrors,
+    },
 }
 
 impl Reply {
@@ -163,37 +128,36 @@ impl Reply {
                 reply: self.turn,
             });
         }
-        let mut seen: BTreeSet<&str> = BTreeSet::new();
+        let requested: BTreeSet<&str> = request
+            .views
+            .iter()
+            .map(|view| view.business.as_str())
+            .collect();
+        let mut by_business: BTreeMap<&str, &Decision> = BTreeMap::new();
         for decision in &self.decisions {
             let name = decision.business.as_str();
-            if !request.views.iter().any(|view| view.business == name) {
+            if !requested.contains(name) {
                 problems.push(ReplyError::UnknownBusiness {
                     name: name.to_string(),
                 });
-            } else if !seen.insert(name) {
+            } else if by_business.insert(name, decision).is_some() {
                 problems.push(ReplyError::DuplicateBusiness {
                     name: name.to_string(),
                 });
             }
         }
         if !problems.is_empty() {
-            return Err(ReplyErrors(problems));
+            return Err(ErrorList::new(problems));
         }
         Ok(request
             .views
             .iter()
-            .map(|view| {
-                match self
-                    .decisions
-                    .iter()
-                    .find(|decision| decision.business == view.business)
-                {
-                    None => Answer::Nothing,
-                    Some(decision) => match decision.validate(view, goods) {
-                        Ok(()) => Answer::Valid(decision),
-                        Err(errors) => Answer::Refused(errors),
-                    },
-                }
+            .map(|view| match by_business.get(view.business.as_str()) {
+                None => Answer::Nothing,
+                Some(&decision) => match decision.validate(view, goods) {
+                    Ok(()) => Answer::Valid(decision),
+                    Err(errors) => Answer::Refused { decision, errors },
+                },
             })
             .collect())
     }
@@ -431,10 +395,13 @@ mod tests {
         let answers = r.validate(&q, &g).unwrap();
         assert_eq!(answers.len(), 3);
         match &answers[0] {
-            Answer::Refused(errors) => assert_eq!(
-                errors.iter().map(ToString::to_string).collect::<Vec<_>>(),
-                ["factory #9: not in this business's view"]
-            ),
+            Answer::Refused { decision, errors } => {
+                assert_eq!(decision.business, "a");
+                assert_eq!(
+                    errors.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                    ["factory #9: not in this business's view"]
+                );
+            }
             other => panic!("{other:?}"),
         }
         assert_eq!(answers[1], Answer::Nothing);

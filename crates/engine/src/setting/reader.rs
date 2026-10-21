@@ -314,6 +314,33 @@ impl<'a, 'i> EntryReader<'a, 'i> {
         quantity
     }
 
+    /// Checks that `value` is a whole number of at least 1 that fits a `u32` (and, when
+    /// `max` is `Some`, is no more than it) and returns it; otherwise reports
+    /// `<prefix> must be at least 1`, or `<prefix> is out of range` (followed by ` (the most
+    /// is <max>)` when `max` is `Some`), at the value and returns None. `prefix` is as for
+    /// [`positive_quantity`](Self::positive_quantity), which this mirrors for integers.
+    pub fn at_least_one(
+        &mut self,
+        prefix: &str,
+        value: Located<i64>,
+        max: Option<u32>,
+    ) -> Option<u32> {
+        if value.value < 1 {
+            self.sink
+                .at(&value.at, format!("{prefix} must be at least 1"));
+            return None;
+        }
+        match u32::try_from(value.value) {
+            Ok(n) if max.is_none_or(|m| n <= m) => Some(n),
+            _ => {
+                let limit = max.map_or(String::new(), |m| format!(" (the most is {m})"));
+                self.sink
+                    .at(&value.at, format!("{prefix} is out of range{limit}"));
+                None
+            }
+        }
+    }
+
     /// Checks that `value` is a finite number of at least 0 and returns it; otherwise
     /// reports `<prefix> must be a finite number of at least 0` at the value and returns
     /// None. `prefix` is as for [`positive_quantity`](Self::positive_quantity).
@@ -738,6 +765,42 @@ e = nan
                 "rules/t.toml:3:5: key 'c' in thing must be a finite number greater than 0",
                 "rules/t.toml:4:5: key 'd' in thing must be a finite number greater than 0",
                 "rules/t.toml:5:5: key 'e' in thing must be a finite number greater than 0",
+            ]
+        );
+    }
+
+    #[test]
+    fn at_least_one_accepts_whole_numbers_in_range_and_reports_the_rest() {
+        let errors = run(
+            "a = 1
+b = 4294967295
+c = 0
+d = -3
+e = 4294967296
+f = 10
+g = 11
+",
+            |r| {
+                let read = |r: &mut EntryReader<'_, '_>, key: &str, max: Option<u32>| {
+                    let value = r.required_integer(key).unwrap();
+                    r.at_least_one(&format!("key '{key}' in thing"), value, max)
+                };
+                assert_eq!(read(r, "a", None), Some(1));
+                assert_eq!(read(r, "b", None), Some(u32::MAX));
+                assert_eq!(read(r, "c", None), None);
+                assert_eq!(read(r, "d", Some(10)), None);
+                assert_eq!(read(r, "e", None), None);
+                assert_eq!(read(r, "f", Some(10)), Some(10));
+                assert_eq!(read(r, "g", Some(10)), None);
+            },
+        );
+        assert_eq!(
+            errors,
+            vec![
+                "rules/t.toml:3:5: key 'c' in thing must be at least 1",
+                "rules/t.toml:4:5: key 'd' in thing must be at least 1",
+                "rules/t.toml:5:5: key 'e' in thing is out of range",
+                "rules/t.toml:7:5: key 'g' in thing is out of range (the most is 10)",
             ]
         );
     }

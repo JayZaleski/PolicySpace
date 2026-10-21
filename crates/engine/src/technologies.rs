@@ -19,8 +19,8 @@
 //! - **t > t₁ is allowed.** Such a factory wears out faster than it can be maintained.
 //!
 //! The [`production`](crate::production) module runs, wears and maintains factories by
-//! these numbers, as pure functions; Step 08 of this Stage wires it into the turn. Knows
-//! nothing about files: the setting loader builds [`Technologies`] from a checked setting,
+//! these numbers, as pure functions, and the World runs them for each business every turn.
+//! Knows nothing about files: the setting loader builds [`Technologies`] from a checked setting,
 //! and everything else only reads them.
 
 use crate::bundle::Bundle;

@@ -309,13 +309,17 @@ impl DeciderHost {
         let mut answers = vec![BusinessAnswer::Nothing; businesses.len()];
         let mut failures = Vec::new();
 
+        let mut by_decider: BTreeMap<&str, Vec<BusinessId>> = BTreeMap::new();
+        for (id, _, business) in businesses.iter() {
+            by_decider
+                .entry(business.decider.as_str())
+                .or_default()
+                .push(id);
+        }
+
         let mut exchanges = Vec::with_capacity(self.deciders.len());
         for (name, decider) in self.deciders.iter_mut() {
-            let ids: Vec<BusinessId> = businesses
-                .iter()
-                .filter(|(_, _, business)| business.decider == *name)
-                .map(|(id, _, _)| id)
-                .collect();
+            let ids = by_decider.remove(name.as_str()).unwrap_or_default();
             let request = Request {
                 turn: world.turn(),
                 views: ids.iter().map(|id| world.business_view(*id)).collect(),
@@ -365,17 +369,12 @@ impl DeciderHost {
                     });
                 }
                 Ok(validated) => {
-                    for ((id, view), answer) in ids.iter().zip(&request.views).zip(validated) {
+                    for (id, answer) in ids.iter().zip(validated) {
                         answers[id.index()] = match answer {
                             Answer::Nothing => BusinessAnswer::Nothing,
                             Answer::Valid(decision) => BusinessAnswer::Valid(decision.clone()),
-                            Answer::Refused(errors) => BusinessAnswer::Refused {
-                                decision: reply
-                                    .decisions
-                                    .iter()
-                                    .find(|decision| decision.business == view.business)
-                                    .expect("a refused answer has a decision")
-                                    .clone(),
+                            Answer::Refused { decision, errors } => BusinessAnswer::Refused {
+                                decision: decision.clone(),
                                 errors,
                             },
                         };

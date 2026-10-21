@@ -7801,7 +7801,7 @@ a.anchor-link {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="PolicySpace-Manual">PolicySpace Manual<a class="anchor-link" href="#PolicySpace-Manual">¶</a></h1><p>PolicySpace is a game about economies and policy. It is being built one system at a time, and so far two systems exist: <strong>the world</strong> and <strong>the people in it</strong>. A <em>setting</em> describes a world: its goods, its map with a currency on every hex, its natural resources, the prices its markets post, and the groups of people, called <strong>POPs</strong>, who live on it. The engine loads the setting and runs turns in which the POPs earn, trade, consume and grow, and a developer tool lets you watch all of it happen. There is no player-facing game yet, so this manual is written for <strong>setting authors</strong> and developers.</p>
+<h1 id="PolicySpace-Manual">PolicySpace Manual<a class="anchor-link" href="#PolicySpace-Manual">¶</a></h1><p>PolicySpace is a game about economies and policy. It is being built one system at a time, and so far three systems exist: <strong>the world</strong>, <strong>the people in it</strong>, and <strong>the businesses that produce</strong>. A <em>setting</em> describes a world: its goods, its map with a currency on every hex, its natural resources, the prices its markets post, the groups of people, called <strong>POPs</strong>, who live on it, the <strong>technologies</strong> (the recipes factories run), and the <strong>businesses</strong> that own deposits and factories. The engine loads the setting and runs turns in which the POPs earn, trade, consume and grow, and the businesses, each steered by a small decision program, buy, produce and sell. A developer tool lets you watch all of it happen. There is no player-facing game yet, so this manual is written for <strong>setting authors</strong> and developers.</p>
 <p><em>This manual grows as each part of the project is completed.</em></p>
 </div>
 </div>
@@ -7813,7 +7813,7 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="Contents">Contents<a class="anchor-link" href="#Contents">¶</a></h2><ul>
-<li><a href="#Project-overview">Project overview</a></li>
+<li><a href="#Project-overview">Project overview</a>, including how to set up the Python environment</li>
 <li><a href="#Writing-a-setting">Writing a setting</a><ul>
 <li><a href="#The-folder-layout">The folder layout</a></li>
 <li><a href="#Naming-rules">Naming rules</a></li>
@@ -7823,7 +7823,10 @@ a.anchor-link {
 <li><a href="#Markets">Markets</a></li>
 <li><a href="#POP-types">POP types</a>, including how POPs grow</li>
 <li><a href="#POPs">POPs</a></li>
-<li><a href="#Running-a-setting">Running a setting</a>: the turn, how POPs trade and grow, turn reports</li>
+<li><a href="#Technologies">Technologies</a>: the recipes factories run, and what their numbers mean</li>
+<li><a href="#Businesses">Businesses</a>: the actors that own deposits and factories, and how the arithmetic rule decides for them</li>
+<li><a href="#Factories">Factories</a></li>
+<li><a href="#Running-a-setting">Running a setting</a>: the turn, how POPs trade and grow, how businesses trade and produce, turn reports</li>
 <li><a href="#Checking-a-setting">Checking a setting</a></li>
 <li><a href="#The-developer-UI">The developer UI</a></li>
 </ul>
@@ -7839,12 +7842,18 @@ a.anchor-link {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="Project-overview">Project overview<a class="anchor-link" href="#Project-overview">¶</a></h2><p>The project is a Rust workspace with two parts: an <strong>engine</strong> library, which holds the rules and runs the world, and a <strong>developer UI</strong> program, which loads settings and shows them. The engine never depends on the developer UI. Details are in <a href="docs/workspace.md">docs/workspace.md</a>, and the way names become internal IDs is explained in <a href="docs/ids.md">docs/ids.md</a>.</p>
+<h2 id="Project-overview">Project overview<a class="anchor-link" href="#Project-overview">¶</a></h2><p>The project has three parts. The <strong>engine</strong> library (Rust) holds the rules and runs the world. The <strong>developer UI</strong> program (Rust) loads settings and shows them. The <strong>Python package</strong>, <code>policyspace</code>, holds the <strong>deciders</strong>: the programs that choose, every turn, what each business does. The engine never depends on the developer UI, and it never imports the Python code: it starts a decider as a separate process and exchanges one message per turn with it, which is why deciders can be written in Python. Details are in <a href="docs/workspace.md">docs/workspace.md</a> and <a href="docs/python.md">docs/python.md</a>, and the way names become internal IDs is explained in <a href="docs/ids.md">docs/ids.md</a>.</p>
+<p><strong>Setting up.</strong> Run these two commands once, from the project's root folder (Python 3.12 or later; the first install needs network access):</p>
+<pre><code>python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt
+</code></pre>
+<p>They create a virtual environment holding the Python package, the test runner and Jupyter. The developer UI needs it to load any setting that has businesses, the sample included, and the tests need it too. Without it, loading such a setting fails with a message that names where the environment was expected and repeats the two commands above. A setting with no businesses needs no Python at all.</p>
 <p>Two commands matter day to day, both run from the project's root folder:</p>
 <ul>
 <li><code>cargo run -p policyspace-dev-ui -- &lt;folder&gt;</code> opens the developer UI on a setting (see <a href="#The-developer-UI">The developer UI</a>).</li>
-<li><code>python tools/check.py</code> runs formatting checks, lint checks and all the tests.</li>
+<li><code>.venv/Scripts/python tools/check.py</code> runs four checks: formatting, lints, the Rust tests and the Python tests. Run it with the environment's Python, as written, because the Python tests run under whichever Python starts the script; if it complains that pytest is missing, rerun the install command.</li>
 </ul>
+<p>Two environment variables are there for developers: <code>POLICYSPACE_PYTHON</code> points the developer UI and the tests at another Python interpreter, and <code>POLICYSPACE_DECIDER_TIME_LIMIT</code> sets how many seconds the engine waits for a decider's answer each turn (normally 5; <code>0</code> means wait forever, which is what you want when stepping through a decider in a debugger). See <a href="docs/workspace.md#the-python-environment">docs/workspace.md</a>.</p>
 </div>
 </div>
 </div>
@@ -7854,12 +7863,13 @@ a.anchor-link {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="Writing-a-setting">Writing a setting<a class="anchor-link" href="#Writing-a-setting">¶</a></h2><p>A <strong>setting</strong> is a folder of plain-text <a href="https://toml.io">TOML</a> files that describes a world: what goods exist, what the map looks like and which good each hex uses as its currency, where natural resources lie, what the markets charge, and which groups of people live where. The engine has no built-in content, so everything comes from the setting. A complete example lives in <code>settings/sample/</code>; copy it to start your own.</p>
+<h2 id="Writing-a-setting">Writing a setting<a class="anchor-link" href="#Writing-a-setting">¶</a></h2><p>A <strong>setting</strong> is a folder of plain-text <a href="https://toml.io">TOML</a> files that describes a world: what goods exist, what the map looks like and which good each hex uses as its currency, where natural resources lie, what the markets charge, which groups of people live where, which recipes factories can run, and which businesses own the deposits and factories. The engine has no built-in content, so everything comes from the setting. A complete example lives in <code>settings/sample/</code>; copy it to start your own.</p>
 <p>For the technical side of the format, see <a href="docs/setting-loader.md">docs/setting-loader.md</a>.</p>
 <h3 id="The-folder-layout">The folder layout<a class="anchor-link" href="#The-folder-layout">¶</a></h3><pre><code>my_setting/
   setting.toml      the manifest
-  rules/            things that never change during play (goods, resource types, POP types)
-  start/            what turn 0 looks like (the map and its currencies, the deposits, the markets, the POPs)
+  rules/            things that never change during play (goods, resource types, POP types, technologies)
+  start/            what turn 0 looks like (the map and its currencies, the deposits, the markets,
+                    the POPs, the businesses and their factories)
 </code></pre>
 <p><strong>The manifest, <code>setting.toml</code>,</strong> has these keys:</p>
 <table>
@@ -7899,9 +7909,9 @@ a.anchor-link {
 <li>Organize files however you like, nested to any depth. Files are read in sorted path order.</li>
 <li>What a file defines comes from its section headers (such as <code>[[good]]</code>), not from its file name.</li>
 <li><code>README.md</code> files are the place for notes. Hidden files, <code>Thumbs.db</code> and <code>desktop.ini</code> are ignored. Any other file that does not end in <code>.toml</code> is an error.</li>
-<li>Each section type belongs in one of the two folders: <code>[[good]]</code>, <code>[[resource]]</code> and <code>[[pop_type]]</code> in <code>rules/</code>; <code>[[hex]]</code>, <code>[[deposit]]</code>, <code>[[market]]</code> and <code>[[pop]]</code> in <code>start/</code>. Putting one in the wrong folder is an error.</li>
+<li>Each section type belongs in one of the two folders: <code>[[good]]</code>, <code>[[resource]]</code>, <code>[[pop_type]]</code> and <code>[[technology]]</code> in <code>rules/</code>; <code>[[hex]]</code>, <code>[[deposit]]</code>, <code>[[market]]</code>, <code>[[pop]]</code>, <code>[[business]]</code> and <code>[[factory]]</code> in <code>start/</code>. Putting one in the wrong folder is an error.</li>
 </ul>
-<h3 id="Naming-rules">Naming rules<a class="anchor-link" href="#Naming-rules">¶</a></h3><p>Names of goods, resource types and POP types use lowercase letters, digits and underscores, and must start with a letter: <code>copper_ore</code> and <code>grain2</code> are fine; <code>Copper</code>, <code>2grain</code> and <code>copper-ore</code> are not. Each kind of thing has its own list of names, so a resource type or a POP type may share a name with a good.</p>
+<h3 id="Naming-rules">Naming rules<a class="anchor-link" href="#Naming-rules">¶</a></h3><p>Names of goods, resource types, POP types, technologies and businesses use lowercase letters, digits and underscores, and must start with a letter: <code>copper_ore</code> and <code>grain2</code> are fine; <code>Copper</code>, <code>2grain</code> and <code>copper-ore</code> are not. Each kind of thing has its own list of names, so a resource type, a POP type, a technology or a business may share a name with a good. Hexes, deposits, POPs and factories have no names.</p>
 <h3 id="Goods">Goods<a class="anchor-link" href="#Goods">¶</a></h3><p>A <strong>good</strong> is anything an actor can own. The engine has no built-in goods and no built-in categories such as labor, money or capital: the setting defines them all.</p>
 <p>Define goods with <code>[[good]]</code> sections in <code>rules/</code>, in any file at any depth, as many per file as you like. Goods from all files are merged. A setting with no goods is valid. A <code>[[good]]</code> in <code>start/</code> is an error.</p>
 <table>
@@ -7941,7 +7951,7 @@ a.anchor-link {
 <span class="k">[[good]]</span>
 <span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"copper"</span>
 </pre></div>
-<p>The sample setting defines six goods:</p>
+<p>The sample setting defines seven goods:</p>
 <table>
 <thead>
 <tr>
@@ -7987,6 +7997,12 @@ a.anchor-link {
 <td>never</td>
 <td>true</td>
 <td>The currency every sample hex uses</td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td>never</td>
+<td>true</td>
+<td>The capital good the sample's factories are made of, and what its toolmaker makes</td>
 </tr>
 </tbody>
 </table>
@@ -8040,7 +8056,7 @@ a.anchor-link {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="Natural-resources">Natural resources<a class="anchor-link" href="#Natural-resources">¶</a></h3><p>Natural resources come in two parts: <strong>resource types</strong> say what kinds of resource exist and what one deposit produces, and <strong>deposits</strong> put them on the map. Each deposit produces its type's output every turn (see <a href="#Running-a-setting">Running a setting</a>). There is no ownership yet (that is a later stage), and no stock or depletion.</p>
+<h3 id="Natural-resources">Natural resources<a class="anchor-link" href="#Natural-resources">¶</a></h3><p>Natural resources come in two parts: <strong>resource types</strong> say what kinds of resource exist and what one deposit produces, and <strong>deposits</strong> put them on the map. Each deposit produces its type's output every turn (see <a href="#Running-a-setting">Running a setting</a>). A deposit can be owned by one business; the ownership is written on the business, not on the deposit (see <a href="#Businesses">Businesses</a>). An owned deposit produces into its owner's stockpile, an unowned one into the hex's stockpile of unowned goods. There is no stock or depletion.</p>
 <p><strong>Resource types</strong> are <code>[[resource]]</code> sections in <code>rules/</code> (in <code>start/</code> it is an error), in any file at any depth, merged across files. Three keys are required:</p>
 <table>
 <thead>
@@ -8088,7 +8104,7 @@ a.anchor-link {
 </tr>
 </tbody>
 </table>
-<p><code>count = 3</code> makes three separate deposits. Each will be ownable by a single owner later, so the total on a hex is <code>count</code> times <code>output</code>. A hex can hold several resource types, but each type may appear only once per hex: raise <code>count</code> instead.</p>
+<p><code>count = 3</code> makes three separate deposits, each of which can have its own owner, so the total on a hex is <code>count</code> times <code>output</code>. A hex can hold several resource types, but each type may appear only once per hex: raise <code>count</code> instead.</p>
 <div class="highlight"><pre><span></span><span class="c1"># rules/resources.toml</span>
 <span class="k">[[resource]]</span>
 <span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"copper_ore"</span>
@@ -8172,7 +8188,7 @@ a.anchor-link {
 </tr>
 </tbody>
 </table>
-<p>Hex <code>(0, 0)</code> holds two resource types at once. In the diagram, hexes with deposits are shaded.</p>
+<p>Hex <code>(0, 0)</code> holds two resource types at once, and three of its four deposits are owned by the sample's businesses (see <a href="#Businesses">Businesses</a>); every other deposit is unowned. In the diagram, hexes with deposits are shaded.</p>
 </div>
 </div>
 </div>
@@ -8251,6 +8267,7 @@ a.anchor-link {
 <th><code>copper</code></th>
 <th><code>unimproved_grain</code></th>
 <th><code>unimproved_copper</code></th>
+<th><code>tools</code></th>
 </tr>
 </thead>
 <tbody>
@@ -8261,12 +8278,14 @@ a.anchor-link {
 <td>5</td>
 <td>0.5</td>
 <td>1</td>
+<td>12</td>
 </tr>
 <tr>
 <td>every other hex except <code>(2, -2)</code></td>
 <td>1</td>
 <td>2</td>
 <td>5</td>
+<td>not traded</td>
 <td>not traded</td>
 <td>not traded</td>
 </tr>
@@ -8277,10 +8296,11 @@ a.anchor-link {
 <td></td>
 <td></td>
 <td></td>
+<td></td>
 </tr>
 </tbody>
 </table>
-<p>So the sample has one hex that trades every good, seventeen that trade some, and one that trades nothing. The prices are placeholders: nothing is produced for sale yet, so they need not be consistent with production.</p>
+<p>So the sample has one hex that trades every good, seventeen that trade some, and one that trades nothing. The center's prices are what the sample's technologies are balanced against: at these prices a farm and a mine clearly pay, and a toolmaker only just (see <a href="#Technologies">Technologies</a>). The other hexes' prices are placeholders.</p>
 <p>More detail: <a href="docs/market.md">docs/market.md</a>.</p>
 <h3 id="POP-types">POP types<a class="anchor-link" href="#POP-types">¶</a></h3><p>A <strong>POP</strong> is a group of identical people of one kind living on one hex, and a <strong>POP type</strong> describes one person of that kind: what they receive each turn, what they want to consume, and how their numbers grow. POP types are rules, so they go in <code>rules/</code> as <code>[[pop_type]]</code> sections (in <code>start/</code> it is an error). Mind the two headers: <code>[[pop_type]]</code> in <code>rules/</code> describes a person, and <code>[[pop]]</code> in <code>start/</code> places a group of them (see <a href="#POPs">POPs</a>).</p>
 <p>Four keys, all required:</p>
@@ -8471,7 +8491,7 @@ a.anchor-link {
 <li><strong>Size is a starting value, and it need not be whole.</strong> A POP is an aggregate: what it receives and wants scales with its size, and every turn the size is multiplied by a growth rate, so after the first turn sizes are long decimals anyway. Nothing is rounded, in the engine or on screen.</li>
 <li><strong>At most one POP of each type per hex.</strong> Two groups of the same type on one hex would behave as one group split in two, so a second <code>[[pop]]</code> with the same type and coordinates is an error that names the first. A hex may hold POPs of several types, or none.</li>
 <li><strong>POPs start with nothing.</strong> There is no starting cash or goods. At the start of every turn, turn 0 included, each POP receives its type's endowment times its size, and it perishes like any other good: the sample's labor would be gone at the end of the turn it arrives if the POP did not sell or consume it, while an endowed durable good would pile up.</li>
-<li>Deposits are still unowned: their output goes to the hex's unowned stockpile, not to the POPs there.</li>
+<li>POPs never receive deposit output. It goes to the business that owns the deposit or, if nobody does, to the hex's stockpile of unowned goods.</li>
 </ul>
 <div class="highlight"><pre><span></span><span class="k">[[pop]]</span>
 <span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"peasant"</span>
@@ -8503,19 +8523,445 @@ a.anchor-link {
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d4f6b8c0">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=t3a1b2c3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p>More detail: <a href="docs/pops.md">docs/pops.md</a>.</p>
-<h3 id="Running-a-setting">Running a setting<a class="anchor-link" href="#Running-a-setting">¶</a></h3><p>A loaded setting becomes a running <strong>world</strong>. The rules stay fixed; the world holds the clock (starting at turn 0), a stockpile of unowned goods on every hex, and for every POP its current size and its own stockpile. Each turn has three parts:</p>
+<h3 id="Technologies">Technologies<a class="anchor-link" href="#Technologies">¶</a></h3><p>A <strong>technology</strong> is a recipe that factories run: what a factory of that kind makes and from what, how much it can make in a turn, what a finished factory is made of, what building one takes, and how long it lasts. A technology is shared by every factory that uses it, the way a POP type is shared by POPs. Technologies are rules, so they go in <code>rules/</code> as <code>[[technology]]</code> sections (in <code>start/</code> it is an error). The factories themselves are placed in <code>start/</code> and belong to businesses (see <a href="#Factories">Factories</a> and <a href="#Businesses">Businesses</a>).</p>
+<p>Eight keys, all required:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Lowercase snake_case, unique among technologies</td>
+</tr>
+<tr>
+<td><code>inputs</code></td>
+<td><code>good name = amount</code> pairs: what making one unit of output takes. May be empty (<code>{}</code>)</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td>The name of the one good a factory of this kind makes</td>
+</tr>
+<tr>
+<td><code>capacity</code></td>
+<td>The most output one factory makes in one turn: a number greater than 0</td>
+</tr>
+<tr>
+<td><code>capital</code></td>
+<td><code>good name = amount</code> pairs: the goods a finished factory is made of. At least one good</td>
+</tr>
+<tr>
+<td><code>construction</code></td>
+<td><code>good name = amount</code> pairs: the goods used up to build one factory. May be empty (<code>{}</code>)</td>
+</tr>
+<tr>
+<td><code>construction_turns</code></td>
+<td>How many turns building a factory takes: a whole number, 1 or more</td>
+</tr>
+<tr>
+<td><code>lifetime</code></td>
+<td>How many turns a factory's capital lasts: a whole number, 1 or more</td>
+</tr>
+</tbody>
+</table>
+<p>Things worth knowing:</p>
+<ul>
+<li>Every amount, and the capacity, is a number greater than 0. An empty table has to be written out as <code>{}</code>: leaving <code>inputs</code> or <code>construction</code> out is an error, so an empty one says you meant it.</li>
+<li><strong>Inputs are fixed proportions.</strong> Making 12 units takes 12 times each input, with no substitution between inputs. A technology with no inputs makes its output from nothing.</li>
+<li>The output good can't also be an input, but it can be part of the capital: a toolmaker made of tools is fine.</li>
+<li><strong>Nothing checks the economics.</strong> The loader doesn't care whether a technology can pay for itself, whether its inputs are sold anywhere, or whether its capital goods are durable.</li>
+<li>Both TOML table forms work, as for a POP type's endowment.</li>
+</ul>
+<h4 id="What-the-numbers-mean">What the numbers mean<a class="anchor-link" href="#What-the-numbers-mean">¶</a></h4><ul>
+<li><strong>Wear.</strong> Every turn, whether or not it runs, a factory uses up 1/<code>lifetime</code> of its capital, one <em>slice</em>. A factory runs only while it holds at least one whole slice, so every turn of output costs exactly one slice; below that it is <strong>shut down</strong> and makes nothing, and a leftover part of a slice is simply lost. Condition doesn't slow a factory down: it runs at full capacity right up to the turn it shuts down. A full factory that nobody maintains runs exactly <code>lifetime</code> turns.</li>
+<li><strong>Construction.</strong> Building a factory takes <code>construction_turns</code> turns and pays an equal share of the capital goods and the construction goods each turn. (Building new factories is not something a business can decide yet; the numbers exist now because maintenance is defined by them.)</li>
+<li><strong>Maintenance is a partial rebuild.</strong> Topping a factory up by some share of its capital costs that share of both the capital goods and the construction goods, and a factory can regain at most 1/<code>construction_turns</code> of its capital in one turn. Bringing one from 95% to 100% costs 5% of each bundle.</li>
+<li><strong>If <code>construction_turns</code> is greater than <code>lifetime</code></strong>, a factory wears out faster than it can be maintained, and once it is exhausted maintenance can never bring it back, because it never regains a whole slice. That is allowed, not an error: it is a legitimate thing for a setting to say.</li>
+<li><strong>Order.</strong> Each turn a business's factories run, then wear, then are maintained. Running before wear is what gives a full factory exactly <code>lifetime</code> turns; maintaining after wear is what lets one slice of maintenance a turn hold a factory at full condition. How this fits into the turn is under <a href="#How-businesses-trade-and-produce">How businesses trade and produce</a>.</li>
+</ul>
+<p>A worked example with the sample's <code>farm</code> (capital 4 tools, construction 8 labor, 2 construction turns, lifetime 8): it loses 0.5 tools of capital every turn. Building one would take 2 turns at 2 tools and 4 labor each. Topping it up from 75% to 100% costs 1 tool and 2 labor, and can be done in one turn, because 25% is within the 50% a turn that 2 construction turns allow. The chart follows a factory's <strong>condition</strong> (the share of its capital it holds) over thirty turns under three regimes: never maintained, maintained as fast as allowed when construction is quicker than the lifetime, and maintained as fast as allowed when it is slower. The never-maintained farm has run eight times when its condition reaches 0 at the end of turn 7; the slow-to-build factory sinks below one slice, shuts down, and never gets back.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=t3c4d5e6">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3NjAiIGhlaWdodD0iMzQwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMSI+CjxsaW5lIHgxPSI2MC4wIiB5MT0iMzYiIHgyPSI2MC4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNjAuMCIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4wPC90ZXh0Pgo8bGluZSB4MT0iMTc0LjAiIHkxPSIzNiIgeDI9IjE3NC4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iMTc0LjAiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+NTwvdGV4dD4KPGxpbmUgeDE9IjI4OC4wIiB5MT0iMzYiIHgyPSIyODguMCIgeTI9IjI5NCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjI4OC4wIiB5PSIzMDgiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjEwPC90ZXh0Pgo8bGluZSB4MT0iNDAyLjAiIHkxPSIzNiIgeDI9IjQwMi4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNDAyLjAiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTU8L3RleHQ+CjxsaW5lIHgxPSI1MTYuMCIgeTE9IjM2IiB4Mj0iNTE2LjAiIHkyPSIyOTQiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI1MTYuMCIgeT0iMzA4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yMDwvdGV4dD4KPGxpbmUgeDE9IjYzMC4wIiB5MT0iMzYiIHgyPSI2MzAuMCIgeTI9IjI5NCIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjYzMC4wIiB5PSIzMDgiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjI1PC90ZXh0Pgo8bGluZSB4MT0iNzQ0LjAiIHkxPSIzNiIgeDI9Ijc0NC4wIiB5Mj0iMjk0IiBzdHJva2U9IiNlNWU1ZTUiLz4KPHRleHQgeD0iNzQ0LjAiIHk9IjMwOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MzA8L3RleHQ+CjxsaW5lIHgxPSI2MCIgeTE9IjI5NC4wIiB4Mj0iNzQ0IiB5Mj0iMjk0LjAiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI1NCIgeT0iMjk4LjAiIHRleHQtYW5jaG9yPSJlbmQiPjA8L3RleHQ+CjxsaW5lIHgxPSI2MCIgeTE9IjIzMi42IiB4Mj0iNzQ0IiB5Mj0iMjMyLjYiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI1NCIgeT0iMjM2LjYiIHRleHQtYW5jaG9yPSJlbmQiPjAuMjU8L3RleHQ+CjxsaW5lIHgxPSI2MCIgeTE9IjE3MS4xIiB4Mj0iNzQ0IiB5Mj0iMTcxLjEiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI1NCIgeT0iMTc1LjEiIHRleHQtYW5jaG9yPSJlbmQiPjAuNTwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iMTA5LjciIHgyPSI3NDQiIHkyPSIxMDkuNyIgc3Ryb2tlPSIjZTVlNWU1Ii8+Cjx0ZXh0IHg9IjU0IiB5PSIxMTMuNyIgdGV4dC1hbmNob3I9ImVuZCI+MC43NTwvdGV4dD4KPGxpbmUgeDE9IjYwIiB5MT0iNDguMyIgeDI9Ijc0NCIgeTI9IjQ4LjMiIHN0cm9rZT0iI2U1ZTVlNSIvPgo8dGV4dCB4PSI1NCIgeT0iNTIuMyIgdGV4dC1hbmNob3I9ImVuZCI+MTwvdGV4dD4KPHJlY3QgeD0iNjAiIHk9IjM2IiB3aWR0aD0iNjg0IiBoZWlnaHQ9IjI1OCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOTk5Ii8+Cjxwb2x5bGluZSBwb2ludHM9IjYwLjAsNzkuMCA4Mi44LDEwOS43IDEwNS42LDE0MC40IDEyOC40LDE3MS4xIDE1MS4yLDIwMS45IDE3NC4wLDIzMi42IDE5Ni44LDI2My4zIDIxOS42LDI5NC4wIDI0Mi40LDI5NC4wIDI2NS4yLDI5NC4wIDI4OC4wLDI5NC4wIDMxMC44LDI5NC4wIDMzMy42LDI5NC4wIDM1Ni40LDI5NC4wIDM3OS4yLDI5NC4wIDQwMi4wLDI5NC4wIDQyNC44LDI5NC4wIDQ0Ny42LDI5NC4wIDQ3MC40LDI5NC4wIDQ5My4yLDI5NC4wIDUxNi4wLDI5NC4wIDUzOC44LDI5NC4wIDU2MS42LDI5NC4wIDU4NC40LDI5NC4wIDYwNy4yLDI5NC4wIDYzMC4wLDI5NC4wIDY1Mi44LDI5NC4wIDY3NS42LDI5NC4wIDY5OC40LDI5NC4wIDcyMS4yLDI5NC4wIDc0NC4wLDI5NC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiNkNjI3MjgiIHN0cm9rZS13aWR0aD0iMiIvPgo8bGluZSB4MT0iNjAiIHkxPSIyMCIgeDI9Ijc4IiB5Mj0iMjAiIHN0cm9rZT0iI2Q2MjcyOCIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjx0ZXh0IHg9IjgyIiB5PSIyNCI+bmV2ZXIgbWFpbnRhaW5lZCAobGlmZXRpbWUgOCk8L3RleHQ+Cjxwb2x5bGluZSBwb2ludHM9IjYwLjAsNDguMyA4Mi44LDQ4LjMgMTA1LjYsNDguMyAxMjguNCw0OC4zIDE1MS4yLDQ4LjMgMTc0LjAsNDguMyAxOTYuOCw0OC4zIDIxOS42LDQ4LjMgMjQyLjQsNDguMyAyNjUuMiw0OC4zIDI4OC4wLDQ4LjMgMzEwLjgsNDguMyAzMzMuNiw0OC4zIDM1Ni40LDQ4LjMgMzc5LjIsNDguMyA0MDIuMCw0OC4zIDQyNC44LDQ4LjMgNDQ3LjYsNDguMyA0NzAuNCw0OC4zIDQ5My4yLDQ4LjMgNTE2LjAsNDguMyA1MzguOCw0OC4zIDU2MS42LDQ4LjMgNTg0LjQsNDguMyA2MDcuMiw0OC4zIDYzMC4wLDQ4LjMgNjUyLjgsNDguMyA2NzUuNiw0OC4zIDY5OC40LDQ4LjMgNzIxLjIsNDguMyA3NDQuMCw0OC4zIiBmaWxsPSJub25lIiBzdHJva2U9IiMyY2EwMmMiIHN0cm9rZS13aWR0aD0iMiIvPgo8bGluZSB4MT0iMjczLjgiIHkxPSIyMCIgeDI9IjI5MS44IiB5Mj0iMjAiIHN0cm9rZT0iIzJjYTAyYyIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjx0ZXh0IHg9IjI5NS44IiB5PSIyNCI+bWFpbnRhaW5lZCBhcyBmYXN0IGFzIGFsbG93ZWQsIDIgY29uc3RydWN0aW9uIHR1cm5zLCBsaWZldGltZSA4PC90ZXh0Pgo8cG9seWxpbmUgcG9pbnRzPSI2MC4wLDU4LjUgODIuOCw2OC44IDEwNS42LDc5LjAgMTI4LjQsODkuMiAxNTEuMiw5OS41IDE3NC4wLDEwOS43IDE5Ni44LDEyMC4wIDIxOS42LDEzMC4yIDI0Mi40LDE0MC40IDI2NS4yLDE1MC43IDI4OC4wLDE2MC45IDMxMC44LDE3MS4xIDMzMy42LDE4MS40IDM1Ni40LDE5MS42IDM3OS4yLDIwMS45IDQwMi4wLDIxMi4xIDQyNC44LDIyMi4zIDQ0Ny42LDIzMi42IDQ3MC40LDI0Mi44IDQ5My4yLDI1My4wIDUxNi4wLDI2My4zIDUzOC44LDI3My41IDU2MS42LDI3My41IDU4NC40LDI3My41IDYwNy4yLDI3My41IDYzMC4wLDI3My41IDY1Mi44LDI3My41IDY3NS42LDI3My41IDY5OC40LDI3My41IDcyMS4yLDI3My41IDc0NC4wLDI3My41IiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjc3YjQiIHN0cm9rZS13aWR0aD0iMiIvPgo8bGluZSB4MT0iNjk4LjQwMDAwMDAwMDAwMDEiIHkxPSIyMCIgeDI9IjcxNi40MDAwMDAwMDAwMDAxIiB5Mj0iMjAiIHN0cm9rZT0iIzFmNzdiNCIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjx0ZXh0IHg9IjcyMC40MDAwMDAwMDAwMDAxIiB5PSIyNCI+bWFpbnRhaW5lZCBhcyBmYXN0IGFzIGFsbG93ZWQsIDEyIGNvbnN0cnVjdGlvbiB0dXJucywgbGlmZXRpbWUgODwvdGV4dD4KPHBvbHlsaW5lIHBvaW50cz0iNjAuMCwyNjMuMyA3NDQuMCwyNjMuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOTk5IiBzdHJva2Utd2lkdGg9IjIiLz4KPGxpbmUgeDE9IjExMjkuMiIgeTE9IjIwIiB4Mj0iMTE0Ny4yIiB5Mj0iMjAiIHN0cm9rZT0iIzk5OSIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjx0ZXh0IHg9IjExNTEuMiIgeT0iMjQiPm9uZSBzbGljZSAoMS84KTogYmVsb3cgdGhpcyBhIGZhY3RvcnkgaXMgc2h1dCBkb3duPC90ZXh0Pgo8dGV4dCB4PSI0MDIuMCIgeT0iMzM0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj50dXJuPC90ZXh0Pgo8dGV4dCB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxNCAxNjUuMCkgcm90YXRlKC05MCkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPmNvbmRpdGlvbiBhZnRlciB0aGUgdHVybjwvdGV4dD4KPC9zdmc+"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=t3f6a7b8">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<div class="highlight"><pre><span></span><span class="c1"># Inline form: the sample's farm.</span>
+<span class="k">[[technology]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"farm"</span>
+<span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">unimproved_grain</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">unskilled_labor</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mf">0.5</span><span class="w"> </span><span class="p">}</span>
+<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"grain"</span>
+<span class="n">capacity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">12</span>
+<span class="n">capital</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">tools</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="p">}</span>
+<span class="n">construction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">unskilled_labor</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">8</span><span class="w"> </span><span class="p">}</span>
+<span class="n">construction_turns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+<span class="n">lifetime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span>
+
+<span class="c1"># Sub-table form. A well makes water from nothing and costs nothing to build.</span>
+<span class="k">[[technology]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"well"</span>
+<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"water"</span>
+<span class="n">capacity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">20</span>
+<span class="n">construction_turns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="n">lifetime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span>
+
+<span class="k">[technology.inputs]</span><span class="w">          </span><span class="c1"># empty: water from nothing</span>
+
+<span class="k">[technology.capital]</span>
+<span class="n">stone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span>
+
+<span class="k">[technology.construction]</span><span class="w">    </span><span class="c1"># empty</span>
+</pre></div>
+<p>Errors, each with file, line and column: a missing key; a bad or duplicate name; an <code>inputs</code>, <code>capital</code> or <code>construction</code> that is not a table; an <code>output</code> that is not text; a <code>capacity</code> or an amount that is not a number or not greater than 0 (<code>inf</code> included); a <code>construction_turns</code> or <code>lifetime</code> that is not a whole number or is below 1; an empty <code>capital</code>; the output good among the inputs (<code>key 'grain' in inputs of technology must not be the output good</code>); an unknown good; an unknown key; and a <code>[[technology]]</code> in <code>start/</code>. Unknown-good errors are skipped while part of the setting could not be read.</p>
+<p><strong>The sample setting</strong> defines three technologies, one production chain:</p>
+<table>
+<thead>
+<tr>
+<th>Technology</th>
+<th>Inputs per unit of output</th>
+<th>Output</th>
+<th>Capacity</th>
+<th>Capital</th>
+<th>Construction</th>
+<th>Construction turns</th>
+<th>Lifetime</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>farm</code></td>
+<td>1 <code>unimproved_grain</code>, 0.5 <code>unskilled_labor</code></td>
+<td><code>grain</code></td>
+<td>12</td>
+<td>4 <code>tools</code></td>
+<td>8 <code>unskilled_labor</code></td>
+<td>2</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>mine</code></td>
+<td>1 <code>unimproved_copper</code>, 1 <code>unskilled_labor</code></td>
+<td><code>copper</code></td>
+<td>2.5</td>
+<td>2 <code>tools</code></td>
+<td>4 <code>unskilled_labor</code></td>
+<td>2</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>toolmaker</code></td>
+<td>2 <code>copper</code>, 1.5 <code>unskilled_labor</code></td>
+<td><code>tools</code></td>
+<td>4</td>
+<td>3 <code>tools</code></td>
+<td>6 <code>unskilled_labor</code></td>
+<td>3</td>
+<td>24</td>
+</tr>
+</tbody>
+</table>
+<p>The capacities match what the center's deposits produce each turn (12 unimproved grain and 2.5 unimproved copper). Every technology is made of tools and built with labor, so the toolmaker's output is what keeps every factory, its own included, in repair. At the center's prices (see <a href="#Markets">Markets</a>) a farm and a mine clearly pay their way and a toolmaker only just; the margin test under <a href="#Businesses">Businesses</a> shows the numbers. The diagram shows the chain.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=t3c9d0e1">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4NDAiIGhlaWdodD0iMjE1IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiI+CjxkZWZzPjxtYXJrZXIgaWQ9ImFycm93IiBtYXJrZXJXaWR0aD0iOCIgbWFya2VySGVpZ2h0PSI4IiByZWZYPSI3IiByZWZZPSI0IiBvcmllbnQ9ImF1dG8iPjxwYXRoIGQ9Ik0wLDAgTDgsNCBMMCw4IHoiIGZpbGw9IiM0NTYiLz48L21hcmtlcj48L2RlZnM+Cjx0ZXh0IHg9IjEwIiB5PSIxOCIgZm9udC1zaXplPSIxMiI+ZGVwb3NpdHMgKHNoYWRlZCkgZmVlZCBmYWN0b3JpZXMgKGdyZWVuKTsgZXZlcnkgZmFjdG9yeSBpcyBtYWRlIG9mIHRvb2xzPC90ZXh0Pgo8cmVjdCB4PSIxMCIgeT0iMzAiIHdpZHRoPSIxNTAiIGhlaWdodD0iMzIiIHJ4PSI1IiBmaWxsPSIjZmRmM2QwIiBzdHJva2U9IiM0NTYiLz4KPHRleHQgeD0iODUuMCIgeT0iNTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPmFyYWJsZV9sYW5kIMOXIDM8L3RleHQ+CjxyZWN0IHg9IjE5MCIgeT0iMzAiIHdpZHRoPSIxNTAiIGhlaWdodD0iMzIiIHJ4PSI1IiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiLz4KPHRleHQgeD0iMjY1LjAiIHk9IjUxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj51bmltcHJvdmVkX2dyYWluPC90ZXh0Pgo8cmVjdCB4PSIzNzAiIHk9IjMwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iI2U2ZjRlNiIgc3Ryb2tlPSIjNDU2Ii8+Cjx0ZXh0IHg9IjQyMC4wIiB5PSI1MSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+ZmFybTwvdGV4dD4KPHJlY3QgeD0iNTAwIiB5PSIzMCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIzMiIgcng9IjUiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIvPgo8dGV4dCB4PSI1NTAuMCIgeT0iNTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPmdyYWluPC90ZXh0Pgo8cmVjdCB4PSI2MzAiIHk9IjMwIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSJub25lIi8+Cjx0ZXh0IHg9IjczMC4wIiB5PSI1MSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+dGhlIFBPUHMgZWF0IGl0PC90ZXh0Pgo8cmVjdCB4PSIxMCIgeT0iMTEwIiB3aWR0aD0iMTUwIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iI2ZkZjNkMCIgc3Ryb2tlPSIjNDU2Ii8+Cjx0ZXh0IHg9Ijg1LjAiIHk9IjEzMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y29wcGVyX29yZSDDlyAxPC90ZXh0Pgo8cmVjdCB4PSIxOTAiIHk9IjExMCIgd2lkdGg9IjE1MCIgaGVpZ2h0PSIzMiIgcng9IjUiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIvPgo8dGV4dCB4PSIyNjUuMCIgeT0iMTMxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj51bmltcHJvdmVkX2NvcHBlcjwvdGV4dD4KPHJlY3QgeD0iMzcwIiB5PSIxMTAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzIiIHJ4PSI1IiBmaWxsPSIjZTZmNGU2IiBzdHJva2U9IiM0NTYiLz4KPHRleHQgeD0iNDIwLjAiIHk9IjEzMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+bWluZTwvdGV4dD4KPHJlY3QgeD0iNTAwIiB5PSIxMTAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzIiIHJ4PSI1IiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiLz4KPHRleHQgeD0iNTUwLjAiIHk9IjEzMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y29wcGVyPC90ZXh0Pgo8cmVjdCB4PSI2MzAiIHk9IjExMCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIzMiIgcng9IjUiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIvPgo8dGV4dCB4PSI2ODAuMCIgeT0iMTMxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj50b29sbWFrZXI8L3RleHQ+CjxyZWN0IHg9Ijc2MCIgeT0iMTEwIiB3aWR0aD0iNzAiIGhlaWdodD0iMzIiIHJ4PSI1IiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiLz4KPHRleHQgeD0iNzk1LjAiIHk9IjEzMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+dG9vbHM8L3RleHQ+CjxsaW5lIHgxPSIxNjAiIHkxPSI0Ni4wIiB4Mj0iMTkwIiB5Mj0iNDYuMCIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuNSIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KPGxpbmUgeDE9IjM0MCIgeTE9IjQ2LjAiIHgyPSIzNzAiIHkyPSI0Ni4wIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS41IiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgo8bGluZSB4MT0iNDcwIiB5MT0iNDYuMCIgeDI9IjUwMCIgeTI9IjQ2LjAiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CjxsaW5lIHgxPSI2MDAiIHkxPSI0Ni4wIiB4Mj0iNjMwIiB5Mj0iNDYuMCIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuNSIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KPGxpbmUgeDE9IjE2MCIgeTE9IjEyNi4wIiB4Mj0iMTkwIiB5Mj0iMTI2LjAiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CjxsaW5lIHgxPSIzNDAiIHkxPSIxMjYuMCIgeDI9IjM3MCIgeTI9IjEyNi4wIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS41IiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgo8bGluZSB4MT0iNDcwIiB5MT0iMTI2LjAiIHgyPSI1MDAiIHkyPSIxMjYuMCIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuNSIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KPGxpbmUgeDE9IjYwMCIgeTE9IjEyNi4wIiB4Mj0iNjMwIiB5Mj0iMTI2LjAiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CjxsaW5lIHgxPSI3MzAiIHkxPSIxMjYuMCIgeDI9Ijc2MCIgeTI9IjEyNi4wIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS41IiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgo8cG9seWxpbmUgcG9pbnRzPSI3OTUsMTQyIDc5NSwxODUgNDIwLDE4NSA0MjAsMTQ2IiBmaWxsPSJub25lIiBzdHJva2U9IiNhNDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtZGFzaGFycmF5PSI1IDQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CjxsaW5lIHgxPSI0MjAiIHkxPSIxODUiIHgyPSI0MjAiIHkyPSI2NiIgc3Ryb2tlPSIjYTQwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWRhc2hhcnJheT0iNSA0IiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIgb3BhY2l0eT0iMC41Ii8+CjxsaW5lIHgxPSI2ODAiIHkxPSIxODUiIHgyPSI2ODAiIHkyPSIxNDYiIHN0cm9rZT0iI2E0MCIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1kYXNoYXJyYXk9IjUgNCIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KPHRleHQgeD0iNDMwIiB5PSIyMDUiIGZpbGw9IiNhNDAiIGZvbnQtc2l6ZT0iMTEiPnRvb2xzIGFyZSB0aGUgY2FwaXRhbCBvZiBldmVyeSBmYWN0b3J5OiB3ZWFyIHRha2VzIHRoZW0sIG1haW50ZW5hbmNlIHB1dHMgdGhlbSBiYWNrPC90ZXh0Pgo8L3N2Zz4="/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=t3b2c3d4">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>More detail: <a href="docs/technologies.md">docs/technologies.md</a> for the keys and every error message, <a href="docs/production.md">docs/production.md</a> for the exact rules of running, wear and maintenance, and <a href="docs/goods.md">docs/goods.md</a> for the goods a technology names.</p>
+<h3 id="Businesses">Businesses<a class="anchor-link" href="#Businesses">¶</a></h3><p>A <strong>business</strong> is a named actor on one hex. It holds goods and cash, owns some of the deposits on its hex and the factories there, and is controlled by a <strong>decider</strong>: a program that chooses, every turn, what the business sells, buys, runs and maintains. Businesses are starting state, so they go in <code>start/</code> as <code>[[business]]</code> sections (in <code>rules/</code> it is an error). Six keys, all required:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Lowercase snake_case, unique among businesses. Factories name their owner, which is why businesses have names</td>
+</tr>
+<tr>
+<td><code>q</code>, <code>r</code></td>
+<td>A hex that exists on the map, as for deposits and POPs</td>
+</tr>
+<tr>
+<td><code>inventory</code></td>
+<td><code>good name = amount</code> pairs: what the business holds at turn 0, each amount greater than 0. May be empty (<code>{}</code>) but must be written</td>
+</tr>
+<tr>
+<td><code>deposits</code></td>
+<td><code>resource type = count</code> pairs: how many deposits of each type on its hex the business owns, each a whole number of 1 or more. May be empty (<code>{}</code>) but must be written</td>
+</tr>
+<tr>
+<td><code>decider</code></td>
+<td>The name of the decider that controls it. <code>arithmetic</code> is the only one so far</td>
+</tr>
+</tbody>
+</table>
+<p>Things worth knowing:</p>
+<ul>
+<li><strong>Cash is just the hex's currency in the inventory.</strong> There is no separate cash key, and a business that lists none starts with no cash. A business needs cash to buy what its deposits don't supply (labor, say) until its own sales come in: in the sample the farm starts with 100 silver against about 15 silver of purchases a turn.</li>
+<li><strong>One hex.</strong> A business sits on one hex and can own only deposits and factories on that hex. A hex can hold several businesses, and a business can sit on a hex with no market; it then trades nothing, but still runs its factories from what it holds.</li>
+<li><strong>Ownership is written on the business</strong>, not on the <code>[[deposit]]</code> entry, which doesn't change. Deposits of one type on one hex are identical, so it doesn't matter which units a business gets. The loader hands them out in order, with businesses taken in file order, so the same folder always gives the same owners. Claiming more deposits than the hex has left unowned is an error whose message says how many were available.</li>
+<li><strong>The decider name must be one the Python package knows.</strong> The loader checks only that it is a valid name. When the setting is loaded in the developer UI or run with <code>check --turns</code>, one <code>python -m policyspace &lt;name&gt;</code> process is started for each distinct name, and a name the package doesn't know fails the load (see <a href="#Checking-a-setting">Checking a setting</a>). Several businesses can share one decider; the sample's three all name <code>arithmetic</code>.</li>
+<li>Both TOML table forms work.</li>
+<li>In play, a business trades and runs its factories every turn; see <a href="#How-businesses-trade-and-produce">How businesses trade and produce</a>.</li>
+</ul>
+<div class="highlight"><pre><span></span><span class="c1"># Inline form: the sample's farm, which owns two of the center's three arable land deposits.</span>
+<span class="k">[[business]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"center_farm"</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">inventory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">silver</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="p">}</span>
+<span class="n">deposits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">arable_land</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span>
+<span class="n">decider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arithmetic"</span>
+
+<span class="c1"># Sub-table form. A smithy with some copper in stock and no deposits.</span>
+<span class="k">[[business]]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"smithy"</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">decider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arithmetic"</span>
+
+<span class="k">[business.inventory]</span>
+<span class="n">silver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40</span>
+<span class="n">copper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span>
+
+<span class="k">[business.deposits]</span><span class="w">        </span><span class="c1"># empty: owns no deposit</span>
+</pre></div>
+<p>Errors, each with file, line and column: a missing key; a bad or duplicate name; a <code>decider</code> that is not text or not a valid name; bad coordinates or coordinates with no hex; an <code>inventory</code> or <code>deposits</code> that is not a table; an inventory amount that is not a number or not greater than 0; a deposit count that is not a whole number or is below 1; an unknown good in <code>inventory</code>; an unknown resource type in <code>deposits</code>; more deposits claimed than the hex has unowned (<code>key 'arable_land' in deposits of business claims more deposits than the hex has unowned (3 claimed, 1 available)</code>); an unknown key; and a <code>[[business]]</code> in <code>rules/</code>. The reference checks and the handing out of deposits are skipped while part of the setting could not be read. A misspelled decider name is not a loader error: it is caught when the deciders are started, by the window and by <code>check --turns</code>, not by plain <code>check</code>.</p>
+<p><strong>How deposits are handed out.</strong> Suppose a hex has three deposits of one type and two businesses on it, in file order, claim 2 and 1. The first gets two units, the second the third; a third business claiming one more gets the error above with <code>0 available</code>. File order decides who gets which unit, and since the units are identical it never matters.</p>
+<h4 id="How-the-arithmetic-rule-decides">How the arithmetic rule decides<a class="anchor-link" href="#How-the-arithmetic-rule-decides">¶</a></h4><p>Every turn each business is shown its circumstances (its hex's prices, its stockpile and cash, its factories with their technologies and condition, its deposits) and its decider answers with a <strong>decision</strong>: what to offer for sale, what to bid for, and for each factory the share of its capacity to run and the share of its capital to replenish. The only decider so far, <code>arithmetic</code>, plans each business from that view alone and remembers nothing between turns. For each kind of factory a business owns, it:</p>
+<ul>
+<li>checks whether <strong>one turn at full capacity pays</strong> at the hex's posted prices: what the output sells for, minus the inputs, minus the steady upkeep (one turn's share of the factory's capital and construction goods);</li>
+<li>if it pays, or breaks even, <strong>runs the factory at capacity and maintains it</strong> back to full condition (as far as one turn's maintenance allows, so a worn factory catches up over a few turns, and a shut-down one is revived slice by slice); if it doesn't pay, or if any good involved has no price on the hex, <strong>leaves the factory idle and unmaintained</strong>, so it slowly runs down;</li>
+<li><strong>sells everything it holds that the plan doesn't need</strong>, last turn's output included, and <strong>bids for what the plan needs that it doesn't hold</strong>;</li>
+<li>if those purchases cost more than its cash plus what its sales will bring in, <strong>scales every factory's run and maintenance down by one proportion</strong> so that they fit;</li>
+<li>on a hex with no market, does nothing.</li>
+</ul>
+<p>Every decision comes with a short written explanation of this arithmetic, its <strong>trace</strong>, which the developer UI shows in the business's section. The sample's farm at turn 0: grain sells at 2, so 12 grain bring 24; the inputs (12 unimproved grain at 0.5 and 6 labor at 1) cost 12; the upkeep (4 tools at 12 and 8 labor at 1, spread over the farm's 8-turn lifetime) costs 7 a turn. The margin is 5, so the farm runs. It holds 8 unimproved grain from its own fields, so it buys 4 more, plus 7 labor and half a tool, for 15 of its 100 silver:</p>
+<pre><code>farm: revenue 24; inputs 12; maintenance 7; margin 5: run and maintain
+factory #0 (farm, condition 1): run 1, maintenance 0.125
+budget 100 = cash 100 + offers 0; bids cost 15: within budget
+</code></pre>
+<p>The toolmaker is the opposite edge: its margin is 0.25 on a revenue of 48, so a small change in the price of copper or tools would idle it. The table below is computed from the sample's own files, so it changes if you edit them.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=t3e5f6a7">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>technology    revenue   inputs   upkeep   margin   verdict
+farm               24       12        7        5   run and maintain
+mine             12.5        5      3.5        4   run and maintain
+toolmaker          48       46     1.75     0.25   run and maintain
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=t3a8b9c0">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p><strong>The sample setting</strong> places three businesses, all on the center hex <code>(0, 0)</code> and all with decider <code>arithmetic</code>, one for each technology in the chain:</p>
+<table>
+<thead>
+<tr>
+<th>Business</th>
+<th>Starting inventory</th>
+<th>Owns</th>
+<th>Factory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>center_farm</code></td>
+<td>100 <code>silver</code></td>
+<td>2 of the center's 3 <code>arable_land</code> deposits</td>
+<td>a <code>farm</code></td>
+</tr>
+<tr>
+<td><code>center_mine</code></td>
+<td>50 <code>silver</code></td>
+<td>the center's <code>copper_ore</code> deposit</td>
+<td>a <code>mine</code>, starting worn</td>
+</tr>
+<tr>
+<td><code>center_toolmaker</code></td>
+<td>200 <code>silver</code></td>
+<td>no deposit: it buys its copper</td>
+<td>a <code>toolmaker</code></td>
+</tr>
+</tbody>
+</table>
+<p>The center's third arable land deposit, and every deposit on other hexes, stay unowned. So each turn the center's 14.5 units of deposit output are split three ways: 8 unimproved grain to <code>center_farm</code>, 2.5 unimproved copper to <code>center_mine</code>, and 4 unimproved grain to the hex's stockpile of unowned goods, which is all the hex itself shows (see <a href="#The-developer-UI">The developer UI</a>).</p>
+<p>More detail: <a href="docs/businesses.md">docs/businesses.md</a> for the keys, every error message, how deposits are handed out and the business stockpiles; <a href="docs/python.md#the-arithmetic-rule-arithmeticpy">docs/python.md</a> for the exact arithmetic rule and how to read its trace; <a href="docs/decider.md">docs/decider.md</a> for what a decider is shown and what it may answer; <a href="docs/decider-host.md">docs/decider-host.md</a> for how the deciders are started and talked to; and <a href="docs/currency.md">docs/currency.md</a> for why cash is just the hex's currency.</p>
+<h3 id="Factories">Factories<a class="anchor-link" href="#Factories">¶</a></h3><p>A <strong>factory</strong> is an asset on a hex that runs one technology and belongs to one business. Factories are starting state, so they go in <code>start/</code> as <code>[[factory]]</code> sections (in <code>rules/</code> it is an error). Four keys are required and two are optional:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>q</code>, <code>r</code></td>
+<td>A hex that exists on the map. For now it must be the owner's hex</td>
+</tr>
+<tr>
+<td><code>technology</code></td>
+<td>The name of a technology from <code>rules/</code></td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td>The name of a business. Every factory has exactly one owner</td>
+</tr>
+<tr>
+<td><code>condition</code></td>
+<td>Optional, default 1. How much of its technology's capital the factory holds, as a share from just above 0 up to 1</td>
+</tr>
+<tr>
+<td><code>count</code></td>
+<td>Optional, 1 to 1,000,000, default 1. Places that many identical factories at once, the same rule as a deposit's <code>count</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Factories have no names.</strong> Each gets a number in load order (file order, then entry order, with an entry's <code>count</code> copies numbered consecutively), so the same folder always numbers them the same way. The deciders and the developer UI refer to a factory by that number.</li>
+<li><strong>Condition is one number, not a table of goods.</strong> Wear and maintenance always change a factory's capital as a whole, in the technology's own proportions, so the share is all there is to store. The goods in a factory are the technology's capital times the condition: the sample's mine at 0.75 holds 1.5 of its 2 tools. A condition of 1 is a factory in full repair; a factory can't be placed at 0. <strong>The condition changes during play</strong>: wear takes a slice every turn and maintenance puts back what the business pays for, so a fresh world's factories are already past turn 0's wear (see <a href="#Running-a-setting">Running a setting</a>). A factory nobody maintains wears out in <code>lifetime</code> turns.</li>
+<li>A hex or a business may have any number of factories, of any technologies. Nothing checks that a factory makes economic sense: whether its owner can get its inputs or sell its output is the owner's problem.</li>
+<li>The factory must be on its owner's hex. This restriction goes once trade between hexes exists.</li>
+</ul>
+<div class="highlight"><pre><span></span><span class="c1"># The sample's mine: three quarters of its capital left.</span>
+<span class="k">[[factory]]</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">technology</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mine"</span>
+<span class="n">owner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"center_mine"</span>
+<span class="n">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.75</span>
+
+<span class="c1"># Two identical farms in full condition.</span>
+<span class="k">[[factory]]</span>
+<span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">technology</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"farm"</span>
+<span class="n">owner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"center_farm"</span>
+<span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+</pre></div>
+<p>Errors, each with file, line and column: a missing <code>q</code>, <code>r</code>, <code>technology</code> or <code>owner</code>; bad coordinates or coordinates with no hex; a <code>technology</code> or <code>owner</code> that is not text; an unknown technology or business; a factory that is not on its owner's hex (<code>factory at (1, 0) is not on the hex of its owner 'farm' at (0, 0)</code>); a <code>condition</code> that is not a number, is 0 or below, above 1, infinite or not a number; a <code>count</code> that is not whole or is out of range; an unknown key; and a <code>[[factory]]</code> in <code>rules/</code>. The reference checks, the owner's-hex check included, are skipped while part of the setting could not be read.</p>
+<p><strong>The sample setting</strong> places one factory per business on the center hex, each running the technology its business is named for:</p>
+<table>
+<thead>
+<tr>
+<th>Number</th>
+<th>Technology</th>
+<th>Owner</th>
+<th>Condition at turn 0</th>
+<th>Capital held</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>farm</code></td>
+<td><code>center_farm</code></td>
+<td>1</td>
+<td>4 <code>tools</code></td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>mine</code></td>
+<td><code>center_mine</code></td>
+<td>0.75</td>
+<td>1.5 of 2 <code>tools</code>: six turns of its eight-turn lifetime</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>toolmaker</code></td>
+<td><code>center_toolmaker</code></td>
+<td>1</td>
+<td>3 <code>tools</code></td>
+</tr>
+</tbody>
+</table>
+<p>The mine starts worn so that the sample has a factory to repair: under the arithmetic rule it is maintained back to full in turn 0 (see <a href="#How-businesses-trade-and-produce">How businesses trade and produce</a>). The diagram shows the center hex with its deposits, POPs, businesses and factories.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noInput" id="cell-id=t3d1e2f3">
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-RenderedSVG jp-OutputArea-output" data-mime-type="image/svg+xml" tabindex="0">
+<img alt="No description has been provided for this image" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNTciIGhlaWdodD0iMzQ0IiB2aWV3Qm94PSItMTc5IC0xODQgMzU3IDM0NCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiPgo8dGV4dCB4PSItMTc1IiB5PSItMTY4IiBmb250LXNpemU9IjEyIj5xIGdyb3dzIGVhc3QsIHIgZ3Jvd3Mgc291dGg8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTM0LjYsLTE0MC4wIC0zNC42LC0xMDAuMCAtNjkuMywtODAuMCAtMTAzLjksLTEwMC4wIC0xMDMuOSwtMTQwLjAgLTY5LjMsLTE2MC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9Ii02OS4zIiB5PSItMTIyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIC0yPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjM0LjYsLTE0MC4wIDM0LjYsLTEwMC4wIDAuMCwtODAuMCAtMzQuNiwtMTAwLjAgLTM0LjYsLTE0MC4wIC0wLjAsLTE2MC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjAuMCIgeT0iLTEyMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAtMjwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIxMDMuOSwtMTQwLjAgMTAzLjksLTEwMC4wIDY5LjMsLTgwLjAgMzQuNiwtMTAwLjAgMzQuNiwtMTQwLjAgNjkuMywtMTYwLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iNjkuMyIgeT0iLTEyMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yLCAtMjwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSItNjkuMywtODAuMCAtNjkuMywtNDAuMCAtMTAzLjksLTIwLjAgLTEzOC42LC00MC4wIC0xMzguNiwtODAuMCAtMTAzLjksLTEwMC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9Ii0xMDMuOSIgeT0iLTYyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0xLCAtMTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIwLjAsLTgwLjAgMC4wLC00MC4wIC0zNC42LC0yMC4wIC02OS4zLC00MC4wIC02OS4zLC04MC4wIC0zNC42LC0xMDAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItMzQuNiIgeT0iLTYyLjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjAsIC0xPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjY5LjMsLTgwLjAgNjkuMywtNDAuMCAzNC42LC0yMC4wIC0wLjAsLTQwLjAgMC4wLC04MC4wIDM0LjYsLTEwMC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjM0LjYiIHk9Ii02Mi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAtMTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIxMzguNiwtODAuMCAxMzguNiwtNDAuMCAxMDMuOSwtMjAuMCA2OS4zLC00MC4wIDY5LjMsLTgwLjAgMTAzLjksLTEwMC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjEwMy45IiB5PSItNjIuMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MiwgLTE8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iLTEwMy45LC0yMC4wIC0xMDMuOSwyMC4wIC0xMzguNiw0MC4wIC0xNzMuMiwyMC4wIC0xNzMuMiwtMjAuMCAtMTM4LjYsLTQwLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTEzOC42IiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMiwgMDwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSItMzQuNiwtMjAuMCAtMzQuNiwyMC4wIC02OS4zLDQwLjAgLTEwMy45LDIwLjAgLTEwMy45LC0yMC4wIC02OS4zLC00MC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9Ii02OS4zIiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMSwgMDwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIzNC42LC0yMC4wIDM0LjYsMjAuMCAwLjAsNDAuMCAtMzQuNiwyMC4wIC0zNC42LC0yMC4wIC0wLjAsLTQwLjAiIGZpbGw9IiNlNmY0ZTYiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMC4wIiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4wLCAwPC90ZXh0Pgo8dGV4dCB4PSIwLjAiIHk9IjkuMCIgZm9udC1zaXplPSI4LjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMyNjQiPmZhcm0sIG1pbmUsIHRvb2xtYWtlcjwvdGV4dD4KPHRleHQgeD0iMC4wIiB5PSIxOS4wIiBmb250LXNpemU9IjguNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzI2NCI+MyBidXNpbmVzc2VzPC90ZXh0Pgo8dGV4dCB4PSIwLjAiIHk9IjI5LjAiIGZvbnQtc2l6ZT0iOC41IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjMjY0Ij40IGRlcG9zaXRzLCAyIFBPUHM8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iMTAzLjksLTIwLjAgMTAzLjksMjAuMCA2OS4zLDQwLjAgMzQuNiwyMC4wIDM0LjYsLTIwLjAgNjkuMywtNDAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSI2OS4zIiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAwPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjE3My4yLC0yMC4wIDE3My4yLDIwLjAgMTM4LjYsNDAuMCAxMDMuOSwyMC4wIDEwMy45LC0yMC4wIDEzOC42LC00MC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjEzOC42IiB5PSItMi4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yLCAwPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii02OS4zLDQwLjAgLTY5LjMsODAuMCAtMTAzLjksMTAwLjAgLTEzOC42LDgwLjAgLTEzOC42LDQwLjAgLTEwMy45LDIwLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iLTEwMy45IiB5PSI1OC4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4tMiwgMTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIwLjAsNDAuMCAwLjAsODAuMCAtMzQuNiwxMDAuMCAtNjkuMyw4MC4wIC02OS4zLDQwLjAgLTM0LjYsMjAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItMzQuNiIgeT0iNTguMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+LTEsIDE8L3RleHQ+Cjxwb2x5Z29uIHBvaW50cz0iNjkuMyw0MC4wIDY5LjMsODAuMCAzNC42LDEwMC4wIC0wLjAsODAuMCAwLjAsNDAuMCAzNC42LDIwLjAiIGZpbGw9IiNlOGYwZmEiIHN0cm9rZT0iIzQ1NiIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KPHRleHQgeD0iMzQuNiIgeT0iNTguMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MCwgMTwvdGV4dD4KPHBvbHlnb24gcG9pbnRzPSIxMzguNiw0MC4wIDEzOC42LDgwLjAgMTAzLjksMTAwLjAgNjkuMyw4MC4wIDY5LjMsNDAuMCAxMDMuOSwyMC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjEwMy45IiB5PSI1OC4wIiBmb250LXNpemU9IjExIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xLCAxPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9Ii0zNC42LDEwMC4wIC0zNC42LDE0MC4wIC02OS4zLDE2MC4wIC0xMDMuOSwxNDAuMCAtMTAzLjksMTAwLjAgLTY5LjMsODAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSItNjkuMyIgeT0iMTE4LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0yLCAyPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjM0LjYsMTAwLjAgMzQuNiwxNDAuMCAwLjAsMTYwLjAgLTM0LjYsMTQwLjAgLTM0LjYsMTAwLjAgLTAuMCw4MC4wIiBmaWxsPSIjZThmMGZhIiBzdHJva2U9IiM0NTYiIHN0cm9rZS13aWR0aD0iMS4yIi8+Cjx0ZXh0IHg9IjAuMCIgeT0iMTE4LjAiIGZvbnQtc2l6ZT0iMTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPi0xLCAyPC90ZXh0Pgo8cG9seWdvbiBwb2ludHM9IjEwMy45LDEwMC4wIDEwMy45LDE0MC4wIDY5LjMsMTYwLjAgMzQuNiwxNDAuMCAzNC42LDEwMC4wIDY5LjMsODAuMCIgZmlsbD0iI2U4ZjBmYSIgc3Ryb2tlPSIjNDU2IiBzdHJva2Utd2lkdGg9IjEuMiIvPgo8dGV4dCB4PSI2OS4zIiB5PSIxMTguMCIgZm9udC1zaXplPSIxMSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MCwgMjwvdGV4dD4KPC9zdmc+"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=t3f4a5b6">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>More detail: <a href="docs/factories.md">docs/factories.md</a> for the keys, every error message, condition and count; <a href="docs/technologies.md">docs/technologies.md</a> for the capital bundle the condition is a share of; and <a href="docs/production.md">docs/production.md</a> for wear and maintenance.</p>
+<h3 id="Running-a-setting">Running a setting<a class="anchor-link" href="#Running-a-setting">¶</a></h3><p>A loaded setting becomes a running <strong>world</strong>. The rules stay fixed; the world holds the clock (starting at turn 0), a stockpile of unowned goods on every hex, for every POP its current size and its own stockpile, for every business its own stockpile (filled from its inventory before turn 0), and every factory's condition. Each turn has three parts:</p>
 <ol>
-<li><strong>Emit and endow.</strong> At the start of the turn every deposit produces its resource type's <code>output</code> of its good, into the unowned stockpile of its hex (deposits have no owners yet). Then every POP receives its type's endowment times its size, into its own stockpile.</li>
-<li><strong>Trade, consume and grow.</strong> On every hex, each POP sells the market what it does not mean to keep, buys what it wants with the proceeds, and consumes. Then every POP's size changes by its growth rate. The rest of this section explains it.</li>
-<li><strong>Perish.</strong> At the end of the turn, goods that have reached their limit are removed from every stockpile, the hexes' and the POPs'.</li>
+<li><strong>Emit and endow.</strong> At the start of the turn every deposit produces its resource type's <code>output</code> of its good: into its owner's stockpile if a business owns it, otherwise into the hex's stockpile of unowned goods. Then every POP receives its type's endowment times its size, into its own stockpile.</li>
+<li><strong>Decide, trade, produce and grow.</strong> First every business's decider is asked what the business should do this turn. Then, on every hex, everyone sells before anyone buys: each POP sells the market what it does not mean to keep and each business what its decision offers; then each POP buys what it wants with the proceeds and each business what its decision bids for, as far as its cash allows. Each POP consumes. Each business then runs, wears and maintains its factories. Finally every POP's size changes by its growth rate. The rest of this section explains it.</li>
+<li><strong>Perish.</strong> At the end of the turn, goods that have reached their limit are removed from every stockpile: the hexes', the POPs' and the businesses'.</li>
 </ol>
-<p>The world is observed after part 2 and before part 3, so what you see at any turn is the world after that turn's trading and growth, with nothing perished yet. That includes turn 0: a freshly loaded world has already run turn 0's trade and growth, which is why its POPs are not at the sizes written in the setting (see <a href="#Turn-reports">Turn reports</a> below).</p>
+<p>The world is observed after part 2 and before part 3, so what you see at any turn is the world after that turn's decisions, trading, production and growth, with nothing perished yet. That includes turn 0: a freshly loaded world has already run turn 0, which is why its POPs are not at the sizes written in the setting and its factories have already run (or, for an idle business, worn) once (see <a href="#Turn-reports">Turn reports</a> below).</p>
 <p><code>perishes_after</code> takes effect in part 3. With 1, output is usable during the turn it appears and gone when it ends. With 3, it is gone at the end of the third turn it exists. Goods without <code>perishes_after</code> last forever and accumulate. (<code>movable</code> still has no effect.)</p>
 <p>A <strong>stockpile</strong> holds the total of each good, and for each total, how much perishes at the end of which turn. For example, a good with <code>perishes_after = 3</code> produced at 5 per turn:</p>
 <table>
@@ -8559,7 +9005,7 @@ a.anchor-link {
 <li><strong>Income is everything the POP holds</strong>, valued at the hex's prices: this turn's endowment, plus any durable goods it still has, plus any currency left over from earlier turns.</li>
 <li><strong>Subsistence comes first.</strong> The POP first covers every utility good's subsistence amount, times its size. Whatever income is left is split between its utility goods by their shares. Goods the hex does not price are left out of this sum: a held one is simply kept, and a wanted one cannot be bought.</li>
 <li><strong>Below subsistence, everything is scaled down.</strong> If the income cannot cover the subsistence bundle, the POP spends all of it and gets the same fraction of every subsistence amount, leisure included: a peasant facing dear grain sells more of its labor than it would like to keep and still goes short of grain.</li>
-<li><strong>Sales first, then purchases.</strong> On each hex every POP sells before any POP buys. With today's fixed-price market this changes nothing; it is there so that the later live market, which can run short, is fair.</li>
+<li><strong>Sales first, then purchases.</strong> On each hex every sale, by POPs and businesses alike, happens before any purchase. With today's fixed-price market this changes nothing; it is there so that the later live market, which can run short, is fair.</li>
 <li><strong>Then it consumes</strong> the goods in its utility, up to what it wanted. The labor it kept is its leisure, consumed the same way. Goods outside its utility are never consumed: they are sold if the hex prices them and kept if it does not.</li>
 <li><strong>Leftover currency stays.</strong> A POP spends essentially all its income; floating-point rounding can leave a tiny sliver of currency, which stays in its stockpile and counts as income next turn. Nothing is rounded.</li>
 <li><strong>No market, no trade.</strong> A POP on a hex with no market keeps what it has and consumes what it can. The sample's north-east peasant consumes all its labor as leisure and goes without grain every turn.</li>
@@ -8639,6 +9085,82 @@ a.anchor-link {
 </div>
 </div>
 </div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=t3b7c8d9">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h4 id="How-businesses-trade-and-produce">How businesses trade and produce<a class="anchor-link" href="#How-businesses-trade-and-produce">¶</a></h4><p>Each turn, after the deposits have produced and the POPs have been endowed, every business's decider is asked for a <strong>decision</strong>: what to offer for sale, what to bid for, and for each factory the share of its capacity to run and the share of its capital to replenish (see <a href="#How-the-arithmetic-rule-decides">How the arithmetic rule decides</a>). The engine checks the decision against what the business actually has: a factory it doesn't own, or a good its hex doesn't price, gets the whole decision <strong>refused</strong>, and the business does nothing that turn. A valid decision is then acted on:</p>
+<ul>
+<li><strong>The business sells its offers and buys its bids on its hex's market, in the same round as the POPs.</strong> Every sale on the hex happens before any purchase. A business sells what it offered, or everything it holds of that good if it offered more.</li>
+<li><strong>Purchases are capped by cash.</strong> It buys what it bid for at the posted prices, unless that costs more than the cash it has after its sales. Then <strong>every purchase is cut by the same proportion</strong>: a business with 10 silver bidding for goods worth 50 buys a fifth of each, so it ends up with a smaller set of goods in the proportions it asked for, rather than all of one good and none of another.</li>
+<li><strong>Then its factories run, wear and are maintained</strong>, in that order, from the business's own stockpile. A factory holding less than one slice makes nothing. If the business is short of an input or a maintenance good (because a cash cut left it short, say), the factories that need it run, or are maintained, less, in proportion to the shortage, and a factory short of two goods is cut by the worse one. The engine never changes the fractions the decider asked for; the shortage does, and both numbers are recorded, so a cut always shows as "asked" above "done".</li>
+<li><strong>Output is sold the next turn.</strong> What factories make goes into the business's stockpile and is offered at the next turn's decision. So at turn 0 no business has anything of its own to sell, and from turn 1 on each sells last turn's output. Labor a business buys is used the same turn; anything left of it perishes at the end of the turn like any labor.</li>
+<li><strong>A business that decides nothing does nothing, but its factories still wear.</strong> That covers a business whose decision was refused, one whose decider failed this turn (see <a href="#Checking-a-setting">Checking a setting</a>), and every business when nothing is running the deciders at all. Its factories lose one slice every turn and eventually shut down.</li>
+<li><strong>A business on a hex with no market</strong> trades nothing and runs its factories from what it holds: its deposits' output and its starting inventory.</li>
+</ul>
+<p>The sample's three businesses under the arithmetic rule, at the center's prices (unimproved grain 0.5, labor 1, grain 2, copper 5, tools 12 silver):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>center_farm</code></th>
+<th><code>center_mine</code></th>
+<th><code>center_toolmaker</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Holds at turn 0's decision</td>
+<td>8 unimproved grain, 100 silver</td>
+<td>2.5 unimproved copper, 50 silver</td>
+<td>200 silver</td>
+</tr>
+<tr>
+<td>Sells at turn 0</td>
+<td>nothing</td>
+<td>nothing</td>
+<td>nothing</td>
+</tr>
+<tr>
+<td>Buys at turn 0</td>
+<td>4 unimproved grain, 7 labor, 0.5 tools</td>
+<td>4 labor, 0.75 tools</td>
+<td>8 copper, 6.25 labor, 0.125 tools</td>
+</tr>
+<tr>
+<td>Its factory at turn 0</td>
+<td>runs at capacity: 12 grain from 12 unimproved grain and 6 labor; wears 1/8; maintained by 1/8, back to 1</td>
+<td>runs at capacity: 2.5 copper; wears 1/8; maintained by 3/8, from 0.75 to 1</td>
+<td>runs at capacity: 4 tools from 8 copper and 6 labor; wears 1/24; maintained by 1/24, back to 1</td>
+</tr>
+<tr>
+<td>Cash after turn 0</td>
+<td>85 silver</td>
+<td>37 silver</td>
+<td>152.25 silver</td>
+</tr>
+<tr>
+<td>Sells at turn 1</td>
+<td>12 grain</td>
+<td>2.5 copper</td>
+<td>3.875 tools (it keeps 0.125 for its own upkeep)</td>
+</tr>
+<tr>
+<td>Cash after turn 1</td>
+<td>94 silver</td>
+<td>43.5 silver</td>
+<td>152.5 silver</td>
+</tr>
+</tbody>
+</table>
+<p>From turn 1 on every turn repeats, each business gets a little richer, and every factory stays at full condition. The developer UI shows these numbers when you select the center hex (see <a href="#The-developer-UI">The developer UI</a>).</p>
+<p><strong>A worked example of the cash cut.</strong> A business with 10 silver bids for 10 labor (at 1 silver) and 4 tools (at 10), costing 50. Every bid is cut to a fifth: it buys 2 labor and 0.8 tools, spending all 10 silver. Its smelter, asked to run at full capacity, finds a fifth of the labor it needs and runs at a fifth, while the record still shows the full run it asked for. The arithmetic rule scales its own plan down to its budget before bidding, so in the sample this cut never happens; it is a safety net under any decider that asks for too much.</p>
+<p>More detail: <a href="docs/trade.md">docs/trade.md</a> for the round, the cash cap and when the factories run; <a href="docs/production.md">docs/production.md</a> for running, wear and maintenance; <a href="docs/decider.md">docs/decider.md</a> for the decision, its checks and why asking for too much is allowed; and <a href="docs/decider-host.md">docs/decider-host.md</a> for how the deciders are asked.</p>
+</div>
+</div>
+</div>
+</div>
 <div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f6b8d0e2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
@@ -8666,7 +9188,7 @@ a.anchor-link {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h4 id="Turn-reports">Turn reports<a class="anchor-link" href="#Turn-reports">¶</a></h4><p>Each turn produces a report with totals over the whole map: per good, what <code>perished</code> when the previous turn ended, what deposits <code>emitted</code>, what POPs were <code>endowed</code>, and what POPs <code>sold</code>, <code>bought</code> and <code>consumed</code>; then the total <code>population</code> after growth. Each list is in the order the goods are defined (so the sample's <code>unskilled_labor</code> comes first and <code>copper</code> before <code>grain</code>), lists only goods with an amount, and prints <code>nothing</code> when empty. The sample over turns 0 to 2, as the checker prints it (the next section gives the command):</p>
+<h4 id="Turn-reports">Turn reports<a class="anchor-link" href="#Turn-reports">¶</a></h4><p>Each turn produces a report with totals over the whole map: per good, what <code>perished</code> when the previous turn ended, what deposits <code>emitted</code>, what POPs were <code>endowed</code>, and what POPs <code>sold</code>, <code>bought</code> and <code>consumed</code>; then the total <code>population</code> after growth; then four business totals, kept apart from the POPs' so that the POP numbers keep their meaning: what <code>businesses sold</code> and <code>businesses bought</code>, what their factories <code>produced</code>, and what the factories <code>used</code> (inputs and maintenance goods together). Each list is in the order the goods are defined (so the sample's <code>unskilled_labor</code> comes first, <code>copper</code> before <code>grain</code>, and <code>tools</code> last), lists only goods with an amount, and prints <code>nothing</code> when empty. If a decider failed during the turn, a line saying so follows the turn's line (see <a href="#Checking-a-setting">Checking a setting</a>). The sample over turns 0 to 2, as the checker prints it (the next section gives the command; it starts the sample's Python decider, so it needs the environment from <a href="#Project-overview">Project overview</a>):</p>
 </div>
 </div>
 </div>
@@ -8677,10 +9199,10 @@ a.anchor-link {
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops
-Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666
-Turn 1: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4194.466666666667 unskilled_labor; sold 2955.6459999999997 unskilled_labor; bought 5.15 copper, 1464.9479999999999 grain; consumed 1238.8206666666667 unskilled_labor, 5.15 copper, 1464.9479999999999 grain; population 429.2982444444444
-Turn 2: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4292.982444444444 unskilled_labor; sold 3034.7550599999995 unskilled_labor; bought 5.304500000000001 copper, 1504.1162799999997 grain; consumed 1258.2273844444444 unskilled_labor, 5.304500000000001 copper, 1504.1162799999997 grain; population 439.55036096296294
+<pre>Loaded setting 'Sample Setting' (format version 1): 7 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops, 3 technologies, 3 businesses, 3 factories
+Turn 0: perished nothing; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4100 unskilled_labor; sold 2878.6 unskilled_labor; bought 5 copper, 1426.8 grain; consumed 1221.4 unskilled_labor, 5 copper, 1426.8 grain; population 419.4466666666666; businesses sold nothing; businesses bought 17.25 unskilled_labor, 4 unimproved_grain, 8 copper, 1.375 tools; produced 2.5 copper, 12 grain, 4 tools; used 17.25 unskilled_labor, 2.5 unimproved_copper, 12 unimproved_grain, 8 copper, 1.375 tools
+Turn 1: perished 0.0000000000000002220446049250313 unskilled_labor, 7.5 unimproved_copper, 16 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4194.466666666667 unskilled_labor; sold 2955.6459999999997 unskilled_labor; bought 5.15 copper, 1464.9479999999999 grain; consumed 1238.8206666666667 unskilled_labor, 5.15 copper, 1464.9479999999999 grain; population 429.2982444444444; businesses sold 2.5 copper, 12 grain, 3.875 tools; businesses bought 16.25 unskilled_labor, 4 unimproved_grain, 8 copper, 0.75 tools; produced 2.5 copper, 12 grain, 4 tools; used 16.25 unskilled_labor, 2.5 unimproved_copper, 12 unimproved_grain, 8 copper, 0.8749999999999999 tools
+Turn 2: perished 0.0000000000000002220446049250313 unskilled_labor, 7.5 unimproved_copper, 16 unimproved_grain; emitted 10 unimproved_copper, 24 unimproved_grain; endowed 4292.982444444444 unskilled_labor; sold 3034.7550599999995 unskilled_labor; bought 5.304500000000001 copper, 1504.1162799999997 grain; consumed 1258.2273844444444 unskilled_labor, 5.304500000000001 copper, 1504.1162799999997 grain; population 439.55036096296294; businesses sold 2.5 copper, 12 grain, 3.875 tools; businesses bought 16.25 unskilled_labor, 4 unimproved_grain, 8 copper, 0.75 tools; produced 2.5 copper, 12 grain, 4 tools; used 16.25 unskilled_labor, 2.5 unimproved_copper, 12 unimproved_grain, 8 copper, 0.8749999999999999 tools
 </pre>
 </div>
 </div>
@@ -8692,29 +9214,45 @@ Turn 2: perished 10 unimproved_copper, 24 unimproved_grain; emitted 10 unimprove
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Where the numbers come from: the setting's 410 people receive 10 labor each, 4100 in all. Each of the 388 peasants on a market hex sells 7.2 labor and buys 3.6 grain, the 10 artisans sell 8.5 labor each and buy grain and copper, and the 4100 − 2878.6 = 1221.4 labor not sold is consumed as leisure (the no-market peasant's 120 included). Labor never appears in <code>perished</code>, because it is all sold or consumed during the turn; only the deposit output perishes. The population at turn 0 is already about 419.4, not 410, because turn 0's growth has run, and each later turn's <code>endowed</code> is 10 labor times the previous turn's population. Amounts print in full, with nothing rounded, which is why they grow long tails of digits after turn 0.</p>
-<p>More detail: <a href="docs/world.md">docs/world.md</a> for the turn and the report, <a href="docs/trade.md">docs/trade.md</a> for the trade round, <a href="docs/demand.md">docs/demand.md</a> for how what a POP wants is worked out, and <a href="docs/growth.md">docs/growth.md</a> for growth.</p>
+<p>Where the numbers come from. <strong>The POPs:</strong> the setting's 410 people receive 10 labor each, 4100 in all. Each of the 388 peasants on a market hex sells 7.2 labor and buys 3.6 grain, the 10 artisans sell 8.5 labor each and buy grain and copper, and the 4100 − 2878.6 = 1221.4 labor not sold is consumed as leisure (the no-market peasant's 120 included). The population at turn 0 is already about 419.4, not 410, because turn 0's growth has run, and each later turn's <code>endowed</code> is 10 labor times the previous turn's population. <strong>The businesses:</strong> at turn 0 they buy 17.25 labor, 4 unimproved grain, 8 copper and 1.375 tools and their factories make 2.5 copper, 12 grain and 4 tools, but they sell nothing, because nothing has been made yet. From turn 1 they sell last turn's output, 2.5 copper, 12 grain and 3.875 tools, buy a little less (every factory is now in full condition, so the mine's catch-up maintenance is over), and the business lines repeat every turn. <strong>Perishing:</strong> the POPs' labor never appears in <code>perished</code>, because it is all sold or consumed during the turn, and from turn 1 <code>perished</code> holds only the <em>unowned</em> deposits' output (7.5 unimproved copper and 16 unimproved grain), because the factories use what the owned deposits produce. The <code>0.0000000000000002220446049250313 unskilled_labor</code> in front of it is a floating-point sliver: the arithmetic rule's labor bid for the toolmaker is a hair above what its maintenance uses, and the leftover perishes. The engine rounds nothing, which is also why amounts grow long tails of digits after turn 0 and why turn 1 says <code>0.8749999999999999 tools</code> rather than 0.875.</p>
+<p>More detail: <a href="docs/world.md">docs/world.md</a> for the turn and the report, <a href="docs/trade.md">docs/trade.md</a> for the trade round, <a href="docs/demand.md">docs/demand.md</a> for how what a POP wants is worked out, <a href="docs/production.md">docs/production.md</a> for the factories, and <a href="docs/growth.md">docs/growth.md</a> for growth.</p>
 <h3 id="Checking-a-setting">Checking a setting<a class="anchor-link" href="#Checking-a-setting">¶</a></h3><p>The checker loads a setting and reports every problem in one go, with file, line and column. It never produces a half-loaded setting.</p>
 <pre><code>dev-ui check &lt;folder&gt; [--turns N]
 </code></pre>
 <p>From the project root, that is <code>cargo run -p policyspace-dev-ui -- check settings/sample</code>. On success it prints one line:</p>
-<pre><code>Loaded setting 'Sample Setting' (format version 1): 6 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops
+<pre><code>Loaded setting 'Sample Setting' (format version 1): 7 goods, 19 hexes, 2 resources, 10 deposits, 18 markets, 2 pop types, 16 pops, 3 technologies, 3 businesses, 3 factories
 </code></pre>
-<p>(Counts use singular wording where it applies: <code>1 hex</code>, <code>1 resource</code>, <code>1 deposit</code>, <code>1 market</code>, <code>1 pop type</code>, <code>1 pop</code>. Currencies are not counted, since every hex has exactly one.) With <code>--turns N</code> (N from 0 to 10,000) it then prints one report line per turn, from turn 0 through turn N, as shown in <a href="#Turn-reports">Turn reports</a>; <code>--turns 0</code> prints only turn 0.</p>
+<p>(Counts use singular wording where it applies: <code>1 hex</code>, <code>1 resource</code>, <code>1 deposit</code>, <code>1 market</code>, <code>1 pop type</code>, <code>1 pop</code>, <code>1 technology</code>, <code>1 business</code>, <code>1 factory</code>. Currencies are not counted, since every hex has exactly one.) With <code>--turns N</code> (N from 0 to 10,000) it then starts the setting's deciders, creates the world and prints one report line per turn, from turn 0 through turn N, as shown in <a href="#Turn-reports">Turn reports</a>; <code>--turns 0</code> prints only turn 0.</p>
 <p>Problems look like this:</p>
 <pre><code>rules/a.toml:3:18: key 'perishes_after' in good must be at least 1
 rules/a.toml:6:6: duplicate good name 'copper' (first defined at rules/a.toml:2:6)
 rules/a.toml:10:10: unknown good 'gold'
 rules/p.toml:14:1: utility of pop_type needs at least one good with a positive share
 rules/p.toml:20:11: key 'decline' in growth of pop_type must be a finite number of at least 0 and less than 1
+rules/t.toml:4:12: key 'grain' in inputs of technology must not be the output good
+start/b.toml:6:14: key 'arable_land' in deposits of business claims more deposits than the hex has unowned (3 claimed, 1 available)
+start/f.toml:1:1: factory at (1, 0) is not on the hex of its owner 'farm' at (0, 0)
 start/k.toml:5:3: 'coin' is the currency at (0, 0), so it can't have a price
 start/m.toml:4:1: unknown key 'terrain' in hex
 start/m.toml:6:1: duplicate hex at (0, 0) (first defined at start/m.toml:1:1)
 start/m.toml:9:1: missing required key 'currency' in hex
 start/p.toml:7:1: duplicate pop of 'peasant' at (0, 0) (first defined at start/p.toml:1:1)
-10 error(s) found in my_setting
+13 error(s) found in my_setting
 </code></pre>
 <p>If part of the setting could not be read (a missing folder, or a broken or unreadable file), errors that refer to names or hexes, such as <code>unknown good</code>, are not shown; fix the structural problem first.</p>
+<p><strong>Deciders that won't start.</strong> With <code>--turns</code>, the checker starts one Python process per decider name the setting's businesses carry (none for a setting without businesses). If one can't start, the checker prints the reason and <code>1 error(s) found in &lt;folder&gt;</code>, runs no turns, and exits with code 1. The likeliest cause for a setting author is a misspelled <code>decider</code> name, which the Python package doesn't know:</p>
+<pre><code>decider 'rule': '...\.venv\Scripts\python.exe -m policyspace rule' exited (exit code: 2) as soon as it started
+its error output ends with:
+  error: unknown decider 'rule' (known: arithmetic)
+1 error(s) found in my_setting
+</code></pre>
+<p>The other cause is a missing Python environment; that message names the path where it was expected and the two setup commands. <strong>Plain <code>check &lt;folder&gt;</code>, without <code>--turns</code>, never starts the deciders, so it can't catch a misspelled decider name; <code>--turns 0</code> does.</strong></p>
+<p><strong>Deciders that fail during a turn</strong> don't stop the world. If a decider's process crashes, takes too long to answer (more than 5 seconds, unless <code>POLICYSPACE_DECIDER_TIME_LIMIT</code> says otherwise), or answers something that isn't a valid reply, the businesses it controls do nothing that turn (their factories still wear), the turn goes on, and a line follows that turn's report, then the last lines the process wrote to its error output:</p>
+<pre><code>Turn 3: decider 'arithmetic' failed: the process exited (exit code: 1) before answering
+    stderr: Traceback (most recent call last):
+    stderr: ...
+</code></pre>
+<p>The process is started again at the next turn; if it keeps failing, a line appears every turn. A failure during the turns doesn't change the checker's exit code. A single business whose decision breaks the rules (a factory it doesn't own, a good with no price) is not a failure line: that business just does nothing that turn, and the developer UI shows why. Printing to standard error (<code>print(..., file=sys.stderr)</code> in Python) is the way to debug a decider, since those lines are what the failure line quotes.</p>
 <table>
 <thead>
 <tr>
@@ -8725,11 +9263,11 @@ start/p.toml:7:1: duplicate pop of 'peasant' at (0, 0) (first defined at start/p
 <tbody>
 <tr>
 <td>0</td>
-<td>The setting loaded</td>
+<td>The setting loaded (and, with <code>--turns</code>, its deciders started)</td>
 </tr>
 <tr>
 <td>1</td>
-<td>The setting has errors</td>
+<td>The setting has errors, or its deciders couldn't start</td>
 </tr>
 <tr>
 <td>2</td>
@@ -8737,14 +9275,14 @@ start/p.toml:7:1: duplicate pop of 'peasant' at (0, 0) (first defined at start/p
 </tr>
 </tbody>
 </table>
-<p>The checker never opens a window, so it is the form to use in scripts. <code>dev-ui --version</code> prints the engine's name and version. More detail: <a href="docs/setting-loader.md">docs/setting-loader.md</a>, and <a href="docs/world.md">docs/world.md</a> for <code>--turns</code>.</p>
-<h3 id="The-developer-UI">The developer UI<a class="anchor-link" href="#The-developer-UI">¶</a></h3><p>The developer UI is a window that shows a setting's map and lets you step through turns and inspect the world: each hex's goods, prices and POPs, and what every POP did this turn.</p>
+<p>The checker never opens a window, so it is the form to use in scripts. <code>dev-ui --version</code> prints the engine's name and version. More detail: <a href="docs/setting-loader.md">docs/setting-loader.md</a>, <a href="docs/world.md">docs/world.md</a> for <code>--turns</code>, and <a href="docs/decider-host.md">docs/decider-host.md</a> for how deciders are started and what counts as a failure.</p>
+<h3 id="The-developer-UI">The developer UI<a class="anchor-link" href="#The-developer-UI">¶</a></h3><p>The developer UI is a window that shows a setting's map and lets you step through turns and inspect the world: each hex's goods, prices, POPs and businesses, what every POP did this turn, what every business decided and what came of it, and each factory's condition and output.</p>
 <ul>
 <li><code>dev-ui &lt;folder&gt;</code> opens the window with a setting loaded.</li>
 <li><code>dev-ui</code> alone opens it with an <strong>Open setting...</strong> button (a system folder picker; cancelling changes nothing).</li>
 </ul>
-<p>For example: <code>cargo run -p policyspace-dev-ui -- settings/sample</code>.</p>
-<h4 id="Reading-the-map">Reading the map<a class="anchor-link" href="#Reading-the-map">¶</a></h4><p>Each hex is a pointy-top hexagon, rows run east-west, <code>q</code> increases eastward and <code>r</code> increases southward, exactly as in <a href="#The-map">The map</a>. The sample setting shows as a hexagon of 19 hexes. When hexes are drawn as hexagons, a hex with at least one deposit shows a small filled circle below its label and a hex with at least one POP a small hollow circle above it, so you can see where to click. A hex can have both marks, either, or neither; the sample's center has both.</p>
+<p>For example: <code>cargo run -p policyspace-dev-ui -- settings/sample</code>. Loading a setting that has businesses starts its deciders as Python processes (one per decider name) and keeps them running while the setting is loaded; Reload, opening another folder and closing the window end them. A decider that can't start is shown like a setting error (see <a href="#Checking-a-setting">Checking a setting</a>).</p>
+<h4 id="Reading-the-map">Reading the map<a class="anchor-link" href="#Reading-the-map">¶</a></h4><p>Each hex is a pointy-top hexagon, rows run east-west, <code>q</code> increases eastward and <code>r</code> increases southward, exactly as in <a href="#The-map">The map</a>. The sample setting shows as a hexagon of 19 hexes. When hexes are drawn as hexagons, three small marks say what a hex holds, so you can see where to click: a hex with at least one deposit shows a <strong>filled circle</strong> below its label, a hex with at least one POP a <strong>hollow circle</strong> above it, and a hex with at least one business a <strong>filled square</strong> at the lower left. A hex can show any combination; the sample's center shows all three.</p>
 <p><strong>Controls</strong></p>
 <ul>
 <li>Drag to pan; scroll to zoom toward the cursor; <strong>Fit</strong> shows the whole map again.</li>
@@ -8757,13 +9295,14 @@ start/p.toml:7:1: duplicate pop of 'peasant' at (0, 0) (first defined at start/p
 <p>The <strong>hex panel</strong> on the right shows, for the selected hex:</p>
 <ul>
 <li>its coordinates;</li>
-<li>its deposits grouped by type, for example <code>arable_land x 3: 4 unimproved_grain each, 12 total</code>;</li>
-<li>its stockpile of unowned goods: each good's total, and the parts of it with a countdown to when they perish: <code>perishes this turn</code>, <code>perishes in N turns</code>, or <code>never perishes</code>;</li>
+<li>its deposits grouped by type, for example <code>arable_land × 3: 4 unimproved_grain each, 12 total</code>. The lines list every deposit on the hex, owned or not;</li>
+<li>its stockpile of <strong>unowned goods</strong>: each good's total, and the parts of it with a countdown to when they perish: <code>perishes this turn</code>, <code>perishes in N turns</code>, or <code>never perishes</code>. Output from deposits a business owns is in that business's stockpile instead, so on the sample's center the stockpile shows only <code>4 unimproved_grain</code>, although its deposit lines add up to 14.5;</li>
 <li>its <strong>market</strong>: the hex's currency (<code>Currency: silver</code>), then each posted price as the amount of currency one unit costs (<code>grain: 2 silver</code>), in the order the goods are defined. A hex with a market but no prices says <code>No prices posted.</code>, and a hex with no market says <code>No market.</code>;</li>
-<li>its <strong>POPs</strong>: one collapsible section per POP, open at first, headed by its type and current size (<code>peasant × 61.6</code>), or <code>No POPs.</code></li>
+<li>its <strong>POPs</strong>: one collapsible section per POP, open at first, headed by its type and current size (<code>peasant × 61.6</code>), or <code>No POPs.</code>;</li>
+<li>its <strong>businesses</strong>: one collapsible section per business, open at first, headed by its name and current cash (<code>center_farm: 85 silver</code>), or <code>No businesses.</code></li>
 </ul>
 <p>Reading the countdown: suppose hex <code>(0, 0)</code> holds 15 of a good that lasts 3 turns, at turn 2, with 5 produced each turn. The panel lists 5 that perish this turn, 5 that perish in 1 turn and 5 that perish in 2 turns: the oldest batch is about to go, the newest has two more turns to live.</p>
-<p><strong>What "this turn" means.</strong> Between steps the world has just been endowed, traded, consumed and grown, and nothing has perished yet (see <a href="#Running-a-setting">Running a setting</a>). So the panel shows the outcome of the turn in the status bar: each POP's size after that turn's growth and its stockpile after consumption. Each step replaces it all with the next turn's figures. A POP section you have collapsed stays collapsed when you step.</p>
+<p><strong>What "this turn" means.</strong> Between steps the world has just run a turn: the businesses have decided, everyone has traded, the POPs have consumed and grown, the factories have run, worn and been maintained, and nothing has perished yet (see <a href="#Running-a-setting">Running a setting</a>). So the panel shows the outcome of the turn in the status bar: each POP's size after that turn's growth and its stockpile after consumption, each business's decision at that turn's decision point and the trade and production it led to, each factory's condition after that turn's wear and maintenance, and each business's stockpile after its factories have run. Each step replaces it all with the next turn's figures. A POP or business section you have collapsed stays collapsed when you step.</p>
 <p><strong>A POP section</strong>, for the sample's center peasant at turn 0, looks like this:</p>
 <pre><code>peasant × 61.6
   Started at 60; index 0.6667; rate +2.67%
@@ -8785,24 +9324,57 @@ start/p.toml:7:1: duplicate pop of 'peasant' at (0, 0) (first defined at start/p
 <li>The <strong>stockpile</strong> is the POP's own, written exactly like the hex's.</li>
 </ul>
 <p>The north-east peasant on <code>(2, -2)</code>, whose hex shows <code>No market.</code>, makes the contrast: its section reads <code>peasant × 10.8</code>, <code>Started at 12; index -1.0000; rate -10.00%</code>, an income of 0, and its grain row in red (demanded 0 against a subsistence need of 24), while all 120 of its labor is held, demanded and consumed as leisure.</p>
-<p>Sizes and amounts are written in full, with long decimals after a few turns, as in the turn log. Only the index (4 decimals), the rate (a percentage to 2 decimals) and the utility shares (up to 4 decimals) are rounded, and hovering shows the full values.</p>
-<p>Other messages: "Click a hex to inspect it.", "No deposits.", "Empty.", "No market.", "No prices posted.", "No POPs." and "This setting has no hexes."</p>
-<h4 id="Stepping-turns">Stepping turns<a class="anchor-link" href="#Stepping-turns">¶</a></h4><p>The <strong>Step</strong> and <strong>Step x10</strong> buttons in the top bar advance the world one or ten turns (shortcuts: Space and Shift+Space). They work whenever the setting loaded without errors, even one with no hexes. The status bar's turn follows. The world starts at turn 0 on every load.</p>
-<h4 id="The-world-panel">The world panel<a class="anchor-link" href="#The-world-panel">¶</a></h4><p>The <strong>world panel</strong> on the left has four sections, which collapse; the panels can be resized.</p>
+<p><strong>A business section</strong>, for the sample's <code>center_farm</code> at turn 0, looks like this:</p>
+<pre><code>center_farm: 85 silver
+  Decider: arithmetic
+  Answer: valid decision
+  Deposits: arable_land × 2: 4 unimproved_grain each, 8 total
+  Cash: 100 silver before; 100 after sales; 85 after purchases;  proportion 1
+
+  Trade
+  Good               Offered   Sold   Bid   Bought
+  unskilled_labor          0      0     7        7
+  unimproved_grain         0      0     4        4
+  tools                    0      0   0.5      0.5
+
+  Factories
+  #   Technology   Condition before   Condition after   Remaining life   Run asked   Run done   Output     Wear    Maintenance asked   Maintenance done
+  0   farm                        1                 1          8 turns           1          1   12 grain   0.125               0.125              0.125
+
+  Trace                                 (collapsed; click to open)
+  Stockpile: 12 grain (12: perishes in 2 turns); 85 silver (85: never perishes)
+</code></pre>
 <ul>
-<li><strong>Turn log:</strong> every turn report since the load, turn 0 included, newest first, in the same wording as <code>check --turns</code> (see <a href="#Turn-reports">Turn reports</a>).</li>
-<li><strong>Goods:</strong> each good's name, how long it lasts, whether it is movable or fixed, and two amounts: <strong>In hexes</strong>, the unowned deposit output held in hex stockpiles, and <strong>In POPs</strong>, what the POPs own. In the sample the raw goods appear only under In hexes and silver only under In POPs.</li>
+<li>The <strong>heading</strong> is the business's name and its cash after this turn's trading: the hex's currency in its stockpile.</li>
+<li><strong>Decider and answer:</strong> the decider's name, and whether this turn's decision was <code>valid decision</code>, <code>refused, N error(s)</code> (each error follows, in red, with the place it was found, for example a factory number the business doesn't own or a good the hex doesn't price), or <code>nothing (no decision was sent, or its decider failed)</code>.</li>
+<li><strong>Deposits</strong> the business owns, written like the hex's deposit lines, or <code>Owns no deposits.</code></li>
+<li><strong>Cash</strong> through the round: before trading, after its sales and after its purchases, and the <strong>proportion</strong> the engine cut its purchases by. 1 means it could afford everything it bid for; a value below 1 is in red and means it asked for more than it could pay for, so it got that share of each good and its factories ran less (see <a href="#How-businesses-trade-and-produce">How businesses trade and produce</a>).</li>
+<li>The <strong>trade table</strong> has one row per good, with what the business offered beside what it sold and what it bid beside what it bought, so a cut shows as "asked" above "done" in one row. A refused decision shows what was asked with everything done at 0; a business that decided nothing shows <code>Nothing was traded.</code></li>
+<li>The <strong>factories table</strong> has one row per factory: its number (the one the decider uses), its technology, its condition before and after this turn, its <strong>remaining life</strong> (how many more turns it can run with no maintenance, or <code>shut down</code> in red), the run asked and done, the output it made, the wear it took, and the maintenance asked and done. Hovering shows the inputs the run used (on Output), what the maintenance cost (on Maintenance done), and the capital the factory now holds (on Condition after). Here the farm bought what its own fields didn't cover, ran at full capacity, lost an eighth of its condition to wear and paid it back with maintenance, so it is back at 1 with 8 turns of life. The hover texts read <code>Inputs: 6 unskilled_labor, 12 unimproved_grain</code>, <code>Maintenance cost: 1 unskilled_labor, 0.5 tools</code> and <code>Capital: 4 tools</code>.</li>
+<li><strong>Trace</strong> is the decider's written explanation of its arithmetic (see <a href="#How-the-arithmetic-rule-decides">How the arithmetic rule decides</a>), collapsed at first. Open it to see why the business did what it did.</li>
+<li>The <strong>stockpile</strong> is the business's own, written exactly like the hex's and the POPs'. It holds this turn's output, waiting to be sold next turn, and the business's cash. After one Step the farm has sold the 12 grain and the heading reads <code>center_farm: 94 silver</code>.</li>
+</ul>
+<p>The contrast is a business that decided nothing, for example the same farm while its decider is failing: <code>Answer: nothing (no decision was sent, or its decider failed)</code>, <code>Nothing was traded.</code>, and a factory row with run 0, output <code>0 grain</code>, condition 1 → 0.875 and <code>7 turns</code> of life, because an idle factory still wears.</p>
+<p>Sizes and amounts are written in full, with long decimals after a few turns, as in the turn log, and nothing in a business section is rounded either: the sample's toolmaker is shown buying <code>0.12499999999999989</code> tools, exactly as its decider asked. Only the index (4 decimals), the rate (a percentage to 2 decimals) and the utility shares (up to 4 decimals) are rounded, and hovering shows the full values.</p>
+<p>Other messages: "Click a hex to inspect it.", "No deposits.", "Empty.", "No market.", "No prices posted.", "No POPs.", "No businesses.", "Owns no deposits.", "Nothing was traded.", "No factories." and "This setting has no hexes."</p>
+<h4 id="Stepping-turns">Stepping turns<a class="anchor-link" href="#Stepping-turns">¶</a></h4><p>The <strong>Step</strong> and <strong>Step x10</strong> buttons in the top bar advance the world one or ten turns (shortcuts: Space and Shift+Space). They work whenever the setting loaded without errors, even one with no hexes. The status bar's turn follows. The world starts at turn 0 on every load.</p>
+<h4 id="The-world-panel">The world panel<a class="anchor-link" href="#The-world-panel">¶</a></h4><p>The <strong>world panel</strong> on the left has six sections, which collapse; the panels can be resized.</p>
+<ul>
+<li><strong>Turn log:</strong> every turn report since the load, turn 0 included, newest first, in the same wording as <code>check --turns</code> (see <a href="#Turn-reports">Turn reports</a>), the businesses' totals included. When a decider fails during a turn, its failure line and the last lines of its error output follow that turn's line, exactly as the checker prints them.</li>
+<li><strong>Goods:</strong> each good's name, how long it lasts, whether it is movable or fixed, and three amounts: <strong>In hexes</strong>, the unowned deposit output held in hex stockpiles; <strong>In POPs</strong>, what the POPs own; and <strong>In businesses</strong>, what the businesses own (their deposits' output, their cash, what they bought and their factories' output). In the sample the raw goods appear under In hexes (the unowned deposits) and In businesses (the owned ones), silver under In POPs and In businesses, and tools only under In businesses.</li>
 <li><strong>Resource types:</strong> each type's name, the good it produces, its output per deposit and its deposit count.</li>
 <li><strong>POP types:</strong> each type's name, its endowment (or <code>nothing</code>), its utility goods with their subsistence amounts and shares as the engine uses them (hover for the full value), its growth parameters, the number of POPs of the type and their total size. The total sizes add up to the turn log's <code>population</code>.</li>
+<li><strong>Technologies:</strong> each technology's recipe (inputs per unit of output, or <code>nothing</code>), output, capacity, capital, construction goods and turns, lifetime, and how many factories run it.</li>
+<li><strong>Businesses:</strong> each business's hex, decider, cash, number of factories, and this turn's answer: <code>valid</code>, <code>refused</code> or <code>nothing</code>. A refused business's row is in red, so a broken decider shows without clicking around the map.</li>
 </ul>
 <h4 id="The-author's-loop">The author's loop<a class="anchor-link" href="#The-author's-loop">¶</a></h4><ol>
-<li>Edit a setting file (for example, change some prices, deposits or POPs).</li>
-<li>Click <strong>Reload</strong>. The world returns to turn 0, with a log of one line. Your pan and zoom stay, and so does your selection if the reloaded map still has a hex at those coordinates.</li>
-<li>Step a few turns and check the stockpiles, prices and POPs.</li>
+<li>Edit a setting file (for example, change some prices, deposits, POPs or businesses), or a decider in <code>python/policyspace/</code>.</li>
+<li>Click <strong>Reload</strong>. The world returns to turn 0, with a log of one line, and the deciders are started afresh, so an edited decider takes effect. Your pan and zoom stay, and so does your selection if the reloaded map still has a hex at those coordinates.</li>
+<li>Step a few turns and check the stockpiles, prices, POPs, and the businesses' trades and factories. To see why a business did something, open its Trace.</li>
 </ol>
-<p>If the setting has errors, the window shows the full error list (the same lines the checker prints) and no map or side panels, and the Step buttons are disabled. Fix the files and Reload again. A failed Reload doesn't lose the selection. A broken folder given on the command line opens the window showing its errors. Opening a different folder clears the selection and the log.</p>
-<h4 id="Not-available-yet">Not available yet<a class="anchor-link" href="#Not-available-yet">¶</a></h4><p>Auto-run, stepping by another number, coloring hexes by data (population included), a POP's history over turns or charts of it, editing the world, and selecting several hexes.</p>
-<p>More detail: <a href="docs/dev-ui.md">docs/dev-ui.md</a> for the panels and marks, with <a href="docs/world.md">docs/world.md</a> for turns and stockpiles, <a href="docs/market.md">docs/market.md</a> and <a href="docs/currency.md">docs/currency.md</a> for the Market section, and <a href="docs/demand.md">docs/demand.md</a>, <a href="docs/trade.md">docs/trade.md</a> and <a href="docs/growth.md">docs/growth.md</a> for the numbers in a POP section.</p>
+<p>If the setting has errors, the window shows the full error list (the same lines the checker prints) and no map or side panels, and the Step buttons are disabled. A decider that won't start (a misspelled <code>decider</code> name, or a missing Python environment) shows the same way, with the message from <a href="#Checking-a-setting">Checking a setting</a>. Fix the files and Reload again. A failed Reload doesn't lose the selection. A broken folder given on the command line opens the window showing its errors. Opening a different folder clears the selection and the log.</p>
+<h4 id="Not-available-yet">Not available yet<a class="anchor-link" href="#Not-available-yet">¶</a></h4><p>Auto-run, stepping by another number, coloring hexes by data (population included), a POP's or a business's history over turns or charts of it, editing the world, selecting several hexes, and taking over a business to send its decisions by hand from the window (planned for later).</p>
+<p>More detail: <a href="docs/dev-ui.md">docs/dev-ui.md</a> for the panels and marks, with <a href="docs/dev-ui.md#businesses-factories-and-technologies">docs/dev-ui.md#businesses-factories-and-technologies</a> for the business sections and tables; <a href="docs/world.md">docs/world.md</a> for turns and stockpiles; <a href="docs/market.md">docs/market.md</a> and <a href="docs/currency.md">docs/currency.md</a> for the Market section; <a href="docs/demand.md">docs/demand.md</a>, <a href="docs/trade.md">docs/trade.md</a> and <a href="docs/growth.md">docs/growth.md</a> for the numbers in a POP section; and <a href="docs/trade.md">docs/trade.md</a>, <a href="docs/production.md">docs/production.md</a>, <a href="docs/decider.md">docs/decider.md</a> and <a href="docs/python.md">docs/python.md</a> for the numbers, errors and trace in a business section.</p>
 </div>
 </div>
 </div>

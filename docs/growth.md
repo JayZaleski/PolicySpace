@@ -15,7 +15,7 @@ Every turn, after it has traded and consumed, a POP's size N grows or shrinks by
 
 The two sides meet at 0: a POP whose income exactly covers its subsistence bundle has u = 0 from either formula. Every input scales with N, so u is per individual and doesn't depend on the POP's size.
 
-In this Stage the demanded and the consumed quantities are the same, so the index measures what the POP actually consumed. Stage 05, where rationing can leave a POP short of its demand, revisits which numbers the index reads; that change belongs inside `subsistence_index`.
+With the dummy market the demanded and the consumed quantities are the same, so the index measures what the POP actually consumed. Stage 04, where rationing can leave a POP short of its demand, revisits which numbers the index reads; that change belongs inside `subsistence_index`.
 
 ## The growth rate
 
@@ -90,12 +90,12 @@ The rates repeat every turn (u depends only on prices and the type, not on N), s
 ## Extending growth
 
 - **A different rule** (another shape below subsistence, a dependence on something other than u): change `growth_rate`, and `GrowthParams` with its loader if it needs new parameters.
-- **A different index** (Stage 05's rationing, where demanded and consumed quantities differ): change `subsistence_index`; its callers don't change.
+- **A different index** (Stage 04's rationing, where demanded and consumed quantities differ): change `subsistence_index`; its callers don't change.
 - **New parameters**: add a field and accessor to `GrowthParams`, extend its `new` checks, read the key in `read_growth` in `setting/pops.rs`, and give every test setting's `growth` sub-table the key (it is a fixed-field sub-table, so an unlisted key is reported as unknown).
 
 ## Not yet
 
-Removing a POP, a minimum size, or any event when a POP becomes very small (N only stays positive); rounding N; growth parameters anywhere but the POP type (no global table, no per-POP override) or changing during play; age structure, migration, or any dependence on other POPs; and rationing's effect on the index (Stage 05).
+Removing a POP, a minimum size, or any event when a POP becomes very small (N only stays positive); rounding N; growth parameters anywhere but the POP type (no global table, no per-POP override) or changing during play; age structure, migration, or any dependence on other POPs; and rationing's effect on the index (Stage 04).
 
 ## Tests
 

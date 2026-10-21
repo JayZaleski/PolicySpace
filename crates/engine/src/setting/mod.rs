@@ -4,7 +4,7 @@
 //! the map, the natural resources, and the rules of a world, written as TOML files in a folder. [`load_setting`]
 //! reads such a folder, checks it strictly, and returns a [`LoadedSetting`] (the manifest,
 //! the persistent rules, and the starting state). A loaded setting is not a running
-//! world: later Steps build the world state from it.
+//! world: the World is built from it.
 //!
 //! # Folder layout
 //! ```text
@@ -64,7 +64,7 @@
 //!   A reader's `finish` that depends on phase 2 (such as `ResourcesReader::finish`) is
 //!   only called after a successful load.
 //!
-//! # Adding a section type (for later Steps)
+//! # Adding a section type (for later Stages)
 //! 1. Define the data, and store it in [`Rules`] or [`StartState`]. Goods are the worked
 //!    example for a kind identified by a name: the domain types are in [`crate::goods`]
 //!    (which knows nothing about files), the reader is in `setting/goods.rs`, and the
@@ -205,10 +205,10 @@ pub fn load_setting(path: impl AsRef<Path>) -> Result<LoadedSetting, LoadErrors>
     // The markets don't need the map reader after phase 2, and `map.finish()` consumes it.
     let prices = content.markets.finish();
     let (map, currencies) = content.map.finish();
-    let deposits = content.deposits.finish(map.len());
     let pops = content.pops.finish(map.len());
     let businesses = content.businesses.finish(map.len());
-    let factories = content.factories.finish(map.len());
+    let deposits = content.deposits.finish(map.len(), businesses.len());
+    let factories = content.factories.finish(map.len(), businesses.len());
     Ok(LoadedSetting {
         manifest,
         rules: Rules {

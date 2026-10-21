@@ -32,7 +32,7 @@ Any other key in a `[[good]]` is an unknown-key error.
 `setting/goods.rs` holds `GoodsReader`, the loader-side accumulator. `WorldContent` has a `goods: GoodsReader` field, and the section's `read` function calls `GoodsReader::read(reader)` for each entry. `read`:
 
 1. reads `name` with `required_name`;
-2. reads `perishes_after` with `optional_integer`, converts it to `NonZeroU32` and reports `key 'perishes_after' in good must be at least 1` (value below 1) or `... is out of range` (above `u32::MAX`), at the value;
+2. reads `perishes_after` with `optional_integer` and passes it through `EntryReader::at_least_one` (the shared "whole number of at least 1" check, with no upper bound; see [setting-loader.md](setting-loader.md#entryreader)), which reports `key 'perishes_after' in good must be at least 1` (value below 1) or `... is out of range` (above `u32::MAX`) at the value; a valid value becomes `Perishes::After(NonZeroU32)`, and an absent or invalid one `Perishes::Never`;
 3. reads `movable` with `optional_bool`;
 4. only if the name is valid, calls `Definitions<GoodKind>::define`, which reports duplicates (the message names the first definition's location, so the error names both places), and pushes the `Good`.
 
@@ -40,7 +40,7 @@ Every key is read even if another one is bad, so one good with several problems 
 
 IDs follow load order: file read order (`rules/` files in byte order of relative path), then the order of goods within each file. The same folder always gives the same IDs. A setting with no goods is valid and gives an empty `Goods`.
 
-Goods contain no references, so `GoodsReader` has nothing to resolve in phase 2. Sections that name goods (a resource type's `produces`, a hex's `currency`, the keys of a market's `prices`, and the keys of a POP type's `endowment` and `utility`) resolve them with `Definitions::resolve` against the goods registry, through `GoodsReader::defs()`. A good's `perishes_after` also decides when a POP's endowment of it perishes (see [pops.md](pops.md)), and when goods bought from a market, and currency received from one, perish (see [market.md](market.md)).
+Goods contain no references, so `GoodsReader` has nothing to resolve in phase 2. Sections that name goods (a resource type's `produces`, a hex's `currency`, the keys of a market's `prices`, the keys of a POP type's `endowment` and `utility`, a technology's `inputs`, `output`, `capital` and `construction`, and the keys of a business's `inventory`) resolve them with `Definitions::resolve` against the goods registry, through `GoodsReader::defs()`. A good's `perishes_after` also decides when a POP's endowment of it perishes (see [pops.md](pops.md)), when goods bought from a market, and currency received from one, perish (see [market.md](market.md)), and when a factory's output perishes (see [production.md](production.md)). The decider protocol names goods by their setting names (see [decider.md](decider.md)).
 
 ## Using goods
 
@@ -62,7 +62,7 @@ let props = goods.get(grain);   // props.perishes, props.movable
 
 ## The sample setting and tests
 
-`settings/sample/rules/goods.toml` defines six goods in this order: `unskilled_labor` (perishes after 1, not movable), `unimproved_copper` (1, not movable), `unimproved_grain` (1, not movable), `copper` (never, movable), `grain` (3, movable), `silver` (never, movable). They cover each combination of the properties and give the resource types something to produce; `unskilled_labor` is what the sample's POP types are endowed with (see [pops.md](pops.md)), and `silver` is the currency every sample hex designates (see [currency.md](currency.md)).
+`settings/sample/rules/goods.toml` defines seven goods in this order: `unskilled_labor` (perishes after 1, not movable), `unimproved_copper` (1, not movable), `unimproved_grain` (1, not movable), `copper` (never, movable), `grain` (3, movable), `silver` (never, movable), `tools` (never, movable). They cover each combination of the properties and give the resource types something to produce; `unskilled_labor` is what the sample's POP types are endowed with (see [pops.md](pops.md)), `silver` is the currency every sample hex designates (see [currency.md](currency.md)), and `tools` is the capital good the sample's technologies are made of (see [technologies.md](technologies.md)).
 
 Tests:
 - The list behavior (accessors, order, foreign-ID panics) is tested once for all named lists in `id.rs` (see [ids.md](ids.md)).

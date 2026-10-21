@@ -2,7 +2,7 @@
 
 Source: `crates/engine/src/currency.rs` (the data model) and `crates/engine/src/setting/map.rs` (reading the `currency` key of each `[[hex]]`). The public type is re-exported from the engine crate root: `HexCurrencies`.
 
-Every hex designates one good as its **currency**: the good that prices on that hex are posted in. The designation is required, so every hex has exactly one currency and no code ever handles a hex without one. Different hexes may designate different goods. The dummy market posts its prices in the hex's currency (see [market.md](market.md)), and the trade round pays and is paid in it (see [trade.md](trade.md)).
+Every hex designates one good as its **currency**: the good that prices on that hex are posted in. The designation is required, so every hex has exactly one currency and no code ever handles a hex without one. Different hexes may designate different goods. The dummy market posts its prices in the hex's currency (see [market.md](market.md)), and the trade round pays and is paid in it (see [trade.md](trade.md)). A business's cash is the amount of its hex's currency in its stockpile; its starting cash is that currency listed in its `[[business]]` `inventory` (see [businesses.md](businesses.md)), and the trade round's cash cap scales its bids to it.
 
 The engine has no opinion about money. The only requirement is that the good exists in the setting's `rules/`: a perishable or non-movable good (even labor) is a valid currency, and there is no currency-specific good property.
 

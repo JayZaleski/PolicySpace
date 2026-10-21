@@ -3,6 +3,8 @@
 use std::error::Error;
 use std::fmt;
 
+use crate::error_list::ErrorList;
+
 /// A position in a setting file: the path relative to the setting folder (with forward
 /// slashes), a 1-based line, and a 1-based column counted in characters.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -77,48 +79,7 @@ impl fmt::Display for LoadError {
 impl Error for LoadError {}
 
 /// Every problem found in one failed load, in sorted order. Never empty.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LoadErrors(Vec<LoadError>);
-
-impl LoadErrors {
-    /// The errors, in order.
-    pub fn iter(&self) -> std::slice::Iter<'_, LoadError> {
-        self.0.iter()
-    }
-
-    /// Number of errors (at least 1).
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Always false: a `LoadErrors` holds at least one error.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-impl<'a> IntoIterator for &'a LoadErrors {
-    type Item = &'a LoadError;
-    type IntoIter = std::slice::Iter<'a, LoadError>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl fmt::Display for LoadErrors {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, error) in self.0.iter().enumerate() {
-            if i > 0 {
-                writeln!(f)?;
-            }
-            write!(f, "{error}")?;
-        }
-        Ok(())
-    }
-}
-
-impl Error for LoadErrors {}
+pub type LoadErrors = ErrorList<LoadError>;
 
 /// Collects every problem found during a load, instead of stopping at the first.
 #[derive(Debug, Default)]
@@ -176,7 +137,7 @@ impl ErrorSink {
             // A stable sort keeps errors at the same position in the order they were
             // reported.
             self.errors.sort_by(|a, b| sort_key(a).cmp(&sort_key(b)));
-            Err(LoadErrors(self.errors))
+            Err(ErrorList::new(self.errors))
         }
     }
 }
@@ -189,14 +150,6 @@ impl ErrorSink {
             Ok(()) => Vec::new(),
             Err(errors) => errors.lines(),
         }
-    }
-}
-
-#[cfg(test)]
-impl LoadErrors {
-    /// Each error as one line of text, in order. For tests.
-    pub(crate) fn lines(&self) -> Vec<String> {
-        self.0.iter().map(|e| e.to_string()).collect()
     }
 }
 
