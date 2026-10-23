@@ -49,7 +49,9 @@
 //! each business's answer, which the world resolves: a business with a valid decision sells its
 //! offers and buys its bids in the trade round (its bids scaled by one proportion if they cost
 //! more than its cash), then runs and maintains its factories at the fractions the decision
-//! gives, and every business's outcome is recorded.
+//! gives, and every business's outcome is recorded. The [`orders`] module holds the order line
+//! and the live market's arithmetic (summing lines into curves and finding where they cross),
+//! not yet wired into the turn.
 //!
 //! A running world is built from a loaded setting and stepped turn by turn (see the
 //! [`world`] module). Each hex holds a stockpile of goods (see the [`stockpile`] module),
@@ -85,6 +87,8 @@ pub mod map;
 pub use map::{HexCoord, HexId, HexKind, HexMap};
 pub mod market;
 pub use market::{HexPrices, Market, TradeError};
+pub mod orders;
+pub use orders::{Crossing, Curve, Line, LineError, LineErrors, LineParams, Side, cross};
 pub mod pops;
 pub use pops::{
     Endowment, GrowthParams, Pop, PopId, PopKind, PopType, PopTypeId, PopTypeKind, PopTypes, Pops,
