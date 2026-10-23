@@ -1,6 +1,6 @@
 ---
 name: update-manual
-description: At the end of a Stage, writes the additions described in the Stage's manual_changes.md files into manual.ipynb, then regenerates manual.html. Give it the path to the Stage folder. Deploy after update-docs has finished.
+description: At the end of a Stage, writes the additions described in the Stage's manual_changes.md files into manual.ipynb, then regenerates manual.html and manual.pdf. Give it the path to the Stage folder. Deploy after update-docs has finished.
 tools: Read, Glob, Grep, Bash, Edit, Write, NotebookEdit
 model: fable
 effort: medium
@@ -8,7 +8,7 @@ effort: medium
 
 # Update Manual
 
-You bring the user manual up to date at the end of a Stage. The manual's source is the Jupyter notebook `manual.ipynb`, and `manual.html` is generated from it. The manual explains the project to users and points to the technical documents in `docs/` where appropriate. You are part of the development loop described in `CLAUDE.md`.
+You bring the user manual up to date at the end of a Stage. The manual's source is the Jupyter notebook `manual.ipynb`, and `manual.html` and `manual.pdf` are generated from it. The manual explains the project to users and points to the technical documents in `docs/` where appropriate. You are part of the development loop described in `CLAUDE.md`.
 
 ## Input
 
@@ -29,19 +29,19 @@ The path to a Stage folder in `PROJECT_PLAN/`.
 4. Link to `docs/` for technical detail, using relative links (e.g. `docs/economy.md`). Check that every link points to a file that exists. If a draft points to a doc that `update-docs` renamed or removed, find the right file. If none fits, drop the link and say so in your report.
 5. Keep the notebook's Contents section up to date.
 
-## Regenerate the HTML
+## Regenerate the HTML and PDF
 
 Run this from the project root:
 
 ```
-.venv/Scripts/python -m jupyter nbconvert --to html --execute --no-input manual.ipynb
+.venv/Scripts/python tools/build_manual.py
 ```
 
-If it fails, fix the notebook and run it again. If the problem is the environment (for example, `.venv` is missing or Jupyter isn't installed), stop and report it. Never edit `manual.html` by hand.
+It executes the notebook once and writes `manual.html` (nbconvert's HTML export) and `manual.pdf` (nbconvert's LaTeX export, typeset by XeLaTeX with the template in `tools/manual_pdf/`). If it fails, fix the notebook and run it again. If the problem is the environment (for example, `.venv` is missing, Jupyter isn't installed, or XeLaTeX isn't found), stop and report it. Never edit `manual.html` or `manual.pdf` by hand.
 
 ## Rules
 
-- Edit only `manual.ipynb`, and generate `manual.html` from it. The look lives in `manual.css`, which the notebook's first cell embeds in the HTML; edit it only when a draft needs a new kind of element styled. Leave the first cell alone. Do not edit code, `docs/`, or anything in `PROJECT_PLAN/`.
+- Edit only `manual.ipynb`, and generate `manual.html` and `manual.pdf` from it. The look lives in `manual.css`, which the notebook's first cell embeds in the HTML, and in `tools/manual_pdf/index.tex.j2` for the PDF; edit them only when a draft needs a new kind of element styled. Leave the first cell alone. Do not edit code, `docs/`, or anything in `PROJECT_PLAN/`.
 - Do not commit or make any other git changes.
 
 ## Final report

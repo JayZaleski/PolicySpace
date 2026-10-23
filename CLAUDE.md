@@ -64,7 +64,7 @@ Steps in `roadmap.md` are tagged using `#tag` format (lowercase, kebab-case, e.g
 ## Documentation
 
 - `docs/` — Markdown files explaining how the code works, for developers who want to modify the project. `docs/README.md` indexes them.
-- `manual.ipynb` — the user manual, a Jupyter notebook. It explains the project to users and points to the technical documents in `docs/` where appropriate. `manual.html` is generated from it with `.venv/Scripts/python -m jupyter nbconvert --to html --execute --no-input manual.ipynb`. Edit the notebook, never the HTML, and regenerate the HTML after every edit. The manual's look lives in `manual.css`: the notebook's first code cell embeds it in the HTML, and the chart and map figures are SVGs drawn by code cells whose colors match it. Edit `manual.css` for styling changes, and regenerate the HTML after those too. Set up the virtual environment with `python -m venv .venv` and `.venv/Scripts/python -m pip install -r requirements.txt`.
+- `manual.ipynb` — the user manual, a Jupyter notebook. It explains the project to users and points to the technical documents in `docs/` where appropriate. `manual.html` and `manual.pdf` are generated from it with `.venv/Scripts/python tools/build_manual.py`, which executes the notebook once and exports both: the HTML through nbconvert, and the PDF through nbconvert's LaTeX export, typeset by XeLaTeX with the template in `tools/manual_pdf/` (pandoc comes from the `pypandoc_binary` package in `requirements.txt`; XeLaTeX must be installed, for example TinyTeX). Edit the notebook, never the HTML or PDF, and regenerate both after every edit. The manual's look lives in `manual.css` for the HTML (the notebook's first code cell embeds it) and in `tools/manual_pdf/index.tex.j2` for the PDF, which follows the same colors and fonts; the chart and map figures are SVGs drawn by code cells whose colors match them. Edit those for styling changes, and regenerate after them too. Set up the virtual environment with `python -m venv .venv` and `.venv/Scripts/python -m pip install -r requirements.txt`.
 
 ## Code Navigation
 
@@ -115,7 +115,7 @@ Work proceeds Stage by Stage, and within each Stage, Step by Step. **Skills** ar
 10. **Update Vision and Roadmap** — agent proposes edits to `vision.md` and `roadmap.md` that reflect the decisions made during the Stage (in the Steps' `design.md` files, roadmap changes, `wont-fix` bugs, and the consolidation), and applies them with the user's approval. The vision stays at the level of goals and player experience; the roadmap keeps its format, statuses, and numbering.
 11. **Update Documentation** — agent deploys the `update-docs` and `update-manual` subagents:
    - `update-docs` uses the Stage's `docs_changes.md` files and `consolidate.md` to update `docs/`.
-   - `update-manual` uses the Stage's `manual_changes.md` files to write the changes into `manual.ipynb`, then regenerates `manual.html`.
+   - `update-manual` uses the Stage's `manual_changes.md` files to write the changes into `manual.ipynb`, then regenerates `manual.html` and `manual.pdf`.
 12. **Update Status** — agent deploys the `update-status` subagent. *Requires user permission.*
 
 Each session starts fresh, so all state needed to continue the loop must live in files (the plan, Step folders, and git history), not in conversation context.

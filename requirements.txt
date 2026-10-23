@@ -1,3 +1,5 @@
 jupyter
 pytest
 -e ./python
+pypandoc_binary
+svglib

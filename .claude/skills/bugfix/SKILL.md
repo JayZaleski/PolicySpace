@@ -109,6 +109,6 @@ Summarize for the user in plain English: what changed, how the regression test s
 
 ## 7. Docs and commit
 
-1. If `docs/` or the manual describe the buggy behavior, fix them. If the affected Step is in the current Stage (`docs/` isn't updated until the Stage ends), update that Step's `docs_changes.md` or `manual_changes.md` instead. If you edit `manual.ipynb`, regenerate `manual.html`.
+1. If `docs/` or the manual describe the buggy behavior, fix them. If the affected Step is in the current Stage (`docs/` isn't updated until the Stage ends), update that Step's `docs_changes.md` or `manual_changes.md` instead. If you edit `manual.ipynb`, regenerate `manual.html` and `manual.pdf` with `.venv/Scripts/python tools/build_manual.py`.
 2. Ask the user for permission to deploy the `update-status` subagent at the **bug** checkpoint. Deploy it only if they agree.
 3. Tell the user the bug is fixed, and what the loop was doing before (so they know where to pick up).
