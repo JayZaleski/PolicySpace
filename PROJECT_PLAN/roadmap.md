@@ -138,11 +138,11 @@
 - Description: Inspect a hex's businesses in the dev UI: cash, stockpile, owned deposits, decider, last turn's decision with its trace, and the trade outcome. Inspect its factories: technology, capital bundle and remaining life, run level, and whether it has shut down. Show the business totals in the turn log. Taking over a business and submitting its decisions by hand waits for Stage 05.
 
 ## Stage 04: market
-- Status: planned
+- Status: in-progress
 - Goal: The live market of the vision's Markets section, in a single closed economy with no external trade. The dummy market goes away: its fixed prices become the prices on turn 0, and from then on each good's price is set where the lines on file cross. Every actor's orders are straight lines with give-up prices: the engine draws POP lines from their Stone-Geary preferences, endowment and cash, and the business script is rewritten to send lines (sell at or above break-even, buy at or below), so the arithmetic rule does not survive unchanged. Orders stay on file under a refresh fraction and a wake-up threshold, businesses are served a view only when due to re-think, actors spend only what they held at the start of the turn, and a placeholder dividend returns business profits to the hex's POPs until Stage 06. Inventory, unemployment and shortages become visible quantities, and the hex's market data is in every view. The test of correctness is that, with constant fundamentals, prices settle to the equilibrium we can calculate and stay there. A small dev-UI Step shows prices, the summed lines, and shortages and gluts moving over turns. Strategies that pursue market power are not part of this Stage; the market doesn't prevent them.
 
 ### Step 01: order-lines
-- Status: planned
+- Status: specified
 - Tags: #market #orders #engine
 - Description: The order line as engine data, with its arithmetic as pure functions with their own tests: a quantity at the current price and a slope, clipped so the quantity never goes below zero or above a maximum, and a give-up price at which the actor trades nothing. Evaluating a line at a price, summing the lines on one side of a good into one curve, finding the price where the summed demand and supply curves cross, and the one-sided case. Design question: how the summed curve is represented, since a sum of clipped lines is piecewise linear, and what of it is published as market data.
 
