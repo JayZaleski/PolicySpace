@@ -138,8 +138,58 @@
 - Description: Inspect a hex's businesses in the dev UI: cash, stockpile, owned deposits, decider, last turn's decision with its trace, and the trade outcome. Inspect its factories: technology, capital bundle and remaining life, run level, and whether it has shut down. Show the business totals in the turn log. Taking over a business and submitting its decisions by hand waits for Stage 05.
 
 ## Stage 04: market
-- Status: outline
-- Goal: The live market of the vision's Markets section, in a single closed economy with no external trade. It brings POPs, factories, and minimal businesses together: the dummy market's infinite counterparty is removed, bids and offers (the POPs' Stone-Geary submissions and the businesses' fixed quantities alike) are settled against each other with proportional rationing, sales before purchases, and prices adjust between turns toward clearing using the aggregate curves at a speed set in the setting. Inventory, unemployment, and shortages become visible quantities. The arithmetic rule stays valid without change, because the engine already trims a business that is sold or bought less than it asked. The test of correctness is that, with constant fundamentals, prices converge over turns to the known equilibrium. Market power is not part of this Stage.
+- Status: planned
+- Goal: The live market of the vision's Markets section, in a single closed economy with no external trade. The dummy market goes away: its fixed prices become the prices on turn 0, and from then on each good's price is set where the lines on file cross. Every actor's orders are straight lines with give-up prices: the engine draws POP lines from their Stone-Geary preferences, endowment and cash, and the business script is rewritten to send lines (sell at or above break-even, buy at or below), so the arithmetic rule does not survive unchanged. Orders stay on file under a refresh fraction and a wake-up threshold, businesses are served a view only when due to re-think, actors spend only what they held at the start of the turn, and a placeholder dividend returns business profits to the hex's POPs until Stage 06. Inventory, unemployment and shortages become visible quantities, and the hex's market data is in every view. The test of correctness is that, with constant fundamentals, prices settle to the equilibrium we can calculate and stay there. A small dev-UI Step shows prices, the summed lines, and shortages and gluts moving over turns. Strategies that pursue market power are not part of this Stage; the market doesn't prevent them.
+
+### Step 01: order-lines
+- Status: planned
+- Tags: #market #orders #engine
+- Description: The order line as engine data, with its arithmetic as pure functions with their own tests: a quantity at the current price and a slope, clipped so the quantity never goes below zero or above a maximum, and a give-up price at which the actor trades nothing. Evaluating a line at a price, summing the lines on one side of a good into one curve, finding the price where the summed demand and supply curves cross, and the one-sided case. Design question: how the summed curve is represented, since a sum of clipped lines is piecewise linear, and what of it is published as market data.
+
+### Step 02: order-protocol
+- Status: planned
+- Tags: #deciders #market #orders #python
+- Description: Lines replace the fixed-quantity offers and bids in the decision vocabulary: one line per good to sell and per good to buy, validated against the view (a line without a give-up price is refused like any malformed decision), serialized losslessly, with the Python client's dataclasses updated and the recordings regenerated. The arithmetic rule emits its present quantities as flat lines so every test keeps running, and the dummy round trades each line's quantity at the posted price until Step 04 replaces it.
+
+### Step 03: pop-orders
+- Status: planned
+- Tags: #pops #utility #market #orders #setting-data
+- Description: The engine draws a POP's lines from its Stone-Geary parameters, its endowment and its cash at the current prices: a demand line for each good it consumes and a supply line for the endowed goods it sells, each a linear approximation of the true curve near the current price, with give-up prices. POPs get starting cash in the starting state, because an actor spends only what it held at the start of the turn. Pure functions with their own tests, not yet wired into the turn.
+
+### Step 04: settlement
+- Status: planned
+- Tags: #market #orders #trade #turn-loop #pops #businesses
+- Description: The live round replaces the inside of the trade round. For each good on a hex the market sums the lines, sets the price at the crossing, or keeps it when orders are on one side only, and everyone trades along their own line at that price. A line that promises more than the actor holds is trimmed and the other side comes up short; purchases that cost more than the cash the actor held at the start of the turn are scaled by one proportion. The `[[market]]` prices become the prices on turn 0 and the dummy exchange goes away. Every actor's lines are drawn or sent afresh every turn until Step 06. Unsold labor counts as leisure. The outcomes, the market's per-good record (price, traded, unfilled on each side) and the turn report gain inventory, unemployment and shortages as visible quantities.
+
+### Step 05: business-orders
+- Status: planned
+- Tags: #deciders #businesses #market #orders #python
+- Description: The hex's public market data goes into every business view: for each good, the current price, the summed demand and supply curves, how much traded and how much went unfilled on each side, on both sides of the protocol with the recordings regenerated. The arithmetic rule is rewritten for the live market: it values its output at the current price, offers every surplus at or above the price where the factory breaks even and bids for every shortfall at or below it, as lines, and scales its plan by one proportion when the bids would cost more than its cash. Its bids are computed from the fractions it sends, which closes bug 01.
+
+### Step 06: order-book
+- Status: planned
+- Tags: #market #orders #turn-loop #setting-data
+- Description: Orders stay on file at the market until the actor replaces them. The rules gain the refresh fraction (the baseline share of actors that re-think each turn) and the wake-up threshold (an actor is woken when a price that matters to it has moved more than this since it last looked); both apply to POPs and businesses. The engine decides deterministically which actors are due each turn and redraws POP lines only for those. Settlement reads the book, so stale lines are what cause mismatches. Businesses still send lines every turn until Step 07.
+
+### Step 07: rationed-attention
+- Status: planned
+- Tags: #deciders #market #orders #turn-loop
+- Description: The decision point serves a view only to the businesses due to re-think this turn (in the baseline fraction, or woken by a price move); the others keep their lines on file and get no view. Resolves the vision's open question of whether a decider can ask to be woken next turn, so a strategy that needs attention every turn isn't cut off. Covers what this means for the request each decider receives, the replay decider and the recordings, the stored answers and the report's counts.
+
+### Step 08: placeholder-dividend
+- Status: planned
+- Tags: #businesses #pops #currency #turn-loop #setting-data
+- Description: An engine rule standing in for ownership until Stage 06: each business keeps a cash reserve, a setting multiple of its usual spending, and pays the excess to the POPs on its hex by headcount at a fixed point in the turn. The rules hold the multiple and a switch that turns the dividend off. What "usual spending" measures is a design question for this Step.
+
+### Step 09: equilibrium
+- Status: planned
+- Tags: #market #orders #tests #setting-data
+- Description: The Stage's test of correctness. Compute the sample setting's equilibrium prices and quantities analytically from its POP types, technologies and deposits, tune the sample so an equilibrium exists and the chain is viable at it, and add tests that with constant fundamentals the prices settle there and stay. One test sets the refresh fraction to 1 so every order is fresh every turn and the market is checked without lag; another uses the sample's own refresh fraction and wake-up threshold to check that the lag knob only slows the settling.
+
+### Step 10: dev-ui-market
+- Status: planned
+- Tags: #dev-ui #market #orders
+- Description: Inspect a hex's market in the dev UI: each good's current price, the summed demand and supply curves, how much traded, and the shortage or glut, with how they moved over the last turns. Show a POP's and a business's lines on file and when they were last refreshed, and the market totals in the turn log.
 
 ## Stage 05: dev-ui
 - Status: outline
@@ -147,7 +197,7 @@
 
 ## Stage 06: businesses
 - Status: outline
-- Goal: Ownership arrives in full. POPs own businesses; businesses already own deposits and factories. Businesses collect their factories' and deposits' earnings, set operating budgets, and pay dividends. Budgets and dividends are new verbs in the decider vocabulary, resolved by engine rules, not new engine decisions. Expansion decisions wait for Stage 07.
+- Goal: Ownership arrives in full. POPs own businesses; businesses already own deposits and factories. Businesses collect their factories' and deposits' earnings, set operating budgets, and pay dividends, replacing the Market Stage's placeholder dividend. Budgets and dividends are new verbs in the decider vocabulary, resolved by engine rules, not new engine decisions. Expansion decisions wait for Stage 07.
 
 ## Stage 07: saving-and-investment
 - Status: outline
