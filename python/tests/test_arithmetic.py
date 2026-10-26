@@ -11,6 +11,7 @@ from policyspace.arithmetic import after_wear, decide, decide_business
 from policyspace.protocol import (
     Decision,
     FactoryOrder,
+    OrderLine,
     Recording,
     Request,
     read_recording,
@@ -33,6 +34,11 @@ def sample_decisions() -> dict[str, Decision]:
     return {d.business: d for d in decide(recording.request).decisions}
 
 
+def quantities(table: dict[str, OrderLine]) -> dict[str, float]:
+    """The quantity of each line."""
+    return {good: line.quantity for good, line in table.items()}
+
+
 def test_the_sample_reply_is_the_recordings():
     recording = read_recording(SAMPLE_RECORDING.read_text(encoding="utf-8"))
     reply = decide(recording.request)
@@ -51,15 +57,23 @@ def test_the_sample_reply_is_the_recordings():
 
 def test_the_sample_numbers():
     decisions = sample_decisions()
+    recording = read_recording(SAMPLE_RECORDING.read_text(encoding="utf-8"))
+    views = {v.business: v for v in recording.request.views}
+    for decision in decisions.values():
+        for table in (decision.offers, decision.bids):
+            for good, line in table.items():
+                assert line.slope == 0.0
+                assert line.maximum == line.quantity
+                assert line.give_up == views[decision.business].price(good)
 
     farm = decisions["center_farm"]
     assert farm.factories == {0: FactoryOrder(1.0, 0.125)}
-    assert farm.bids == {"tools": 0.5, "unimproved_grain": 4.0, "unskilled_labor": 7.0}
+    assert quantities(farm.bids) == {"tools": 0.5, "unimproved_grain": 4.0, "unskilled_labor": 7.0}
     assert farm.offers == {}
 
     mine = decisions["center_mine"]
     assert mine.factories == {1: FactoryOrder(1.0, 0.375)}
-    assert mine.bids == {"tools": 0.75, "unskilled_labor": 4.0}
+    assert quantities(mine.bids) == {"tools": 0.75, "unskilled_labor": 4.0}
     assert mine.offers == {}
 
     toolmaker = decisions["center_toolmaker"]
@@ -67,9 +81,9 @@ def test_the_sample_numbers():
     assert order.run == 1.0
     assert order.maintenance == min(1.0 - after_wear(1.0, 24), 1 / 3)
     assert order.maintenance == pytest.approx(1 / 24, abs=1e-9)
-    assert toolmaker.bids["copper"] == 8.0
-    assert toolmaker.bids["unskilled_labor"] == pytest.approx(6.25, abs=1e-9)
-    assert toolmaker.bids["tools"] == pytest.approx(0.125, abs=1e-9)
+    assert quantities(toolmaker.bids)["copper"] == 8.0
+    assert toolmaker.bids["unskilled_labor"].quantity == pytest.approx(6.25, abs=1e-9)
+    assert toolmaker.bids["tools"].quantity == pytest.approx(0.125, abs=1e-9)
     assert set(toolmaker.bids) == {"copper", "unskilled_labor", "tools"}
     assert toolmaker.offers == {}
 
@@ -83,8 +97,8 @@ def test_a_negative_margin_runs_down():
     view = hand_written_view("negative_margin")
     decision = decide_business(view)
     assert decision.factories == {0: FactoryOrder(0.0, 0.0)}
-    assert decision.offers == {"metal": 3.0, "ore": 5.0}
-    assert decision.bids == {}
+    assert quantities(decision.offers) == {"metal": 3.0, "ore": 5.0}
+    assert quantities(decision.bids) == {}
     assert "run down" in decision.trace
     assert "margin -32.4 < 0" in decision.trace
 
@@ -93,8 +107,8 @@ def test_an_unpriced_input_runs_down():
     view = hand_written_view("unpriced_input")
     decision = decide_business(view)
     assert decision.factories == {0: FactoryOrder(0.0, 0.0)}
-    assert decision.offers == {"metal": 3.0}
-    assert decision.bids == {}
+    assert quantities(decision.offers) == {"metal": 3.0}
+    assert quantities(decision.bids) == {}
     assert "no posted price for ore" in decision.trace
 
 
@@ -112,8 +126,8 @@ def test_a_shut_down_factory_is_revived_but_not_run():
     view = hand_written_view("revival")
     decision = decide_business(view)
     assert decision.factories == {0: FactoryOrder(0.0, 0.5)}
-    assert decision.bids == {"labor": 1.0, "oven": 0.5}
-    assert decision.offers == {}
+    assert quantities(decision.bids) == {"labor": 1.0, "oven": 0.5}
+    assert quantities(decision.offers) == {}
     assert "shut down" in decision.trace
 
 
@@ -122,8 +136,8 @@ def test_no_market_means_an_empty_decision():
     decision = decide_business(view)
     assert decision.business == "remote"
     assert decision.factories == {}
-    assert decision.offers == {}
-    assert decision.bids == {}
+    assert quantities(decision.offers) == {}
+    assert quantities(decision.bids) == {}
     assert "no market" in decision.trace
 
 
@@ -131,8 +145,8 @@ def test_a_business_with_no_factories_only_sells():
     view = hand_written_view("seller")
     decision = decide_business(view)
     assert decision.factories == {}
-    assert decision.offers == {"grain": 4.0, "metal": 3.0}
-    assert decision.bids == {}
+    assert quantities(decision.offers) == {"grain": 4.0, "metal": 3.0}
+    assert quantities(decision.bids) == {}
     assert "within budget" in decision.trace
 
 
@@ -141,7 +155,7 @@ def test_the_currency_in_a_bundle_is_priced_at_one_and_never_bid():
     technology = view.technologies["bakery"]
     technology = dataclasses.replace(technology, construction={"coin": 2.0})
     decision = decide_business(dataclasses.replace(view, technologies={"bakery": technology}))
-    assert decision.bids == {"oven": 0.5}
+    assert quantities(decision.bids) == {"oven": 0.5}
     assert "maintenance 2.2" in decision.trace
 
 
@@ -149,10 +163,10 @@ def test_a_cash_short_plan_is_scaled_uniformly():
     view = hand_written_view("cash_short")
     decision = decide_business(view)
     assert decision.factories == {0: FactoryOrder(0.5, 0.125), 1: FactoryOrder(0.5, 0.125)}
-    assert decision.bids == {"flour": 10.0, "labor": 10.5, "oven": 0.25}
-    assert decision.offers == {}
-    cost = sum(amount * view.price(good) for good, amount in decision.bids.items())
-    sales = sum(amount * view.price(good) for good, amount in decision.offers.items())
+    assert quantities(decision.bids) == {"flour": 10.0, "labor": 10.5, "oven": 0.25}
+    assert quantities(decision.offers) == {}
+    cost = sum(line.quantity * view.price(good) for good, line in decision.bids.items())
+    sales = sum(line.quantity * view.price(good) for good, line in decision.offers.items())
     assert cost <= view.cash + sales + 1e-9
     assert "scaled by 0.5" in decision.trace
 
@@ -170,11 +184,15 @@ def test_every_decision_is_well_formed():
         assert [d.business for d in reply.decisions] == [v.business for v in request.views]
         for view, decision in zip(request.views, reply.decisions):
             for table in (decision.offers, decision.bids):
-                for good, amount in table.items():
+                for good, line in table.items():
                     assert good != view.currency
                     assert view.price(good) is not None
-                    assert amount > 0
-                    assert isinstance(amount, float)
+                    assert line.quantity > 0
+                    assert line.slope == 0.0
+                    assert line.maximum == line.quantity
+                    assert line.give_up == float(view.price(good))
+                    for number in (line.quantity, line.slope, line.maximum, line.give_up):
+                        assert isinstance(number, float)
             for order in decision.factories.values():
                 assert 0.0 <= order.run <= 1.0
                 assert 0.0 <= order.maintenance <= 1.0

@@ -248,7 +248,7 @@ impl Recording {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decider::decision::{FactoryOrder, test_goods};
+    use crate::decider::decision::{FactoryOrder, OrderLine, test_goods};
     use crate::decider::view::test_view;
 
     fn view_of(name: &str) -> BusinessView {
@@ -414,7 +414,9 @@ mod tests {
         q.turn = Turn::MAX;
         let mut r = reply(4, &["a", "c"]);
         r.turn = Turn::MAX;
-        r.decisions[0].offers.insert("grain".to_string(), 1.5);
+        r.decisions[0]
+            .offers
+            .insert("grain".to_string(), OrderLine::flat(1.5, 2.0));
         r.decisions[0].trace = Some("two\nlines".to_string());
         let recording = Recording {
             request: q.clone(),
@@ -444,9 +446,11 @@ mod tests {
             }
         );
         assert_eq!(
-            Reply::from_json(r#"{"turn":4,"decisions":[{"business":"a","offers":{"grain":-1}}]}"#),
+            Reply::from_json(
+                r#"{"turn":4,"decisions":[{"business":"a","offers":{"grain":{"quantity":-1,"slope":0,"maximum":1,"give_up":1}}}]}"#
+            ),
             Err(FormatError::Values(vec![
-                "a: offer 'grain': amount must be a finite number of at least 0 (got -1)"
+                "a: offer 'grain': quantity must be a finite number of at least 0 (got -1)"
                     .to_string()
             ]))
         );
@@ -462,7 +466,15 @@ mod tests {
             Err(FormatError::Values(vec![expected.to_string()]))
         );
         let mut r = reply(4, &["a"]);
-        r.decisions[0].bids.insert("labor".to_string(), -3.0);
+        r.decisions[0].bids.insert(
+            "labor".to_string(),
+            OrderLine {
+                quantity: -3.0,
+                slope: 0.0,
+                maximum: 1.0,
+                give_up: 1.0,
+            },
+        );
         let recording = Recording {
             request: q,
             reply: r,
@@ -471,7 +483,8 @@ mod tests {
             Recording::from_json(&recording.to_json()),
             Err(FormatError::Values(vec![
                 expected.to_string(),
-                "a: bid 'labor': amount must be a finite number of at least 0 (got -3)".to_string()
+                "a: bid 'labor': quantity must be a finite number of at least 0 (got -3)"
+                    .to_string()
             ]))
         );
     }

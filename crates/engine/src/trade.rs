@@ -11,8 +11,8 @@
 //! POPs go in POP ID order, then businesses in business ID order, and goods in good ID
 //! order. Leftover currency stays in the stockpile. A refused trade is an engine bug.
 //!
-//! A business submits what the World resolved from its decision: offers and bids by good,
-//! and its stockpile. It sells each offer up to what it holds, and buys its bids at posted
+//! A business submits what the World resolved from its decision (each order line evaluated
+//! at its good's posted price): offers and bids by good, and its stockpile. It sells each offer up to what it holds, and buys its bids at posted
 //! prices; when the bids cost more than the currency it holds after its sales, every bid is
 //! scaled by one proportion (cash over cost), so what it buys keeps the shape it chose.
 //! The round records what it did as a [`BusinessTrade`]. Operating the factories is not
@@ -127,7 +127,7 @@ impl PopOutcome {
 }
 
 /// One business's submission to its hex's market: its offers and bids as the World resolved
-/// them from its decision (good ID order, only amounts > 0; both empty for a business that
+/// them from its decision's lines at the posted prices (good ID order, only amounts > 0; both empty for a business that
 /// decided nothing or was refused), and its stockpile, moved out for the round.
 pub(crate) struct BusinessSubmission {
     pub offers: Vec<(GoodId, Quantity)>,

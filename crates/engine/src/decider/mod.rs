@@ -7,18 +7,21 @@
 //! perish group, its cash, its factories by ID, their technologies once each, its deposits
 //! per resource type), never other actors or hexes. A decision names its business and
 //! carries, per factory, a run and a maintenance fraction (0 to 1; an unmentioned factory
-//! is left alone), offers and bids per good, and an optional free-text trace the engine
-//! stores and never acts on. Validation refuses nonsense (a factory not in the view, an
-//! unknown good, a bad fraction or amount, the currency, an unpriced good) and reports
-//! every problem at its place; asking for more than the business holds or can pay is a
-//! valid request that the trade round trims (offers to what is held, bids to the cash). One turn's exchange is a [`Request`] (every view) and
+//! is left alone), an order line per good to sell and per good to buy (a quantity at the
+//! posted price, a slope, a maximum and a give-up price; the engine anchors each line at the
+//! good's posted price in the view), and an optional free-text trace the engine stores and
+//! never acts on. Validation refuses nonsense (a factory not in the view, an unknown good, a
+//! bad fraction, a malformed line by Step 01's rules, the currency, an unpriced good) and
+//! reports every problem at its place, the line checks beside the good checks; asking for
+//! more than the business holds or can pay is a valid request that the trade round trims
+//! (offers to what is held, bids to the cash). One turn's exchange is a [`Request`] (every view) and
 //! a [`Reply`] (any subset of decisions, in any order); a [`Recording`] keeps both. Every
 //! type reads and writes JSON losslessly, keyed by setting names and factory ID numbers,
 //! never by engine IDs. The [`host`] module runs the exchange once per turn through a
 //! [`DeciderHost`] of named [`Decider`]s (an external process, a replayed recording, or a
 //! Rust closure), stores each business's [`BusinessAnswer`] and reports every
 //! [`DeciderFailure`]; the world then resolves each valid decision into the business's offers, bids
-//! and factory fractions (see the [`trade`](crate::trade) and [`world`](crate::world)
+//! (each line evaluated at its good's posted price) and factory fractions (see the [`trade`](crate::trade) and [`world`](crate::world)
 //! modules).
 
 use std::collections::BTreeMap;
@@ -38,7 +41,7 @@ pub mod replay;
 pub mod view;
 
 pub use batch::{Answer, Recording, Reply, ReplyError, ReplyErrors, Request};
-pub use decision::{Decision, DecisionError, DecisionErrors, FactoryOrder, Place};
+pub use decision::{Decision, DecisionError, DecisionErrors, FactoryOrder, OrderLine, Place};
 pub use external::{ExternalCommand, ExternalDecider, ProcessConfig, StartError};
 pub use host::{
     BusinessAnswer, ClosureDecider, Decider, DeciderFailure, DeciderHost, DecisionCounts,
@@ -139,9 +142,4 @@ where
 /// True for a finite number from 0 to 1 (a run, maintenance or condition fraction).
 pub(crate) fn is_fraction(value: f64) -> bool {
     value.is_finite() && (0.0..=1.0).contains(&value)
-}
-
-/// True for a finite number of at least 0 (an amount; the same rule as `Quantity::new`).
-pub(crate) fn is_amount(value: f64) -> bool {
-    value.is_finite() && value >= 0.0
 }

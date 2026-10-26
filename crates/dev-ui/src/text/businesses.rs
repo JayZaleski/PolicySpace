@@ -7,6 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use policyspace_engine::decider::OrderLine;
 use policyspace_engine::{BusinessAnswer, BusinessId, GoodId, Quantity, World, slices_held};
 
 use super::{StockLine, count, deposit_lines_from, list, stock_lines};
@@ -52,11 +53,13 @@ pub fn business_stockpile_lines(world: &World, business: BusinessId) -> Vec<Stoc
 pub struct TradeRow {
     /// The good's name (or, in a refused decision, the name as sent).
     pub good: String,
-    /// What the decision offered ("0" when nothing).
+    /// What the decision offered ("0" when nothing): the amount the offer line resolved to at
+    /// the posted price, or, in a refused decision, the line's quantity as sent.
     pub offered: String,
     /// What was sold.
     pub sold: String,
-    /// What the decision bid.
+    /// What the decision bid: the amount the bid line resolved to at the posted price, or, in
+    /// a refused decision, the line's quantity as sent.
     pub bid: String,
     /// What was bought.
     pub bought: String,
@@ -121,7 +124,8 @@ pub struct BusinessSection {
     pub proportion: String,
     /// True if the cash cap cut the bids (`proportion < 1`).
     pub cash_short: bool,
-    /// The trade table.
+    /// The trade table: a valid answer's rows show what each line resolved to at the posted
+    /// price, a refused decision's rows each line's quantity as sent.
     pub trade: Vec<TradeRow>,
     /// The factories table.
     pub factories: Vec<FactoryRow>,
@@ -131,9 +135,9 @@ pub struct BusinessSection {
     pub stockpile: Vec<StockLine>,
 }
 
-/// The amount `map` holds for `name`, f64 `Display`, "0" when it lacks the good.
-fn sent(map: &BTreeMap<String, f64>, name: &str) -> String {
-    map.get(name).copied().unwrap_or(0.0).to_string()
+/// The quantity of the line `map` holds for `name`, f64 `Display`, "0" when it lacks the good.
+fn sent(map: &BTreeMap<String, OrderLine>, name: &str) -> String {
+    map.get(name).map_or(0.0, |line| line.quantity).to_string()
 }
 
 /// The trade table of `business`, merging its decision with what happened.
@@ -395,7 +399,7 @@ pub fn business_rows(world: &World) -> Vec<BusinessRow> {
 
 #[cfg(test)]
 mod tests {
-    use policyspace_engine::decider::{ClosureDecider, FactoryOrder};
+    use policyspace_engine::decider::{ClosureDecider, FactoryOrder, OrderLine};
     use policyspace_engine::{DeciderHost, Decision, FactoryRecord, HexCoord, Reply, Request};
 
     use super::*;
@@ -421,10 +425,14 @@ mod tests {
                 .insert(id, FactoryOrder { run, maintenance });
         }
         for &(good, amount) in offers {
-            decision.offers.insert(good.to_string(), amount);
+            decision
+                .offers
+                .insert(good.to_string(), OrderLine::flat(amount, 0.0));
         }
         for &(good, amount) in bids {
-            decision.bids.insert(good.to_string(), amount);
+            decision
+                .bids
+                .insert(good.to_string(), OrderLine::flat(amount, f64::MAX));
         }
         decision
     }
@@ -887,8 +895,12 @@ mod tests {
             let mut reply = steady(request);
             for decision in &mut reply.decisions {
                 if decision.business == "poor" {
-                    decision.bids.insert("lbor".to_string(), 3.5);
-                    decision.offers.insert("iron".to_string(), 1.0);
+                    decision
+                        .bids
+                        .insert("lbor".to_string(), OrderLine::flat(3.5, f64::MAX));
+                    decision
+                        .offers
+                        .insert("iron".to_string(), OrderLine::flat(1.0, 0.0));
                     decision.trace = Some("line one\nline two".to_string());
                 }
             }

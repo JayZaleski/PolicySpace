@@ -147,7 +147,7 @@
 - Description: The order line as engine data, with its arithmetic as pure functions with their own tests: a quantity at the current price and a slope, clipped so the quantity never goes below zero or above a maximum, and a give-up price at which the actor trades nothing. Evaluating a line at a price, summing the lines on one side of a good into one curve, finding the price where the summed demand and supply curves cross, and the one-sided case. Design question: how the summed curve is represented, since a sum of clipped lines is piecewise linear, and what of it is published as market data.
 
 ### Step 02: order-protocol
-- Status: specified
+- Status: done
 - Tags: #deciders #market #orders #python
 - Description: Lines replace the fixed-quantity offers and bids in the decision vocabulary: one line per good to sell and per good to buy, validated against the view (a line without a give-up price is refused like any malformed decision), serialized losslessly, with the Python client's dataclasses updated and the recordings regenerated. The arithmetic rule emits its present quantities as flat lines so every test keeps running, and the dummy round trades each line's quantity at the posted price until Step 04 replaces it.
 

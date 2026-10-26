@@ -2,12 +2,14 @@
 exact JSON form.
 
 Every message is a dataclass with the Rust field names (`BusinessView`, `Decision`,
-`Request`, `Reply`, `Recording` and their parts). Numbers are kept exactly as parsed: JSON
+`Request`, `Reply`, `Recording` and their parts). A decision's offers and bids are tables of
+`OrderLine`s, one per good: a quantity at the posted price, a slope, a maximum and a give-up
+price, all required (the engine anchors the line at the good's posted price). Numbers are kept exactly as parsed: JSON
 integers stay `int` (exact for the engine's `u64` turns) and other numbers stay `float`, and
 the package never converts between them. Reading is strict like the engine's: unknown or
 missing keys, wrong types, repeated keys, `NaN`/`Infinity` and booleans are refused with a
-`ProtocolError`. Value ranges (fractions, negative amounts) are not checked here; that is
-the engine's validation.
+`ProtocolError`. Value ranges (fractions, negative or wrong-way line numbers) are not checked
+here; that is the engine's validation.
 
 Writing is done by `dumps`, a small JSON writer that lays numbers out the way the engine's
 serde_json does (Python's own writer prints `1e-05` where the engine prints `0.00001`), with
@@ -107,13 +109,30 @@ class FactoryOrder:
 
 
 @dataclass
+class OrderLine:
+    """One order line as a decision carries it: the quantity at the posted price, the slope,
+    the maximum, and the give-up price. The engine anchors it at the good's posted price."""
+
+    quantity: Number
+    slope: Number
+    maximum: Number
+    give_up: Number
+
+    @staticmethod
+    def flat(amount: Number, give_up: Number) -> "OrderLine":
+        """A flat line: `amount` at every price the give-up allows (slope 0.0, maximum
+        `amount`)."""
+        return OrderLine(amount, 0.0, amount, give_up)
+
+
+@dataclass
 class Decision:
     """A business's answer for one turn."""
 
     business: str
     factories: dict[int, FactoryOrder] = field(default_factory=dict)
-    offers: dict[str, Number] = field(default_factory=dict)
-    bids: dict[str, Number] = field(default_factory=dict)
+    offers: dict[str, OrderLine] = field(default_factory=dict)
+    bids: dict[str, OrderLine] = field(default_factory=dict)
     trace: str | None = None
 
     @staticmethod
@@ -483,6 +502,34 @@ def _order_to_data(order: FactoryOrder) -> dict:
     return {"run": order.run, "maintenance": order.maintenance}
 
 
+_LINE_FIELDS = ("quantity", "slope", "maximum", "give_up")
+
+
+def _line_from_data(data: object, what: str) -> OrderLine:
+    data = _record(data, what, _LINE_FIELDS)
+    return OrderLine(*(_number(data[key], f"{what} {key}") for key in _LINE_FIELDS))
+
+
+def _line_to_data(line: OrderLine) -> dict:
+    return {
+        "quantity": line.quantity,
+        "slope": line.slope,
+        "maximum": line.maximum,
+        "give_up": line.give_up,
+    }
+
+
+def _lines(value: object, what: str) -> dict[str, OrderLine]:
+    return {
+        good: _line_from_data(item, f"{what} '{good}'")
+        for good, item in _table(value, f"{what}s").items()
+    }
+
+
+def _lines_data(table: dict[str, OrderLine]) -> dict:
+    return {good: _line_to_data(line) for good, line in _sorted(table)}
+
+
 _DECISION_FIELDS = ("business", "factories", "offers", "bids", "trace")
 
 
@@ -498,8 +545,8 @@ def decision_from_data(data: object) -> Decision:
             _factory_id(key): _order_from_data(item)
             for key, item in _table(data.get("factories", {}), "factories").items()
         },
-        offers=_numbers(data.get("offers", {}), "offers"),
-        bids=_numbers(data.get("bids", {}), "bids"),
+        offers=_lines(data.get("offers", {}), "offer"),
+        bids=_lines(data.get("bids", {}), "bid"),
         trace=trace,
     )
 
@@ -511,8 +558,8 @@ def decision_to_data(decision: Decision) -> dict:
         "factories": {
             str(key): _order_to_data(order) for key, order in sorted(decision.factories.items())
         },
-        "offers": _numbers_data(decision.offers),
-        "bids": _numbers_data(decision.bids),
+        "offers": _lines_data(decision.offers),
+        "bids": _lines_data(decision.bids),
     }
     if decision.trace is not None:
         data["trace"] = decision.trace

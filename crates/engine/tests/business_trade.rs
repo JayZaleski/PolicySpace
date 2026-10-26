@@ -8,7 +8,7 @@ mod common;
 
 use common::{assert_list, close, end, good, groups, load, named, sample_setting, test_setting};
 use policyspace_engine::decider::python;
-use policyspace_engine::decider::{ClosureDecider, DecisionCounts, FactoryOrder};
+use policyspace_engine::decider::{ClosureDecider, DecisionCounts, FactoryOrder, OrderLine};
 use policyspace_engine::{
     BusinessAnswer, BusinessId, BusinessOutcome, DeciderHost, Decision, FactoryId, FactoryRecord,
     Reply, Request, Stockpile, TurnReport, World,
@@ -33,11 +33,16 @@ fn decision(
             .factories
             .insert(id, FactoryOrder { run, maintenance });
     }
+    // Lines that trade at any price, so the amounts are what the dummy round trades.
     for &(good, amount) in offers {
-        decision.offers.insert(good.to_string(), amount);
+        decision
+            .offers
+            .insert(good.to_string(), OrderLine::flat(amount, 0.0));
     }
     for &(good, amount) in bids {
-        decision.bids.insert(good.to_string(), amount);
+        decision
+            .bids
+            .insert(good.to_string(), OrderLine::flat(amount, f64::MAX));
     }
     decision
 }
@@ -321,6 +326,115 @@ fn a_cash_short_business_is_scaled_and_its_run_is_cut() {
         0.5,
     );
     assert!(close(condition(&world, 2), 0.5));
+}
+
+/// A host whose `rule` decider answers every request with these decisions (for the
+/// businesses in the request).
+fn fixed(decisions: Vec<Decision>) -> DeciderHost {
+    rule(move |request| Reply {
+        turn: request.turn,
+        decisions: decisions
+            .iter()
+            .filter(|d| request.views.iter().any(|v| v.business == d.business))
+            .cloned()
+            .collect(),
+    })
+}
+
+/// A decision with no factory orders and these lines.
+fn with_lines(name: &str, offers: &[(&str, OrderLine)], bids: &[(&str, OrderLine)]) -> Decision {
+    let mut decision = Decision::empty(name);
+    for (good, line) in offers {
+        decision.offers.insert(good.to_string(), *line);
+    }
+    for (good, line) in bids {
+        decision.bids.insert(good.to_string(), *line);
+    }
+    decision
+}
+
+#[test]
+fn lines_resolve_at_the_posted_price_in_the_dummy_round() {
+    // Posted prices: labor 1, ore 2, iron 6, tools 10, bread 3.
+    // A give-up price that excludes the posted price resolves to nothing.
+    let mut host = fixed(vec![
+        with_lines(
+            "works",
+            &[("iron", OrderLine::flat(4.0, 7.0))],
+            &[("ore", OrderLine::flat(5.0, 1.5))],
+        ),
+        with_lines("poor", &[("ore", OrderLine::flat(5.0, 2.5))], &[]),
+    ]);
+    let (world, _) = setting_world("business_trade", &mut host);
+    let works = outcome(&world, "works").trade();
+    assert!(works.offered().is_empty() && works.bid().is_empty());
+    assert!(works.sold().is_empty() && works.bought().is_empty());
+    let poor = outcome(&world, "poor").trade();
+    assert!(poor.offered().is_empty() && poor.sold().is_empty());
+
+    // A give-up price equal to the posted price trades the line's quantity.
+    let mut host = fixed(vec![
+        with_lines(
+            "works",
+            &[("iron", OrderLine::flat(4.0, 6.0))],
+            &[("ore", OrderLine::flat(5.0, 2.0))],
+        ),
+        with_lines("poor", &[("ore", OrderLine::flat(5.0, 2.0))], &[]),
+    ]);
+    let (world, _) = setting_world("business_trade", &mut host);
+    let ore = good(&world, "ore");
+    let works = outcome(&world, "works").trade();
+    assert_list(&world, works.offered(), &[("iron", 4.0)]);
+    assert!(works.sold().is_empty(), "it holds no iron");
+    assert_list(&world, works.bid(), &[("ore", 5.0)]);
+    assert!(close(works.bought_of(ore).get(), 5.0));
+    let poor = outcome(&world, "poor").trade();
+    assert_list(&world, poor.offered(), &[("ore", 5.0)]);
+    assert!(close(poor.sold_of(ore).get(), 5.0));
+
+    // A sloped line resolves to its quantity at the posted price (the anchor), and so does a
+    // line with a maximum above its quantity. An offer above holdings is trimmed to what is
+    // held, and a bid beyond the cash is scaled; both are recorded as asked.
+    let sloped = OrderLine {
+        quantity: 10.0,
+        slope: -3.0,
+        maximum: 20.0,
+        give_up: 5.0,
+    };
+    let roomy = OrderLine {
+        quantity: 5.0,
+        slope: 0.0,
+        maximum: 9.0,
+        give_up: 2.0,
+    };
+    let mut host = fixed(vec![
+        with_lines(
+            "works",
+            &[("tools", OrderLine::flat(8.0, 10.0))],
+            &[("labor", sloped), ("ore", roomy)],
+        ),
+        with_lines(
+            "poor",
+            &[],
+            &[
+                ("labor", OrderLine::flat(10.0, 1.0)),
+                ("tools", OrderLine::flat(4.0, 10.0)),
+            ],
+        ),
+    ]);
+    let (world, _) = setting_world("business_trade", &mut host);
+    let (labor, tools) = (good(&world, "labor"), good(&world, "tools"));
+    let works = outcome(&world, "works").trade();
+    assert_list(&world, works.bid(), &[("labor", 10.0), ("ore", 5.0)]);
+    assert!(close(works.bought_of(labor).get(), 10.0));
+    assert!(close(works.bought_of(ore).get(), 5.0));
+    assert_list(&world, works.offered(), &[("tools", 8.0)]);
+    assert!(close(works.sold_of(tools).get(), 3.0));
+    let poor = outcome(&world, "poor").trade();
+    assert_list(&world, poor.bid(), &[("labor", 10.0), ("tools", 4.0)]);
+    assert!(close(poor.proportion(), 0.2));
+    assert!(close(poor.bought_of(labor).get(), 2.0));
+    assert!(close(poor.bought_of(tools).get(), 0.8));
 }
 
 #[test]

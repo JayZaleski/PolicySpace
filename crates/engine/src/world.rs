@@ -33,7 +33,8 @@
 //!      decider its setting entry names, through the host the caller passes to `new` and
 //!      `step` (see the [`decider::host`](crate::decider::host) module), and its answer is
 //!      stored. Then on every hex each POP submits its parameters and holdings and each
-//!      business the offers and bids its valid decision resolves to (none, for a business
+//!      business the offers and bids its valid decision's lines resolve to at the posted
+//!      prices (none, for a business
 //!      that decided nothing or was refused); the market computes the POPs' demand and
 //!      settles every sale before any purchase, and each POP consumes (see the
 //!      [`trade`](crate::trade) module). A business's bids are scaled by one proportion when
@@ -76,8 +77,8 @@ use std::fmt;
 use crate::businesses::{BusinessId, BusinessKind, Businesses};
 use crate::currency::HexCurrencies;
 use crate::decider::{
-    BusinessAnswer, BusinessView, DeciderHost, DecisionCounts, ReportedFailure, UnknownDecider,
-    view,
+    BusinessAnswer, BusinessView, DeciderHost, DecisionCounts, OrderLine, ReportedFailure,
+    UnknownDecider, view,
 };
 use crate::factories::{Factories, FactoryId};
 use crate::goods::{GoodId, Goods};
@@ -85,6 +86,7 @@ use crate::growth::grown_size;
 use crate::id::IdVec;
 use crate::map::{HexId, HexKind, HexMap};
 use crate::market::{HexPrices, Market};
+use crate::orders::{Line, Side};
 use crate::pops::{PopId, PopKind, Pops};
 use crate::production::{self, FactoryRecord, Operation};
 use crate::quantity::Quantity;
@@ -649,12 +651,26 @@ impl World {
     }
 
     /// Resolves `business`'s answer into offers and bids by good ID, in good ID order, only
-    /// amounts > 0; both empty unless the answer is `Valid`. Moves the stockpile out.
+    /// amounts > 0, each line evaluated at its good's posted price on the business's hex;
+    /// both empty unless the answer is `Valid`. Moves the stockpile out.
     fn business_submission(&mut self, business: BusinessId) -> BusinessSubmission {
+        let hex = self.businesses.get(business).hex;
         let (offers, bids) = match self.business_answers.get(business) {
             BusinessAnswer::Valid(decision) => (
-                resolve_amounts(&self.rules.goods, &decision.offers),
-                resolve_amounts(&self.rules.goods, &decision.bids),
+                resolve_lines(
+                    &self.rules.goods,
+                    &self.hex_prices,
+                    hex,
+                    Side::Supply,
+                    &decision.offers,
+                ),
+                resolve_lines(
+                    &self.rules.goods,
+                    &self.hex_prices,
+                    hex,
+                    Side::Demand,
+                    &decision.bids,
+                ),
             ),
             BusinessAnswer::Nothing | BusinessAnswer::Refused { .. } => (Vec::new(), Vec::new()),
         };
@@ -730,16 +746,34 @@ impl World {
     }
 }
 
-/// A decision's amounts by good name as (good, amount) in good ID order, leaving out zero
-/// amounts. A valid decision names known goods with valid amounts.
-fn resolve_amounts(goods: &Goods, amounts: &BTreeMap<String, f64>) -> Vec<(GoodId, Quantity)> {
-    let mut resolved: Vec<(GoodId, Quantity)> = amounts
+/// A valid decision's lines on one side, each evaluated at its good's posted price on `hex`,
+/// as (good, amount) in good ID order, leaving out zero amounts. A valid decision names
+/// only goods with a posted price and holds only well-formed lines, so lookups and
+/// `Line::new` are `expect`ed.
+///
+/// Each line is anchored at the very price it is evaluated at (under the dummy market the
+/// price at trade time is the price in the view), so `at` returns the line's own quantity
+/// unless the give-up price excludes the posted price (a bid with `give_up < price`, an
+/// offer with `give_up > price`), when it returns zero; the slope and the clip never act
+/// here. Step 04 replaces this with the crossing.
+fn resolve_lines(
+    goods: &Goods,
+    prices: &HexPrices,
+    hex: HexId,
+    side: Side,
+    lines: &BTreeMap<String, OrderLine>,
+) -> Vec<(GoodId, Quantity)> {
+    let mut resolved: Vec<(GoodId, Quantity)> = lines
         .iter()
-        .map(|(name, amount)| {
-            (
-                goods.id(name).expect("a valid decision names known goods"),
-                Quantity::new(*amount).expect("a valid decision has valid amounts"),
-            )
+        .map(|(name, line)| {
+            let good = goods.id(name).expect("a valid decision names known goods");
+            let price = prices
+                .get(hex, good)
+                .expect("a valid decision names goods with a posted price");
+            let amount = Line::new(side, &line.params(price.get()))
+                .expect("a valid decision has well-formed lines")
+                .at(price);
+            (good, amount)
         })
         .filter(|(_, amount)| *amount > Quantity::ZERO)
         .collect();

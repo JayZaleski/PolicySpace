@@ -6,7 +6,7 @@ mod common;
 use std::collections::BTreeMap;
 
 use common::{close, q, sample_setting, test_setting, world_of};
-use policyspace_engine::decider::{FactoryOrder, PerishGroup, ReplyError};
+use policyspace_engine::decider::{FactoryOrder, OrderLine, PerishGroup, ReplyError};
 use policyspace_engine::{
     Answer, BusinessId, BusinessView, Decision, Quantity, Recording, Reply, Request, Turn, World,
 };
@@ -30,8 +30,12 @@ fn qmap(items: &[(&str, f64)]) -> BTreeMap<String, Quantity> {
     items.iter().map(|(n, a)| (n.to_string(), q(*a))).collect()
 }
 
-fn table(items: &[(&str, f64)]) -> BTreeMap<String, f64> {
-    items.iter().map(|(n, a)| (n.to_string(), *a)).collect()
+/// A table of flat lines from (good, amount, give-up price).
+fn lines(items: &[(&str, f64, f64)]) -> BTreeMap<String, OrderLine> {
+    items
+        .iter()
+        .map(|(n, a, g)| (n.to_string(), OrderLine::flat(*a, *g)))
+        .collect()
 }
 
 fn order(run: f64, maintenance: f64) -> FactoryOrder {
@@ -73,8 +77,8 @@ fn full_decision(view: &BusinessView) -> Decision {
     for id in view.factories.keys() {
         d.factories.insert(*id, order(1.0, 0.125));
     }
-    d.offers = table(&[("unimproved_grain", 8.0)]);
-    d.bids = table(&[("unskilled_labor", 6.0)]);
+    d.offers = lines(&[("unimproved_grain", 8.0, 0.5)]);
+    d.bids = lines(&[("unskilled_labor", 6.0, 1.0)]);
     d.trace = Some("first line\nsecond line".to_string());
     d
 }
@@ -270,8 +274,8 @@ fn a_decision_validates_against_the_sample_view() {
 
     let mut full = Decision::empty("center_farm");
     full.factories.insert(0, order(1.0, 0.125));
-    full.offers = table(&[("unimproved_grain", 8.0)]);
-    full.bids = table(&[("unskilled_labor", 6.0)]);
+    full.offers = lines(&[("unimproved_grain", 8.0, 0.5)]);
+    full.bids = lines(&[("unskilled_labor", 6.0, 1.0)]);
     full.trace = Some("sell the grain".to_string());
     assert_eq!(full.validate(&farm, goods), Ok(()));
 
@@ -281,9 +285,58 @@ fn a_decision_validates_against_the_sample_view() {
     );
 
     let mut greedy = Decision::empty("center_farm");
-    greedy.offers = table(&[("unimproved_grain", 1000.0)]);
-    greedy.bids = table(&[("tools", 1000.0)]);
+    greedy.offers = lines(&[("unimproved_grain", 1000.0, 0.5)]);
+    greedy.bids = lines(&[("tools", 1000.0, 12.0)]);
     assert_eq!(greedy.validate(&farm, goods), Ok(()));
+
+    let mut wrong_way = Decision::empty("center_farm");
+    wrong_way.offers.insert(
+        "unimproved_grain".to_string(),
+        OrderLine {
+            quantity: 1.0,
+            slope: -1.0,
+            maximum: 1.0,
+            give_up: 0.5,
+        },
+    );
+    let errors = wrong_way.validate(&farm, goods).unwrap_err();
+    assert_eq!(
+        errors.to_string(),
+        "offer 'unimproved_grain': slope of a supply line must be at least 0 (got -1)"
+    );
+
+    let mut above = Decision::empty("center_farm");
+    above.bids.insert(
+        "tools".to_string(),
+        OrderLine {
+            quantity: 2.0,
+            slope: 0.0,
+            maximum: 1.0,
+            give_up: 12.0,
+        },
+    );
+    let errors = above.validate(&farm, goods).unwrap_err();
+    assert_eq!(
+        errors.to_string(),
+        "bid 'tools': quantity at the anchor price (2) is above the maximum (1)"
+    );
+
+    let mut both = Decision::empty("center_farm");
+    both.bids.insert(
+        "silver".to_string(),
+        OrderLine {
+            quantity: 1.0,
+            slope: 1.0,
+            maximum: 1.0,
+            give_up: 1.0,
+        },
+    );
+    let errors = both.validate(&farm, goods).unwrap_err();
+    assert_eq!(
+        errors.to_string(),
+        "bid 'silver': slope of a demand line must be at most 0 (got 1)\n\
+         bid 'silver': it is this hex's currency, which can't be traded against itself"
+    );
 
     let mut other = Decision::empty("center_farm");
     other.factories.insert(1, order(1.0, 0.0));
@@ -294,7 +347,7 @@ fn a_decision_validates_against_the_sample_view() {
     );
 
     let mut currency = Decision::empty("center_farm");
-    currency.offers = table(&[("silver", 1.0)]);
+    currency.offers = lines(&[("silver", 1.0, 1.0)]);
     let errors = currency.validate(&farm, goods).unwrap_err();
     assert_eq!(
         errors.to_string(),
@@ -304,7 +357,7 @@ fn a_decision_validates_against_the_sample_view() {
     let (market_world, _) = world_of(&test_setting("businesses_valid"));
     let idle = view(&market_world, "idle");
     let mut bid = Decision::empty("idle");
-    bid.bids = table(&[("grain", 1.0)]);
+    bid.bids = lines(&[("grain", 1.0, 1.0)]);
     let errors = bid
         .validate(&idle, &market_world.rules().goods)
         .unwrap_err();
@@ -363,7 +416,7 @@ fn every_message_round_trips_on_the_sample() {
 #[test]
 fn a_hand_written_decision_reads_and_validates() {
     let (world, _) = world_of(&sample_setting());
-    let text = r#"{"business": "center_farm", "factories": {"0": {"run": 1}}, "offers": {"unimproved_grain": 8}, "bids": {"unskilled_labor": 6}, "trace": "sell the grain"}"#;
+    let text = r#"{"business": "center_farm", "factories": {"0": {"run": 1}}, "offers": {"unimproved_grain": {"quantity": 8, "slope": 0, "maximum": 8, "give_up": 0.5}}, "bids": {"unskilled_labor": {"quantity": 6, "slope": 0, "maximum": 6, "give_up": 1}}, "trace": "sell the grain"}"#;
     let decision = Decision::from_json(text).unwrap();
     assert_eq!(decision.factories[&0], order(1.0, 0.0));
     assert_eq!(

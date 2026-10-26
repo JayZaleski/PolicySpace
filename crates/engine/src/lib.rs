@@ -41,8 +41,8 @@
 //! defines the decider protocol as data: the view a business is served each turn (its hex's
 //! currency and posted prices, its stockpile by perish group, its cash, its factories, their
 //! technologies and its deposits, and nothing outside its circumstances), the decision it
-//! answers with (a run and a maintenance fraction per factory, offers, bids and an optional
-//! trace), the validation of a decision against its view, the request and reply that carry
+//! answers with (a run and a maintenance fraction per factory, an order line per good to sell
+//! and per good to buy, and an optional trace), the validation of a decision against its view, the request and reply that carry
 //! one turn's batch, and lossless JSON for all of it; a [`DeciderHost`] of named deciders (a
 //! Python process the engine starts and keeps alive, a replayed recording, or a closure)
 //! answers every business's view once per turn at the decision point, and the world stores

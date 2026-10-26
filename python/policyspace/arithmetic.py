@@ -8,8 +8,10 @@ inputs plus one lifetime-slice of the capital and construction bundles. A techno
 above zero margin has every factory run at capacity and maintained; any other is left to run
 down. The business then offers what it holds beyond its needs and bids for what it lacks,
 and, if the bids cost more than its cash plus the value of its offers, scales every
-factory's run and maintenance by one common proportion. Every decision carries a trace of
-the arithmetic. The slice arithmetic mirrors the engine's `production.rs` so that "holds a
+factory's run and maintenance by one common proportion. Its offers and bids are sent as
+flat order lines at the posted price (the amount as quantity and maximum, slope 0, the
+posted price as the give-up price: "sell this much at or above the current price", "buy this
+much at or below it"). Every decision carries a trace of the arithmetic. The slice arithmetic mirrors the engine's `production.rs` so that "holds a
 slice" and the condition after wear are the engine's numbers.
 """
 
@@ -21,6 +23,7 @@ from policyspace.protocol import (
     BusinessView,
     Decision,
     FactoryOrder,
+    OrderLine,
     Reply,
     Request,
     TechnologyView,
@@ -152,6 +155,17 @@ def _value(view: BusinessView, table: dict[str, float]) -> float:
     return sum(amount * view.price(good) for good, amount in sorted(table.items()))
 
 
+def flat_lines(view: BusinessView, table: dict[str, float]) -> dict[str, OrderLine]:
+    """Each amount as a flat line at the good's posted price: the quantity and the maximum
+    are the amount, the slope is 0 and the give-up price is the posted price, so the line
+    says "sell this much at or above the current price" or "buy this much at or below it".
+    Every good in `table` has a posted price (`trade` skips the others)."""
+    return {
+        good: OrderLine.flat(amount, float(view.price(good)))
+        for good, amount in sorted(table.items())
+    }
+
+
 def decide_business(view: BusinessView) -> Decision:
     """The arithmetic rule for one business."""
     if not view.prices:
@@ -214,7 +228,9 @@ def decide_business(view: BusinessView) -> Decision:
             lines.append(head + f"run {_g(order.run)}, maintenance {_g(order.maintenance)}")
     lines.append(budget_line)
 
-    return Decision(view.business, orders, offers, bids, "\n".join(lines))
+    return Decision(
+        view.business, orders, flat_lines(view, offers), flat_lines(view, bids), "\n".join(lines)
+    )
 
 
 def decide(request: Request) -> Reply:

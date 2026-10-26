@@ -182,9 +182,24 @@
         },
         "offers": {},
         "bids": {
-          "tools": 0.5,
-          "unimproved_grain": 4.0,
-          "unskilled_labor": 7.0
+          "tools": {
+            "quantity": 0.5,
+            "slope": 0.0,
+            "maximum": 0.5,
+            "give_up": 12.0
+          },
+          "unimproved_grain": {
+            "quantity": 4.0,
+            "slope": 0.0,
+            "maximum": 4.0,
+            "give_up": 0.5
+          },
+          "unskilled_labor": {
+            "quantity": 7.0,
+            "slope": 0.0,
+            "maximum": 7.0,
+            "give_up": 1.0
+          }
         },
         "trace": "farm: revenue 24; inputs 12; maintenance 7; margin 5: run and maintain\nfactory #0 (farm, condition 1): run 1, maintenance 0.125\nbudget 100 = cash 100 + offers 0; bids cost 15: within budget"
       },
@@ -198,8 +213,18 @@
         },
         "offers": {},
         "bids": {
-          "tools": 0.75,
-          "unskilled_labor": 4.0
+          "tools": {
+            "quantity": 0.75,
+            "slope": 0.0,
+            "maximum": 0.75,
+            "give_up": 12.0
+          },
+          "unskilled_labor": {
+            "quantity": 4.0,
+            "slope": 0.0,
+            "maximum": 4.0,
+            "give_up": 1.0
+          }
         },
         "trace": "mine: revenue 12.5; inputs 5; maintenance 3.5; margin 4: run and maintain\nfactory #1 (mine, condition 0.75): run 1, maintenance 0.375\nbudget 50 = cash 50 + offers 0; bids cost 13: within budget"
       },
@@ -213,9 +238,24 @@
         },
         "offers": {},
         "bids": {
-          "copper": 8.0,
-          "tools": 0.12499999999999989,
-          "unskilled_labor": 6.25
+          "copper": {
+            "quantity": 8.0,
+            "slope": 0.0,
+            "maximum": 8.0,
+            "give_up": 5.0
+          },
+          "tools": {
+            "quantity": 0.12499999999999989,
+            "slope": 0.0,
+            "maximum": 0.12499999999999989,
+            "give_up": 12.0
+          },
+          "unskilled_labor": {
+            "quantity": 6.25,
+            "slope": 0.0,
+            "maximum": 6.25,
+            "give_up": 1.0
+          }
         },
         "trace": "toolmaker: revenue 48; inputs 46; maintenance 1.75; margin 0.25: run and maintain\nfactory #2 (toolmaker, condition 1): run 1, maintenance 0.0416667\nbudget 200 = cash 200 + offers 0; bids cost 47.75: within budget"
       }

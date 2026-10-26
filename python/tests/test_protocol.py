@@ -7,6 +7,7 @@ from conftest import RECORDINGS, recording_text
 from policyspace.protocol import (
     Decision,
     FactoryOrder,
+    OrderLine,
     ProtocolError,
     Reply,
     dumps,
@@ -76,13 +77,17 @@ def test_dumps_refuses_booleans():
         dumps(True)
 
 
+LINE = '{"quantity":8,"slope":0,"maximum":8,"give_up":0.5}'
+"""A well-formed line as JSON text."""
+
+
 @pytest.mark.parametrize(
     "text",
     [
         '{"business": ',
         '{"business":"a","offer":{}}',
-        '{"business":"a","offers":{"g":1,"g":2}}',
-        '{"business":"a","offers":{"g":NaN}}',
+        '{"business":"a","offers":{"g":' + LINE + ',"g":' + LINE + "}}",
+        '{"business":"a","offers":{"g":{"quantity":NaN,"slope":0,"maximum":1,"give_up":1}}}',
         '{"business":"a","factories":{"x":{}}}',
         '{"business":"a","factories":{"0":{"run":true}}}',
     ],
@@ -90,6 +95,26 @@ def test_dumps_refuses_booleans():
 def test_reading_refuses_bad_decisions(text):
     with pytest.raises(ProtocolError):
         read_decision(text)
+
+
+def test_reading_names_what_is_wrong_with_a_line():
+    def decision(line, side="offers"):
+        return '{"business":"a","' + side + '":{"g":' + line + "}}"
+
+    with pytest.raises(ProtocolError, match="missing key 'give_up' in offer 'g'"):
+        read_decision(decision('{"quantity":8,"slope":0,"maximum":8}'))
+    with pytest.raises(ProtocolError, match="unknown key 'anchor' in bid 'g'"):
+        read_decision(decision('{"quantity":8,"slope":0,"maximum":8,"give_up":1,"anchor":2}', "bids"))
+    with pytest.raises(ProtocolError, match="offer 'g' quantity must be a number"):
+        read_decision(decision('{"quantity":"8","slope":0,"maximum":8,"give_up":1}'))
+    with pytest.raises(ProtocolError, match="offer 'g' slope must be a number"):
+        read_decision(decision('{"quantity":8,"slope":true,"maximum":8,"give_up":1}'))
+    with pytest.raises(ProtocolError, match="offer 'g' must be a table"):
+        read_decision(decision("8"))
+    with pytest.raises(ProtocolError, match="offers must be a table"):
+        read_decision('{"business":"a","offers":8}')
+    with pytest.raises(ProtocolError, match="duplicate key 'g'"):
+        read_decision('{"business":"a","bids":{"g":' + LINE + ',"g":' + LINE + "}}")
 
 
 def test_reading_refuses_a_view_with_missing_keys():
@@ -118,20 +143,39 @@ def test_decision_defaults_and_empty_form():
     )
     assert read_reply('{"turn":4}') == Reply(4, [])
     assert write_decision(Decision("a", trace="x")).endswith(',"trace":"x"}')
+    one_line = read_decision('{"business":"a","offers":{"g":' + LINE + "}}")
+    assert one_line.offers == {"g": OrderLine(8, 0, 8, 0.5)}
+    line = one_line.offers["g"]
+    assert [type(n) for n in (line.quantity, line.slope, line.maximum, line.give_up)] == [
+        int,
+        int,
+        int,
+        float,
+    ]
+    assert read_decision(write_decision(one_line)) == one_line
 
 
 def test_tables_are_written_sorted():
     decision = Decision(
         "a",
         factories={10: FactoryOrder(1.0, 0.0), 2: FactoryOrder(0.5, 0.25)},
-        offers={"b": 1.0, "a": 2.0},
+        offers={"b": OrderLine.flat(1.0, 0.5), "a": OrderLine(2.0, 0.5, 4.0, 1.0)},
+        bids={"y": OrderLine.flat(3.0, 2.0)},
     )
     text = write_decision(decision)
     factories = (
         '"factories":{"2":{"run":0.5,"maintenance":0.25},"10":{"run":1.0,"maintenance":0.0}}'
     )
     assert factories in text
-    assert '"offers":{"a":2.0,"b":1.0}' in text
+    a = '"a":{"quantity":2.0,"slope":0.5,"maximum":4.0,"give_up":1.0}'
+    b = '"b":{"quantity":1.0,"slope":0.0,"maximum":1.0,"give_up":0.5}'
+    assert '"offers":{' + a + "," + b + "}" in text
+    y = '"y":{"quantity":3.0,"slope":0.0,"maximum":3.0,"give_up":2.0}'
+    assert '"bids":{' + y + "}" in text
+
+
+def test_a_flat_line_has_no_slope_and_a_maximum_of_its_amount():
+    assert OrderLine.flat(8.0, 0.5) == OrderLine(8.0, 0.0, 8.0, 0.5)
 
 
 def test_the_exactness_request_comes_back_byte_for_byte():
